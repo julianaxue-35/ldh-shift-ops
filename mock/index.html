@@ -14,6 +14,10 @@
     --ink: #1E2238;
     --muted: #6B7280;
     --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --neutral-500: #9C9A90;
     --shadow-raised: 8px 8px 18px rgba(163,177,198,0.45), -8px -8px 18px rgba(255,255,255,0.85);
     --shadow-inset: inset 6px 6px 12px rgba(163,177,198,0.4), inset -6px -6px 12px rgba(255,255,255,0.8);
   }
@@ -135,9 +139,10 @@
   }
   .task-row strong { font-size: 0.95rem; font-weight: 700; }
   .task-row .meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
-  .urgency-urgent { border-left: 5px solid #E74C3C; }
-  .urgency-soon { border-left: 5px solid var(--amber); }
-  .urgency-routine { border-left: 5px solid #95A5A6; }
+  .urgency-urgent { border-left: 5px solid var(--critical); }
+  .urgency-soon { border-left: 5px solid var(--neutral-500); }
+  .urgency-routine { border-left: 5px solid var(--neutral-300); }
+  .task-row.urgency-urgent .meta .urgency-word { color: var(--critical); font-weight: 700; }
   .location-group h3 {
     font-size: 0.72rem;
     font-weight: 700;
@@ -294,10 +299,6 @@
   let ROLE = 'attendant';
   let nextId = 8;
 
-  function urgencyColor(u) {
-    return u === 'urgent' ? '#E74C3C' : u === 'soon' ? 'var(--amber)' : '#95A5A6';
-  }
-
   function applyRoleVisibility() {
     document.getElementById('new-request-form').style.display = ROLE === 'attendant' ? 'block' : 'none';
     document.getElementById('memo-post').style.display = ROLE === 'vet_nurse' ? 'block' : 'none';
@@ -348,7 +349,7 @@
         row.innerHTML = `
           <div>
             <strong>${t.title}</strong>
-            <div class="meta">${t.type.replace('_', '/')} · ${t.shift.replace('_', ' ')} · ${t.urgency}</div>
+            <div class="meta">${t.type.replace('_', '/')} · ${t.shift.replace('_', ' ')} · <span class="urgency-word">${t.urgency}</span></div>
           </div>
           ${ROLE === 'vet_nurse' ? '<button class="mark-done">Mark done</button>' : ''}
         `;
@@ -379,14 +380,14 @@
     document.getElementById('chart-processing').innerHTML = `
       <strong style="color:var(--violet)">Processing</strong>
       <div class="bar-row"><span style="width:50px;">Done</span><div class="bar-track"><div class="bar-fill" style="width:${(procDone/procTotal)*100}%; background:var(--violet);"></div></div><span>${procDone}</span></div>
-      <div class="bar-row"><span style="width:50px;">Left</span><div class="bar-track"><div class="bar-fill" style="width:${((procTotal-procDone)/procTotal)*100}%; background:#ccc;"></div></div><span>${procTotal-procDone}</span></div>
+      <div class="bar-row"><span style="width:50px;">Left</span><div class="bar-track"><div class="bar-fill" style="width:${((procTotal-procDone)/procTotal)*100}%; background:var(--neutral-300);"></div></div><span>${procTotal-procDone}</span></div>
     `;
 
     const si = bySh('sick_injured');
     const siPct = si.length ? Math.round((si.filter((t) => t.done).length / si.length) * 100) : 0;
     document.getElementById('chart-sick-injured').innerHTML = `
       <strong style="color:var(--amber)">Sick &amp; Injured</strong>
-      <div class="donut" style="background: conic-gradient(var(--amber) ${siPct * 3.6}deg, #e5e5e5 0deg);">${siPct}%</div>
+      <div class="donut" style="background: conic-gradient(var(--amber) ${siPct * 3.6}deg, var(--neutral-100) 0deg);">${siPct}%</div>
     `;
 
     const surg = bySh('surgery').filter((t) => !t.done);
@@ -395,9 +396,9 @@
     const maxU = Math.max(byUrg.urgent, byUrg.soon, byUrg.routine, 1);
     document.getElementById('chart-surgery').innerHTML = `
       <strong style="color:var(--blue)">Surgery remaining</strong>
-      <div class="bar-row"><span style="width:60px;">Urgent</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.urgent/maxU)*100}%; background:#E74C3C;"></div></div><span>${byUrg.urgent}</span></div>
-      <div class="bar-row"><span style="width:60px;">Soon</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.soon/maxU)*100}%; background:var(--amber);"></div></div><span>${byUrg.soon}</span></div>
-      <div class="bar-row"><span style="width:60px;">Routine</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.routine/maxU)*100}%; background:#95A5A6;"></div></div><span>${byUrg.routine}</span></div>
+      <div class="bar-row"><span style="width:60px;">Urgent</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.urgent/maxU)*100}%; background:var(--critical);"></div></div><span>${byUrg.urgent}</span></div>
+      <div class="bar-row"><span style="width:60px;">Soon</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.soon/maxU)*100}%; background:var(--neutral-500);"></div></div><span>${byUrg.soon}</span></div>
+      <div class="bar-row"><span style="width:60px;">Routine</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.routine/maxU)*100}%; background:var(--neutral-300);"></div></div><span>${byUrg.routine}</span></div>
     `;
   }
 
