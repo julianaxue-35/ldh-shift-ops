@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDH Shift Ops — MOCK</title>
+<style>
+  :root {
+    --bg: #F4F6FB;
+    --sidebar: #1E2238;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --shadow-raised: 8px 8px 18px rgba(163,177,198,0.45), -8px -8px 18px rgba(255,255,255,0.85);
+    --shadow-inset: inset 6px 6px 12px rgba(163,177,198,0.4), inset -6px -6px 12px rgba(255,255,255,0.8);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: #1E2238;
+  }
+  #mock-banner {
+    background: var(--sidebar);
+    color: #fff;
+    text-align: center;
+    padding: 10px;
+    font-size: 0.85em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  #mock-banner b { color: var(--amber); }
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: calc(100vh - 41px);
+  }
+  aside {
+    background: var(--sidebar);
+    color: #fff;
+    padding: 20px 16px;
+  }
+  aside h2 { font-size: 1em; margin: 0 0 16px; }
+  aside label { display: block; font-size: 0.85em; margin-bottom: 6px; opacity: 0.8; }
+  aside select {
+    width: 100%;
+    background: #2A2F4A;
+    color: #fff;
+    box-shadow: none;
+    margin-bottom: 20px;
+  }
+  .shift-tag { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 0.75em; font-weight: 700; color: #1E2238; margin-bottom: 4px; }
+  main { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; }
+  .card {
+    background: var(--bg);
+    border-radius: 18px;
+    box-shadow: var(--shadow-raised);
+    padding: 20px;
+  }
+  .card h2 { margin: 0 0 14px; font-size: 1.05em; }
+  .full-width { grid-column: 1 / -1; }
+  input, select, textarea {
+    border: none;
+    border-radius: 14px;
+    box-shadow: var(--shadow-inset);
+    padding: 9px 12px;
+    background: var(--bg);
+    font: inherit;
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  button {
+    border: none;
+    border-radius: 14px;
+    padding: 9px 16px;
+    background: var(--amber);
+    color: #1E2238;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button.secondary { background: var(--bg); box-shadow: var(--shadow-raised); }
+  .task-row {
+    background: var(--bg);
+    box-shadow: var(--shadow-raised);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+  }
+  .task-row .meta { font-size: 0.8em; opacity: 0.7; }
+  .urgency-urgent { border-left: 5px solid #E74C3C; }
+  .urgency-soon { border-left: 5px solid var(--amber); }
+  .urgency-routine { border-left: 5px solid #95A5A6; }
+  .location-group h3 { font-size: 0.9em; margin: 14px 0 6px; color: #555; }
+  .location-group:first-child h3 { margin-top: 0; }
+  .chip { display: inline-block; padding: 5px 12px; border-radius: 12px; box-shadow: var(--shadow-raised); margin: 3px; font-size: 0.85em; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.85em; }
+  .bar-track { flex: 1; height: 10px; border-radius: 6px; box-shadow: var(--shadow-inset); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .donut { width: 90px; height: 90px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:700; margin: 0 auto 8px; }
+  .memo { background: var(--bg); box-shadow: var(--shadow-raised); border-radius: 14px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.9em; }
+  .disclaimer { font-size: 0.8em; color: #666; margin: 0 0 10px; }
+  .completed-row { display: flex; justify-content: space-between; font-size: 0.85em; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    main { grid-template-columns: 1fr; padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="mock-banner">MOCK PROTOTYPE — <b>placeholder data only</b>, nothing here is real, nothing is saved, no backend is connected</div>
+
+<div class="layout">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <label>Viewing as</label>
+    <select id="role-select">
+      <option value="attendant">Animal Attendant</option>
+      <option value="vet_nurse">Vet / Nurse</option>
+    </select>
+    <p style="font-size:0.75em; opacity:0.6; line-height:1.4;">
+      This mock has no login, no real database, and resets every time you
+      reload the page. It's here so you can look at the layout while IT
+      sets up the real backend.
+    </p>
+  </aside>
+
+  <main>
+    <section class="card" id="new-request-form">
+      <h2>New task request</h2>
+      <input id="req-title" placeholder="Animal ID / kennel, e.g. A-1042">
+      <select id="req-location">
+        <option>Cat Room 1</option><option>Cat Room 2</option><option>Cat Room 3</option>
+        <option>Adoption 1</option><option>Adoption 2</option><option>FIR Room</option>
+        <option>Pound 1</option><option>Pound 2</option><option>Pound 3</option><option>Pound 4</option>
+        <option>Transport</option>
+      </select>
+      <select id="req-shift">
+        <option value="processing">Processing</option>
+        <option value="sick_injured">Sick &amp; Injured</option>
+        <option value="surgery">Surgery</option>
+      </select>
+      <select id="req-type">
+        <option value="check_recheck">Check/recheck</option>
+        <option value="medication">Medication</option>
+        <option value="other">Other</option>
+      </select>
+      <select id="req-origin">
+        <option value="scheduled">Scheduled</option>
+        <option value="add_on">Add-on (logged today)</option>
+      </select>
+      <select id="req-urgency">
+        <option value="routine">Routine</option>
+        <option value="soon">Soon</option>
+        <option value="urgent">Urgent</option>
+      </select>
+      <button id="req-submit">Submit request</button>
+    </section>
+
+    <section class="card" id="shift-progress">
+      <h2>Shift progress</h2>
+      <div id="chart-processing"></div>
+      <div id="chart-sick-injured"></div>
+      <div id="chart-surgery"></div>
+    </section>
+
+    <section class="card full-width" id="queue-section">
+      <h2>Open queue</h2>
+      <div id="queue"></div>
+    </section>
+
+    <section class="card" id="roster-panel">
+      <h2>Today's roster</h2>
+      <h4 style="color:var(--violet); margin:0 0 4px;">Processing</h4>
+      <div class="roster-chips" data-shift="processing"></div>
+      <h4 style="color:var(--amber); margin:12px 0 4px;">Sick &amp; Injured</h4>
+      <div class="roster-chips" data-shift="sick_injured"></div>
+      <h4 style="color:var(--blue); margin:12px 0 4px;">Surgery</h4>
+      <div class="roster-chips" data-shift="surgery"></div>
+    </section>
+
+    <section class="card" id="memo-board">
+      <h2>Memo board</h2>
+      <div id="memo-list"></div>
+      <div id="memo-post">
+        <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
+        <button id="memo-submit">Post</button>
+      </div>
+    </section>
+
+    <section class="card full-width" id="completed-panel">
+      <h2>Recently completed</h2>
+      <p class="disclaimer">Status updates only — clinical detail belongs in the offline shift tool, not here.</p>
+      <div id="completed-list"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+  // Placeholder in-memory data only. Nothing here is saved, sent anywhere,
+  // or connected to a real database.
+  let TASKS = [
+    { id: 1, title: 'A-1042', location: 'Cat Room 2', shift: 'sick_injured', type: 'check_recheck', origin: 'scheduled', urgency: 'soon', done: false },
+    { id: 2, title: 'A-2077', location: 'Pound 3', shift: 'processing', type: 'medication', origin: 'scheduled', urgency: 'routine', done: false },
+    { id: 3, title: 'A-3390', location: 'Adoption 1', shift: 'surgery', type: 'check_recheck', origin: 'add_on', urgency: 'urgent', done: false },
+    { id: 4, title: 'A-1188', location: 'FIR Room', shift: 'sick_injured', type: 'check_recheck', origin: 'add_on', urgency: 'urgent', done: true, completed_by_role: 'vet_nurse', completed_at: new Date(Date.now() - 20 * 60000).toISOString(), note: 'Moved to Cat Room 2' },
+    { id: 5, title: 'A-2201', location: 'Pound 1', shift: 'processing', type: 'other', origin: 'scheduled', urgency: 'routine', done: true, completed_by_role: 'vet_nurse', completed_at: new Date(Date.now() - 45 * 60000).toISOString(), note: '' },
+    { id: 6, title: 'A-3055', location: 'Transport', shift: 'surgery', type: 'medication', origin: 'scheduled', urgency: 'routine', done: false },
+    { id: 7, title: 'A-1077', location: 'Cat Room 1', shift: 'processing', type: 'check_recheck', origin: 'scheduled', urgency: 'soon', done: false },
+  ];
+  let MEMOS = [
+    { author: 'Vet team', text: '(Placeholder) Cat Room 2 recheck moved to 2pm.' },
+  ];
+  let ROSTER = {
+    processing: ['(Placeholder) Nurse A'],
+    sick_injured: ['(Placeholder) Vet B'],
+    surgery: ['(Placeholder) Vet C'],
+  };
+  let ROLE = 'attendant';
+  let nextId = 8;
+
+  function urgencyColor(u) {
+    return u === 'urgent' ? '#E74C3C' : u === 'soon' ? 'var(--amber)' : '#95A5A6';
+  }
+
+  function applyRoleVisibility() {
+    document.getElementById('new-request-form').style.display = ROLE === 'attendant' ? 'block' : 'none';
+    document.getElementById('memo-post').style.display = ROLE === 'vet_nurse' ? 'block' : 'none';
+    renderQueue();
+  }
+
+  document.getElementById('role-select').addEventListener('change', (e) => {
+    ROLE = e.target.value;
+    applyRoleVisibility();
+  });
+
+  document.getElementById('req-submit').addEventListener('click', () => {
+    const title = document.getElementById('req-title').value.trim();
+    if (!title) return;
+    TASKS.push({
+      id: nextId++,
+      title,
+      location: document.getElementById('req-location').value,
+      shift: document.getElementById('req-shift').value,
+      type: document.getElementById('req-type').value,
+      origin: document.getElementById('req-origin').value,
+      urgency: document.getElementById('req-urgency').value,
+      done: false,
+    });
+    document.getElementById('req-title').value = '';
+    renderAll();
+  });
+
+  function renderQueue() {
+    const container = document.getElementById('queue');
+    const open = TASKS.filter((t) => !t.done);
+    const byLocation = {};
+    for (const t of open) (byLocation[t.location] ??= []).push(t);
+    const order = { urgent: 0, soon: 1, routine: 2 };
+    container.innerHTML = '';
+    if (!Object.keys(byLocation).length) {
+      container.innerHTML = '<p style="opacity:0.6;">Queue is empty.</p>';
+      return;
+    }
+    for (const [loc, items] of Object.entries(byLocation)) {
+      items.sort((a, b) => order[a.urgency] - order[b.urgency]);
+      const group = document.createElement('div');
+      group.className = 'location-group';
+      group.innerHTML = `<h3>${loc}</h3>`;
+      for (const t of items) {
+        const row = document.createElement('div');
+        row.className = `task-row urgency-${t.urgency}`;
+        row.innerHTML = `
+          <div>
+            <strong>${t.title}</strong>
+            <div class="meta">${t.type.replace('_', '/')} · ${t.shift.replace('_', ' ')} · ${t.urgency}</div>
+          </div>
+          ${ROLE === 'vet_nurse' ? '<button class="mark-done">Mark done</button>' : ''}
+        `;
+        const btn = row.querySelector('.mark-done');
+        if (btn) btn.addEventListener('click', () => markDone(t.id));
+        group.appendChild(row);
+      }
+      container.appendChild(group);
+    }
+  }
+
+  function markDone(id) {
+    const t = TASKS.find((x) => x.id === id);
+    if (!t) return;
+    t.done = true;
+    t.completed_by_role = ROLE;
+    t.completed_at = new Date().toISOString();
+    t.note = '';
+    renderAll();
+  }
+
+  function renderCharts() {
+    const bySh = (s) => TASKS.filter((t) => t.shift === s);
+
+    const proc = bySh('processing');
+    const procDone = proc.filter((t) => t.done).length;
+    const procTotal = proc.length || 1;
+    document.getElementById('chart-processing').innerHTML = `
+      <strong style="color:var(--violet)">Processing</strong>
+      <div class="bar-row"><span style="width:50px;">Done</span><div class="bar-track"><div class="bar-fill" style="width:${(procDone/procTotal)*100}%; background:var(--violet);"></div></div><span>${procDone}</span></div>
+      <div class="bar-row"><span style="width:50px;">Left</span><div class="bar-track"><div class="bar-fill" style="width:${((procTotal-procDone)/procTotal)*100}%; background:#ccc;"></div></div><span>${procTotal-procDone}</span></div>
+    `;
+
+    const si = bySh('sick_injured');
+    const siPct = si.length ? Math.round((si.filter((t) => t.done).length / si.length) * 100) : 0;
+    document.getElementById('chart-sick-injured').innerHTML = `
+      <strong style="color:var(--amber)">Sick &amp; Injured</strong>
+      <div class="donut" style="background: conic-gradient(var(--amber) ${siPct * 3.6}deg, #e5e5e5 0deg);">${siPct}%</div>
+    `;
+
+    const surg = bySh('surgery').filter((t) => !t.done);
+    const byUrg = { urgent: 0, soon: 0, routine: 0 };
+    for (const t of surg) byUrg[t.urgency]++;
+    const maxU = Math.max(byUrg.urgent, byUrg.soon, byUrg.routine, 1);
+    document.getElementById('chart-surgery').innerHTML = `
+      <strong style="color:var(--blue)">Surgery remaining</strong>
+      <div class="bar-row"><span style="width:60px;">Urgent</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.urgent/maxU)*100}%; background:#E74C3C;"></div></div><span>${byUrg.urgent}</span></div>
+      <div class="bar-row"><span style="width:60px;">Soon</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.soon/maxU)*100}%; background:var(--amber);"></div></div><span>${byUrg.soon}</span></div>
+      <div class="bar-row"><span style="width:60px;">Routine</span><div class="bar-track"><div class="bar-fill" style="width:${(byUrg.routine/maxU)*100}%; background:#95A5A6;"></div></div><span>${byUrg.routine}</span></div>
+    `;
+  }
+
+  function renderRoster() {
+    for (const shift of ['processing', 'sick_injured', 'surgery']) {
+      document.querySelector(`.roster-chips[data-shift="${shift}"]`).innerHTML =
+        ROSTER[shift].map((n) => `<span class="chip">${n}</span>`).join('');
+    }
+  }
+
+  function renderMemos() {
+    document.getElementById('memo-list').innerHTML = MEMOS
+      .map((m) => `<div class="memo"><strong>${m.author}</strong>: ${m.text}</div>`)
+      .join('') || '<p style="opacity:0.6;">No memos yet.</p>';
+  }
+
+  document.getElementById('memo-submit').addEventListener('click', () => {
+    const text = document.getElementById('memo-text').value.trim();
+    if (!text) return;
+    MEMOS.unshift({ author: 'Vet team', text });
+    document.getElementById('memo-text').value = '';
+    renderMemos();
+  });
+
+  function renderCompleted() {
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const recent = TASKS.filter((t) => t.done && t.completed_at && new Date(t.completed_at).getTime() > cutoff)
+      .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+    document.getElementById('completed-list').innerHTML = recent.map((t) => `
+      <div class="completed-row">
+        <span>${t.title} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Attendant'}${t.note ? ' — ' + t.note : ''}</span>
+        <span style="opacity:0.6;">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+      </div>
+    `).join('') || '<p style="opacity:0.6;">Nothing completed recently.</p>';
+  }
+
+  function renderAll() {
+    renderQueue();
+    renderCharts();
+    renderRoster();
+    renderMemos();
+    renderCompleted();
+  }
+
+  applyRoleVisibility();
+  renderAll();
+</script>
+</body>
+</html>
