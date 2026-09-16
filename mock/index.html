@@ -11,26 +11,34 @@
     --amber: #FF9F43;
     --blue: #4A6CF7;
     --violet: #8C62FF;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
     --shadow-raised: 8px 8px 18px rgba(163,177,198,0.45), -8px -8px 18px rgba(255,255,255,0.85);
     --shadow-inset: inset 6px 6px 12px rgba(163,177,198,0.4), inset -6px -6px 12px rgba(255,255,255,0.8);
   }
   * { box-sizing: border-box; }
+  html { font-size: 15px; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
     background: var(--bg);
-    color: #1E2238;
+    color: var(--ink);
+    line-height: 1.5;
   }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
   #mock-banner {
     background: var(--sidebar);
     color: #fff;
     text-align: center;
     padding: 10px;
-    font-size: 0.85em;
+    font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.02em;
   }
-  #mock-banner b { color: var(--amber); }
+  #mock-banner b { color: var(--amber); font-weight: 700; }
   .layout {
     display: grid;
     grid-template-columns: 220px 1fr;
@@ -39,44 +47,78 @@
   aside {
     background: var(--sidebar);
     color: #fff;
-    padding: 20px 16px;
+    padding: 24px 18px;
   }
-  aside h2 { font-size: 1em; margin: 0 0 16px; }
-  aside label { display: block; font-size: 0.85em; margin-bottom: 6px; opacity: 0.8; }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; }
+  aside label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #B4B8CC;
+    margin-bottom: 8px;
+  }
   aside select {
     width: 100%;
     background: #2A2F4A;
     color: #fff;
     box-shadow: none;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    font-size: 0.9rem;
   }
-  .shift-tag { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 0.75em; font-weight: 700; color: #1E2238; margin-bottom: 4px; }
+  aside p.hint {
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: #9BA0BC;
+    margin: 0;
+  }
   main { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; }
   .card {
     background: var(--bg);
     border-radius: 18px;
     box-shadow: var(--shadow-raised);
-    padding: 20px;
+    padding: 22px;
   }
-  .card h2 { margin: 0 0 14px; font-size: 1.05em; }
+  .card h2 {
+    margin: 0 0 18px;
+    font-size: 1rem;
+    letter-spacing: 0.01em;
+    color: var(--ink);
+  }
   .full-width { grid-column: 1 / -1; }
+  label.field-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--muted-light);
+    margin: 0 0 4px;
+  }
   input, select, textarea {
     border: none;
     border-radius: 14px;
     box-shadow: var(--shadow-inset);
-    padding: 9px 12px;
+    padding: 10px 14px;
     background: var(--bg);
     font: inherit;
+    font-size: 0.9rem;
+    color: var(--ink);
     width: 100%;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
   }
+  input::placeholder, textarea::placeholder { color: var(--muted-light); }
   button {
     border: none;
     border-radius: 14px;
-    padding: 9px 16px;
+    padding: 10px 18px;
     background: var(--amber);
-    color: #1E2238;
+    color: var(--ink);
+    font: inherit;
+    font-size: 0.88rem;
     font-weight: 700;
+    letter-spacing: 0.01em;
     cursor: pointer;
   }
   button.secondary { background: var(--bg); box-shadow: var(--shadow-raised); }
@@ -84,27 +126,55 @@
     background: var(--bg);
     box-shadow: var(--shadow-raised);
     border-radius: 14px;
-    padding: 10px 14px;
-    margin-bottom: 8px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
   }
-  .task-row .meta { font-size: 0.8em; opacity: 0.7; }
+  .task-row strong { font-size: 0.95rem; font-weight: 700; }
+  .task-row .meta { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
   .urgency-urgent { border-left: 5px solid #E74C3C; }
   .urgency-soon { border-left: 5px solid var(--amber); }
   .urgency-routine { border-left: 5px solid #95A5A6; }
-  .location-group h3 { font-size: 0.9em; margin: 14px 0 6px; color: #555; }
+  .location-group h3 {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 18px 0 8px;
+  }
   .location-group:first-child h3 { margin-top: 0; }
-  .chip { display: inline-block; padding: 5px 12px; border-radius: 12px; box-shadow: var(--shadow-raised); margin: 3px; font-size: 0.85em; }
-  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.85em; }
+  .empty-state { font-size: 0.88rem; color: var(--muted); margin: 0; }
+  .chip {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 12px;
+    box-shadow: var(--shadow-raised);
+    margin: 3px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 0.82rem; color: var(--muted); }
+  .bar-row span:last-child { font-weight: 700; color: var(--ink); min-width: 18px; text-align: right; }
   .bar-track { flex: 1; height: 10px; border-radius: 6px; box-shadow: var(--shadow-inset); overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 6px; }
-  .donut { width: 90px; height: 90px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:700; margin: 0 auto 8px; }
-  .memo { background: var(--bg); box-shadow: var(--shadow-raised); border-radius: 14px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.9em; }
-  .disclaimer { font-size: 0.8em; color: #666; margin: 0 0 10px; }
-  .completed-row { display: flex; justify-content: space-between; font-size: 0.85em; padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+  .donut { width: 90px; height: 90px; border-radius: 50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: 1.05rem; margin: 0 auto 10px; }
+  .memo { background: var(--bg); box-shadow: var(--shadow-raised); border-radius: 14px; padding: 12px 16px; margin-bottom: 10px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  .disclaimer { font-size: 0.8rem; color: var(--muted); margin: 0 0 12px; font-style: italic; }
+  .completed-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.85rem;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(30,34,56,0.08);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
     main { grid-template-columns: 1fr; padding: 16px; }
@@ -123,7 +193,7 @@
       <option value="attendant">Animal Attendant</option>
       <option value="vet_nurse">Vet / Nurse</option>
     </select>
-    <p style="font-size:0.75em; opacity:0.6; line-height:1.4;">
+    <p class="hint">
       This mock has no login, no real database, and resets every time you
       reload the page. It's here so you can look at the layout while IT
       sets up the real backend.
@@ -264,7 +334,7 @@
     const order = { urgent: 0, soon: 1, routine: 2 };
     container.innerHTML = '';
     if (!Object.keys(byLocation).length) {
-      container.innerHTML = '<p style="opacity:0.6;">Queue is empty.</p>';
+      container.innerHTML = '<p class="empty-state">Queue is empty.</p>';
       return;
     }
     for (const [loc, items] of Object.entries(byLocation)) {
@@ -341,7 +411,7 @@
   function renderMemos() {
     document.getElementById('memo-list').innerHTML = MEMOS
       .map((m) => `<div class="memo"><strong>${m.author}</strong>: ${m.text}</div>`)
-      .join('') || '<p style="opacity:0.6;">No memos yet.</p>';
+      .join('') || '<p class="empty-state">No memos yet.</p>';
   }
 
   document.getElementById('memo-submit').addEventListener('click', () => {
@@ -359,9 +429,9 @@
     document.getElementById('completed-list').innerHTML = recent.map((t) => `
       <div class="completed-row">
         <span>${t.title} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Attendant'}${t.note ? ' — ' + t.note : ''}</span>
-        <span style="opacity:0.6;">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        <span class="time">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </div>
-    `).join('') || '<p style="opacity:0.6;">Nothing completed recently.</p>';
+    `).join('') || '<p class="empty-state">Nothing completed recently.</p>';
   }
 
   function renderAll() {
