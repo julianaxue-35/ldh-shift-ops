@@ -307,14 +307,16 @@ only this much —
   still succeeds and the sync either retries quietly or is simply skipped —
   it must never stop a vet from finishing their local record because the
   dashboard couldn't be reached.
-- **Decided, 2026-09-18: a dedicated low-privilege sync account, not the
-  shared staff login.** The three offline tools authenticate as their own
+- **Superseded, 2026-09-18 (same day): Option 2 (dedicated low-privilege
+  sync account) hit an unresolved, reproducible platform-specific bug and
+  was abandoned in favor of Option 3 (Edge Function) — see below.** Kept
+  here for the record, since the account/policies described may still
+  exist in the project (harmless if unused):
+
+  The three offline tools would authenticate as their own
   Supabase Auth user — separate from the shared staff account the dashboard
   itself uses — scoped so it can `insert`/`update` on `tasks` only, and
-  cannot `select` from `tasks`, `memos`, or `roster` at all. This bounds the
-  damage if this credential ever leaks from the public GitHub Pages source:
-  worst case, someone can write junk completions, never read anything.
-  Implementation:
+  cannot `select` from `tasks`, `memos`, or `roster` at all. Implementation:
   1. Create the account (Supabase Dashboard → Authentication → Add User —
      any valid-format email, e.g. `sync@ldh-shift-tools.internal`).
   2. Tag it via SQL Editor (this only works with `raw_app_meta_data`, never
@@ -378,6 +380,59 @@ only this much —
   failed sync is surfaced to the user at all (leaning toward: no, keep it
   silent, since the offline tool's own record is always the source of truth
   and this is a convenience mirror, not the system of record).
+
+## Amendment (2026-09-18, fourth): Option 2 abandoned — Edge Function instead
+
+**Why Option 2 was dropped.** Thoroughly diagnosed, not just abandoned on a
+hunch. Evidence, in order:
+
+1. `pg_policies` confirmed exactly the 3 expected policies on `tasks` exist,
+   nothing extra.
+2. The `sync_writer` session's JWT, decoded client-side, correctly showed
+   `role: authenticated` and `app_metadata: {role: "sync_writer"}`.
+3. Manually simulating `set local role authenticated` plus the matching
+   `request.jwt.claims` directly in the SQL Editor **succeeded** at
+   inserting a row — proof the policy logic itself (`auth.role() =
+   'authenticated'`) is correct.
+4. A real HTTP request from the **staff** account (untagged, ordinary
+   authenticated user) to the same endpoint, same payload shape, succeeded
+   (`HTTP 201`).
+5. The identical request from the **sync_writer** account — same policy,
+   same confirmed-correct JWT claims, same code path, only difference being
+   the `app_metadata.role` tag — failed every time with `42501: new row
+   violates row-level security policy`, both via the Supabase JS SDK and via
+   a raw `fetch` bypassing the SDK entirely.
+
+That combination (correct policy, correct token, success for an untagged
+user, failure only for the tagged one) points at some platform-level
+interaction specific to this project's newer Publishable/Secret key system
+and JWT-tagged sessions that couldn't be resolved through further
+configuration — likely worth a Supabase support ticket at some point, but
+not worth blocking on.
+
+**Decided instead: a Supabase Edge Function (`supabase/functions/sync-
+completion`).** The three offline tools call this function directly — no
+Supabase Auth session, no JWT, no RLS-role interaction of any kind. The
+function itself runs with the service-role key server-side (never exposed
+to the browser) and is the only thing that ever writes to `tasks` on the
+sync path; it enforces the same constraints Option 2 was meant to enforce
+(exactly 3 fields in, insert/update only), just in application code instead
+of via RLS:
+
+- Request must include header `x-sync-secret` matching a secret only the
+  function and the offline tools know (not a Supabase Auth credential —
+  just a shared string).
+- Body must be exactly `{ title, location, shift }`; `shift` must be one of
+  the three valid values.
+- The function does the same upsert Option 2 was going to do (`done: true`,
+  `completed_at: now()`, matched on the same unique index).
+- Since it runs as service-role, it bypasses RLS entirely — the function's
+  own input validation is the only gate, so it must never be extended to
+  accept arbitrary fields or forward arbitrary data to `tasks`.
+
+**Consequence for the sync_writer account/migration:** they're harmless to
+leave in place (an unused Auth user, unused RLS policies), but no longer
+part of the active design. Not worth spending more time unwinding them.
 
 ## Amendment (2026-09-18, third): annual & monthly progress reporting
 
