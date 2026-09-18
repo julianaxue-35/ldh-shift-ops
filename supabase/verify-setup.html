@@ -96,6 +96,16 @@ document.getElementById('run').addEventListener('click', async () => {
     if (syncSignInErr) {
       results.appendChild(row('Sync account sign-in', false, syncSignInErr.message));
     } else {
+      // Decode the actual JWT being sent, so we see ground truth instead
+      // of assuming the session/claims are what we expect.
+      const { data: { session } } = await syncClient.auth.getSession();
+      let claimsText = '(no session)';
+      try {
+        const payload = JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        claimsText = `role=${payload.role}, app_metadata=${JSON.stringify(payload.app_metadata)}`;
+      } catch (e) { claimsText = 'could not decode: ' + e.message; }
+      results.appendChild(row('Sync session JWT claims', null, claimsText));
+
       const { data: syncSelData, error: syncSelErr } = await syncClient.from('tasks').select('*');
       results.appendChild(row(
         'Sync account CANNOT read tasks (should fail/empty)',
