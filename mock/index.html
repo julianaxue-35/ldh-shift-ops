@@ -12,6 +12,7 @@
     --blue: #4A6CF7;
     --violet: #8C62FF;
     --green: #229A63;
+    --teal: #0F9B8E;
     --ink: #1E2238;
     --muted: #6B7280;
     --muted-light: #9CA3AF;
@@ -358,7 +359,7 @@
     const total = TASKS.length || 1;
     const done = TASKS.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
-    document.getElementById('completion-donut').style.background = `conic-gradient(var(--blue) ${pct * 3.6}deg, var(--neutral-300) 0deg)`;
+    document.getElementById('completion-donut').style.background = `conic-gradient(var(--teal) ${pct * 3.6}deg, var(--muted) 0deg)`;
     document.getElementById('completion-donut').innerHTML = `<span class="val">${pct}%</span><span class="lbl">TODAY</span>`;
     document.getElementById('completion-fraction').textContent = `${done} of ${total}`;
   }
