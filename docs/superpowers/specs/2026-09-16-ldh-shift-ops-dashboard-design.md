@@ -91,10 +91,17 @@ nothing until authenticated.
 
 ## Data model
 
-- **`tasks`**: title, location, shift, type (check/recheck, medication,
-  other), origin (scheduled vs. add-on), urgency (routine/soon/urgent), done
-  (bool), completed_by_role, completed_at, note (short, non-clinical — see
-  below)
+- **`tasks`**: title, location, shift, type, urgency (routine/soon/urgent),
+  done (bool), completed_by_role, completed_at, note (short, non-clinical —
+  see below). **`type` updated 2026-09-18** to `shelter` / `foster` /
+  `rescue` / `medication` / `check_recheck` (dropped the original generic
+  `other`; see the second amendment below for why). **`origin`
+  (scheduled/add-on) is no longer exposed in the UI** as of the same
+  amendment — Shelter Staff requests are always same-day/ad hoc, so the
+  distinction stopped being meaningful for that form. Whether `origin`
+  stays in the schema repurposed to distinguish a Shelter-Staff-flagged task
+  from a future tool-synced one (see the 2026-09-18 sync amendment above) is
+  an open question, not yet decided — see the trends amendment below.
 - **`memos`**: author (role-level, e.g. "Vet team"), text, created_at
 - **`roster`**: shift, staff_name, date — named individuals per shift (this is
   about staffing, not login identity, so real names here are fine)
@@ -144,27 +151,56 @@ guarantee that's still just self-reported either way.
 
 ## Roles
 
-Self-selected dropdown, unchanged from the original spec:
+Self-selected dropdown. **Renamed 2026-09-18: "Animal Attendant" → "Shelter
+Staff"** (label only — internal role value is still `attendant`, referenced
+by `completed_by_role` etc.).
 
-- **Animal Attendant:** can log new task requests only. Cannot pick up/
-  complete tasks, cannot post to the memo board.
+- **Shelter Staff:** can log new task requests only (always logged under
+  Sick & Injured — see below). Cannot pick up/complete tasks, cannot post to
+  or even see the memo board.
 - **Vet/Nurse:** can pick up and complete tasks, post to the memo board.
-  Cannot submit new requests (attendant-only, to prevent an unfiltered flood).
+  Cannot submit new requests.
 
-This is a *workflow* role (which buttons are shown), separate from the
-*security* boundary (logged in or not) — it does not gate data.
+This is a *workflow* role (which sections/buttons are shown), separate from
+the *security* boundary (logged in or not) — it does not gate data.
+
+**The two roles now see meaningfully different pages, not just toggled
+buttons on a shared one** (amendment, 2026-09-18):
+
+- **Shelter Staff:** new-request form (Animal ID, Location, request type,
+  urgency — no shift or origin picker; every Shelter Staff request is
+  logged as shift = Sick & Injured, since that's what Shelter Staff actually
+  flag), the per-shift progress cards, and a flat searchable "Cases flagged"
+  table.
+- **Vet/Nurse:** no per-shift progress cards (not useful to this role) and no
+  flat table — instead, "Cases flagged" is a 3-column board split by
+  urgency (Urgent / Soon / Routine), with a request-type filter bar above it
+  (All / Shelter / Foster / Rescue / Medication / Check-recheck). The type
+  filter exists specifically so remote staff who only help with medication
+  checks can filter straight to that queue. The memo board is Vet/Nurse-only
+  and moved here from being universally visible.
+
+Both roles still see: the hero completion donut, "Recently completed," and
+the new annual/monthly trends section (below).
+
+## Request type taxonomy (amendment, 2026-09-18)
+
+`type` was `check_recheck` / `medication` / `other`. Replaced with:
+`shelter` / `foster` / `rescue` / `medication` / `check_recheck` — the vague
+`other` is gone, and `shelter`/`foster`/`rescue` are new, distinct values
+for placement-related requests (as opposed to clinical ones), added because
+"we will have different requests" down the road as this expands beyond
+purely clinical coordination.
 
 ## Shifts, locations, shift-progress visuals
 
-Unchanged from the original spec:
-
-- Three shifts — Processing, Sick & Injured, Surgery — each with a different
-  chart type tied to its shift colour: Processing (paired bar, Done vs.
-  Remaining), Sick & Injured (donut, percent complete), Surgery (horizontal
-  bars, remaining tasks by urgency).
+- Three shifts — Processing, Sick & Injured, Surgery.
+- **Shift-progress visuals unified 2026-09-18** (see the first 2026-09-18
+  amendment above) into one consistent card per shift: a progress bar,
+  "done / total processed today," and that shift's on-duty roster — visible
+  to Shelter Staff only, not Vet/Nurse (see Roles above).
 - Locations for physical routing: Cat Room 1-3, Adoption 1-2, FIR Room, Pound
-  1-4, Transport. Open queue groups by location, urgent-first within each
-  group.
+  1-4, Transport.
 
 ## Error handling / edge cases
 
@@ -248,3 +284,43 @@ only this much —
   failed sync is surfaced to the user at all (leaning toward: no, keep it
   silent, since the offline tool's own record is always the source of truth
   and this is a convenience mirror, not the system of record).
+
+## Amendment (2026-09-18, third): annual & monthly progress reporting
+
+New section, visible to both roles, placed at the bottom of the page. The
+headline ask: "how many surgeries have we done this year, how many
+examinations, how many sick animals attended" — three running annual
+totals, plus a shorter-horizon trend view.
+
+- **Three YTD counters:** Surgeries this year (`shift = 'surgery'`,
+  `done = true`, `completed_at` in current year), Examinations this year
+  (`shift = 'processing'`, same conditions — "examination" here means
+  Processing-shift work), Sick & injured attended this year
+  (`shift = 'sick_injured'`, same conditions).
+- **Past-30-days cumulative chart:** same three categories plus a fourth
+  line — tasks flagged by Shelter Staff that have since been completed —
+  plotted as a running cumulative total (not a bar-per-hour trend; a
+  monotonically-rising line avoids the earlier problem where an
+  hour-of-day chart always reads low at shift start).
+- **Granularity fallback:** daily buckets by default; if fewer than 30 days
+  of history exist yet (e.g. shortly after launch), fall back to weekly
+  buckets over whatever history does exist, rather than showing a
+  mostly-empty daily chart. Not yet implemented against real data — the
+  mock always renders synthetic daily data, since it has no real history to
+  be sparse in the first place.
+- **This-year cumulative chart:** the same four categories, monthly buckets,
+  January through the current month, cumulative — this is what backs the
+  three YTD counters (each counter is that series' latest value).
+- **Open question — "flagged by Shelter Staff" needs a reliable marker:**
+  right now, every task in the system originates from the Shelter Staff
+  request form, so "flagged by Shelter Staff and completed" is currently
+  indistinguishable from "every completed task." That stops being true once
+  the completion-sync amendment above is implemented, since tool-synced
+  tasks will also land in `tasks` without ever having gone through the
+  Shelter Staff form. At that point, this metric needs a real way to tell
+  the two cohorts apart — most likely by giving `origin` (see the request
+  type amendment above) two values: `staff_flagged` vs `tool_sync`, rather
+  than leaving it unused. **Not decided yet** — flagging so it isn't lost
+  before that sync work starts, since fixing it retroactively (once
+  historical rows already exist without the distinction) is harder than
+  deciding it now.

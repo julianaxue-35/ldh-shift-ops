@@ -90,7 +90,7 @@
   .completion-side { font-size: 0.85rem; color: var(--muted); max-width: 220px; }
   .completion-side b { display: block; font-size: 1.4rem; color: var(--ink); }
 
-  /* Per-shift progress cards */
+  /* Per-shift progress cards (Shelter Staff view only) */
   .shift-progress-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
   .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
@@ -102,7 +102,7 @@
     margin: 2px; font-size: 0.78rem; font-weight: 600;
   }
 
-  /* Cases flagged table */
+  /* Cases flagged table (Shelter Staff view) */
   table.queue-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
   table.queue-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0 10px 10px; }
   table.queue-table td { padding: 10px; border-top: 1px solid rgba(30,34,56,0.06); }
@@ -121,24 +121,44 @@
   .completed-row:last-child { border-bottom: none; }
   .completed-row .time { color: var(--muted-light); white-space: nowrap; }
 
-  /* Urgent attention, split by how soon it needs doing */
-  .urgent-split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  .urgent-split .card.immediate { border: 2px solid rgba(208,59,59,0.35); }
-  .urgent-split h2.immediate-h { color: var(--critical); }
+  /* Vet/Nurse cases board — split by urgency (columns) and request type (filter) */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .filter-chip {
+    border: none; border-radius: 12px; padding: 7px 14px; background: var(--bg);
+    box-shadow: var(--shadow-raised); font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { box-shadow: var(--shadow-inset); color: var(--ink); }
+  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgency-col h3.urgent-h { color: var(--critical); }
+  .urgency-col h3.soon-h { color: var(--neutral-500); }
+  .urgency-col h3.routine-h { color: var(--muted); }
   .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
   .attn-item:last-child { border-bottom: none; }
   .attn-item .aname { font-size: 0.85rem; font-weight: 600; }
-  .attn-item .ameta { font-size: 0.72rem; color: var(--muted); }
-  .attn-item button.mark-done { padding: 5px 10px; font-size: 0.75rem; }
+  .attn-item .ameta { font-size: 0.7rem; color: var(--muted); }
+  .attn-item button.mark-done { padding: 5px 10px; font-size: 0.72rem; }
 
-  /* Memo board — long, full width, at the bottom */
+  /* Memo board — long, full width, at the bottom (Vet/Nurse view only) */
   #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
   .memo strong { font-weight: 700; }
   #memo-post textarea { min-height: 60px; }
 
+  /* Annual / monthly trends */
+  .ytd-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+  .ytd-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px; text-align: center; }
+  .ytd-card .ytd-val { font-size: 2rem; font-weight: 700; }
+  .ytd-card .ytd-lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 4px; }
+  .chart-subhead { font-size: 0.85rem; margin: 18px 0 8px; }
+  .chart-subhead .fallback-note { font-weight: 400; color: var(--muted-light); font-size: 0.75rem; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
+  .chart-legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
   @media (max-width: 1000px) {
-    .shift-progress-row, .urgent-split { grid-template-columns: 1fr; }
+    .shift-progress-row, .urgency-board, .ytd-row { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
@@ -155,7 +175,7 @@
     <h2>LDH Shift Ops</h2>
     <label>Viewing as</label>
     <select id="role-select">
-      <option value="attendant">Animal Attendant</option>
+      <option value="attendant">Shelter Staff</option>
       <option value="vet_nurse">Vet / Nurse</option>
     </select>
     <p class="hint">
@@ -176,7 +196,8 @@
 
     <section class="card" id="new-request-form">
       <h2>New task request</h2>
-      <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
+      <p class="subtle">Logged under Sick &amp; Injured, today's list.</p>
+      <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:10px;">
         <input id="req-title" placeholder="Animal ID / kennel, e.g. A-1042" style="margin:0;">
         <select id="req-location" style="margin:0;">
           <option>Cat Room 1</option><option>Cat Room 2</option><option>Cat Room 3</option>
@@ -184,19 +205,12 @@
           <option>Pound 1</option><option>Pound 2</option><option>Pound 3</option><option>Pound 4</option>
           <option>Transport</option>
         </select>
-        <select id="req-shift" style="margin:0;">
-          <option value="processing">Processing</option>
-          <option value="sick_injured">Sick &amp; Injured</option>
-          <option value="surgery">Surgery</option>
-        </select>
         <select id="req-type" style="margin:0;">
-          <option value="check_recheck">Check/recheck</option>
+          <option value="shelter">Shelter request</option>
+          <option value="foster">Foster request</option>
+          <option value="rescue">Rescue request</option>
           <option value="medication">Medication</option>
-          <option value="other">Other</option>
-        </select>
-        <select id="req-origin" style="margin:0;">
-          <option value="scheduled">Scheduled</option>
-          <option value="add_on">Add-on (logged today)</option>
+          <option value="check_recheck">Check/recheck</option>
         </select>
         <select id="req-urgency" style="margin:0;">
           <option value="routine">Routine</option>
@@ -219,11 +233,29 @@
 
     <section class="card" id="cases-flagged">
       <h2>Cases flagged</h2>
-      <p class="subtle">Open cases across all shifts — vets pick up as available.</p>
+      <p class="subtle">Open cases across all shifts.</p>
       <table class="queue-table">
-        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th><th></th></tr></thead>
+        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th></tr></thead>
         <tbody id="queue-tbody"></tbody>
       </table>
+    </section>
+
+    <section class="card" id="vet-board">
+      <h2>Cases flagged</h2>
+      <p class="subtle">Split by urgency and request type — pick up as available. Filter to Medication for remote-only cases.</p>
+      <div class="filter-bar" id="type-filter-bar">
+        <button class="filter-chip active" data-type="all">All types</button>
+        <button class="filter-chip" data-type="shelter">Shelter</button>
+        <button class="filter-chip" data-type="foster">Foster</button>
+        <button class="filter-chip" data-type="rescue">Rescue</button>
+        <button class="filter-chip" data-type="medication">Medication</button>
+        <button class="filter-chip" data-type="check_recheck">Check/recheck</button>
+      </div>
+      <div class="urgency-board">
+        <div class="urgency-col"><h3 class="urgent-h">Urgent</h3><div id="board-urgent"></div></div>
+        <div class="urgency-col"><h3 class="soon-h">Soon</h3><div id="board-soon"></div></div>
+        <div class="urgency-col"><h3 class="routine-h">Routine</h3><div id="board-routine"></div></div>
+      </div>
     </section>
 
     <section class="card" id="completed-panel">
@@ -231,17 +263,6 @@
       <p class="subtle">Status only, for the documentation cross-check — clinical detail stays in the offline shift tool.</p>
       <div id="completed-list"></div>
     </section>
-
-    <div class="urgent-split">
-      <section class="card immediate">
-        <h2 class="immediate-h">Needs immediate attention</h2>
-        <div id="attn-immediate"></div>
-      </section>
-      <section class="card">
-        <h2>Due within 24 hours</h2>
-        <div id="attn-24h"></div>
-      </section>
-    </div>
 
     <section class="card" id="memo-board">
       <h2>Memo board</h2>
@@ -251,19 +272,31 @@
         <button id="memo-submit">Post</button>
       </div>
     </section>
+
+    <section class="card" id="trends-section">
+      <h2>Annual &amp; monthly progress</h2>
+      <p class="subtle">Completed work by category — surgeries, physical exams, and sick/injured animals attended.</p>
+      <div class="ytd-row" id="ytd-row"></div>
+      <h3 class="chart-subhead">Past 30 days (cumulative) <span class="fallback-note">— falls back to weekly buckets if less than 30 days of history exists yet</span></h3>
+      <div id="month-chart"></div>
+      <h3 class="chart-subhead">This year (cumulative, monthly)</h3>
+      <div id="year-chart"></div>
+    </section>
   </main>
 </div>
 
 <script>
   let TASKS = [
-    { id: 1, title: 'A-1042', location: 'Cat Room 2', shift: 'sick_injured', type: 'check_recheck', origin: 'scheduled', urgency: 'soon', done: false },
-    { id: 2, title: 'A-2077', location: 'Pound 3', shift: 'processing', type: 'medication', origin: 'scheduled', urgency: 'routine', done: false },
-    { id: 3, title: 'A-3390', location: 'Adoption 1', shift: 'surgery', type: 'check_recheck', origin: 'add_on', urgency: 'urgent', done: false },
-    { id: 4, title: 'A-1188', location: 'FIR Room', shift: 'sick_injured', type: 'check_recheck', origin: 'add_on', urgency: 'urgent', done: true, completed_by_role: 'vet_nurse', completed_at: new Date(Date.now() - 20 * 60000).toISOString(), note: 'Moved to Cat Room 2' },
-    { id: 5, title: 'A-2201', location: 'Pound 1', shift: 'processing', type: 'other', origin: 'scheduled', urgency: 'routine', done: true, completed_by_role: 'vet_nurse', completed_at: new Date(Date.now() - 45 * 60000).toISOString(), note: '' },
-    { id: 6, title: 'A-3055', location: 'Transport', shift: 'surgery', type: 'medication', origin: 'scheduled', urgency: 'routine', done: false },
-    { id: 7, title: 'A-1077', location: 'Cat Room 1', shift: 'processing', type: 'check_recheck', origin: 'scheduled', urgency: 'soon', done: false },
-    { id: 8, title: 'A-1290', location: 'Cat Room 3', shift: 'sick_injured', type: 'medication', origin: 'scheduled', urgency: 'soon', done: false },
+    { id: 1, title: 'A-1042', location: 'Cat Room 2', shift: 'sick_injured', type: 'check_recheck', urgency: 'soon', done: false },
+    { id: 2, title: 'A-2077', location: 'Pound 3', shift: 'processing', type: 'medication', urgency: 'routine', done: false },
+    { id: 3, title: 'A-3390', location: 'Adoption 1', shift: 'surgery', type: 'check_recheck', urgency: 'urgent', done: false },
+    { id: 4, title: 'A-1188', location: 'FIR Room', shift: 'sick_injured', type: 'check_recheck', urgency: 'urgent', done: true, completed_by_role: 'vet_nurse', completed_at: new Date(Date.now() - 20 * 60000).toISOString(), note: 'Moved to Cat Room 2' },
+    { id: 5, title: 'A-2201', location: 'Pound 1', shift: 'processing', type: 'shelter', urgency: 'routine', done: true, completed_by_role: 'vet_nurse', completed_at: new Date(Date.now() - 45 * 60000).toISOString(), note: '' },
+    { id: 6, title: 'A-3055', location: 'Transport', shift: 'surgery', type: 'medication', urgency: 'routine', done: false },
+    { id: 7, title: 'A-1077', location: 'Cat Room 1', shift: 'processing', type: 'check_recheck', urgency: 'soon', done: false },
+    { id: 8, title: 'A-1290', location: 'Cat Room 3', shift: 'sick_injured', type: 'medication', urgency: 'soon', done: false },
+    { id: 9, title: 'A-1305', location: 'Cat Room 1', shift: 'sick_injured', type: 'foster', urgency: 'routine', done: false },
+    { id: 10, title: 'A-1310', location: 'Adoption 2', shift: 'sick_injured', type: 'rescue', urgency: 'soon', done: false },
   ];
   let MEMOS = [
     { author: 'Vet team', text: '(Placeholder) Cat Room 2 recheck moved to 2pm.' },
@@ -271,14 +304,21 @@
   ];
   let ROSTER = { processing: ['(Placeholder) Nurse A'], sick_injured: ['(Placeholder) Vet B'], surgery: ['(Placeholder) Vet C'] };
   let ROLE = 'attendant';
-  let nextId = 9;
+  let typeFilter = 'all';
+  let nextId = 11;
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
   const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
   const URGENCY_COLOR = { urgent: 'var(--critical)', soon: 'var(--neutral-500)', routine: 'var(--neutral-300)' };
+  const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
 
   function applyRoleVisibility() {
-    document.getElementById('new-request-form').style.display = ROLE === 'attendant' ? 'block' : 'none';
-    document.getElementById('memo-post').style.display = ROLE === 'vet_nurse' ? 'block' : 'none';
+    const isStaff = ROLE === 'attendant';
+    document.getElementById('new-request-form').style.display = isStaff ? 'block' : 'none';
+    document.getElementById('search-box').style.display = isStaff ? 'block' : 'none';
+    document.getElementById('shift-progress-row').style.display = isStaff ? 'grid' : 'none';
+    document.getElementById('cases-flagged').style.display = isStaff ? 'block' : 'none';
+    document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
+    document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
     renderAll();
   }
 
@@ -290,9 +330,8 @@
     TASKS.push({
       id: nextId++, title,
       location: document.getElementById('req-location').value,
-      shift: document.getElementById('req-shift').value,
+      shift: 'sick_injured',
       type: document.getElementById('req-type').value,
-      origin: document.getElementById('req-origin').value,
       urgency: document.getElementById('req-urgency').value,
       done: false,
     });
@@ -301,6 +340,14 @@
   });
 
   document.getElementById('search-box').addEventListener('input', renderQueueTable);
+
+  document.querySelectorAll('#type-filter-bar .filter-chip').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      typeFilter = btn.dataset.type;
+      document.querySelectorAll('#type-filter-bar .filter-chip').forEach((b) => b.classList.toggle('active', b === btn));
+      renderVetBoard();
+    });
+  });
 
   function markDone(id) {
     const t = TASKS.find((x) => x.id === id);
@@ -347,7 +394,7 @@
     open.sort((a, b) => order[a.urgency] - order[b.urgency]);
     const tbody = document.getElementById('queue-tbody');
     if (!open.length) {
-      tbody.innerHTML = `<tr><td colspan="6"><p class="empty-state">Nothing matches.</p></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5"><p class="empty-state">Nothing matches.</p></td></tr>`;
       return;
     }
     tbody.innerHTML = open.map(t => `
@@ -355,30 +402,29 @@
         <td><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${t.title}</strong></td>
         <td>${t.location}</td>
         <td style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
-        <td>${t.type.replace('_', '/')}</td>
+        <td>${TYPE_LABELS[t.type]}</td>
         <td><span class="status-pill ${t.urgency}">${t.urgency}</span></td>
-        <td>${ROLE === 'vet_nurse' ? `<button class="secondary mark-done" data-id="${t.id}" style="padding:5px 10px; font-size:0.75rem;">Mark done</button>` : ''}</td>
       </tr>
     `).join('');
-    tbody.querySelectorAll('.mark-done').forEach(btn => btn.addEventListener('click', () => markDone(Number(btn.dataset.id))));
   }
 
-  function renderAttnList(containerId, tasks) {
+  function renderBoardCol(containerId, tasks) {
     const el = document.getElementById(containerId);
-    if (!tasks.length) { el.innerHTML = '<p class="empty-state">Nothing here right now.</p>'; return; }
+    if (!tasks.length) { el.innerHTML = '<p class="empty-state">Nothing here.</p>'; return; }
     el.innerHTML = tasks.map(t => `
       <div class="attn-item">
-        <div><div class="aname">${t.title}</div><div class="ameta">${t.location} · ${SHIFT_LABELS[t.shift]} · ${t.type.replace('_', '/')}</div></div>
-        ${ROLE === 'vet_nurse' ? `<button class="secondary mark-done" data-id="${t.id}">Mark done</button>` : ''}
+        <div><div class="aname">${t.title}</div><div class="ameta">${t.location} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type]}</div></div>
+        <button class="secondary mark-done" data-id="${t.id}">Mark done</button>
       </div>
     `).join('');
     el.querySelectorAll('.mark-done').forEach(btn => btn.addEventListener('click', () => markDone(Number(btn.dataset.id))));
   }
 
-  function renderAttention() {
-    const open = TASKS.filter(t => !t.done);
-    renderAttnList('attn-immediate', open.filter(t => t.urgency === 'urgent'));
-    renderAttnList('attn-24h', open.filter(t => t.urgency === 'soon'));
+  function renderVetBoard() {
+    const open = TASKS.filter(t => !t.done && (typeFilter === 'all' || t.type === typeFilter));
+    renderBoardCol('board-urgent', open.filter(t => t.urgency === 'urgent'));
+    renderBoardCol('board-soon', open.filter(t => t.urgency === 'soon'));
+    renderBoardCol('board-routine', open.filter(t => t.urgency === 'routine'));
   }
 
   function renderCompleted() {
@@ -387,7 +433,7 @@
       .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
     document.getElementById('completed-list').innerHTML = recent.map(t => `
       <div class="completed-row">
-        <span>${t.title} — ${SHIFT_LABELS[t.shift]} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Attendant'}${t.note ? ' — ' + t.note : ''}</span>
+        <span>${t.title} — ${SHIFT_LABELS[t.shift]} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}${t.note ? ' — ' + t.note : ''}</span>
         <span class="time">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </div>
     `).join('') || '<p class="empty-state">Nothing completed recently.</p>';
@@ -406,13 +452,81 @@
     renderMemos();
   });
 
+  // --- Annual / monthly trends (synthetic placeholder history — this mock
+  // has no real historical data, so these series are generated, not real) ---
+  function genCumulative(n, avg, seed) {
+    let total = 0;
+    const arr = [];
+    for (let i = 0; i < n; i++) {
+      const wobble = Math.sin((i + seed) * 1.7) * avg * 0.4;
+      total += Math.max(0, Math.round(avg + wobble));
+      arr.push(total);
+    }
+    return arr;
+  }
+  const TODAY = new Date();
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MONTHS_SO_FAR = TODAY.getMonth() + 1;
+  const MONTH_LABELS = MONTH_NAMES.slice(0, MONTHS_SO_FAR);
+  const YEAR_SERIES = {
+    surgery: genCumulative(MONTHS_SO_FAR, 25, 1),
+    processing: genCumulative(MONTHS_SO_FAR, 90, 2),
+    sick_injured: genCumulative(MONTHS_SO_FAR, 60, 3),
+    attendant_flagged: genCumulative(MONTHS_SO_FAR, 40, 4),
+  };
+  const DAY_LABELS = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
+  const MONTH_SERIES = {
+    surgery: genCumulative(30, 1.1, 5),
+    processing: genCumulative(30, 3.2, 6),
+    sick_injured: genCumulative(30, 2.1, 7),
+    attendant_flagged: genCumulative(30, 1.4, 8),
+  };
+
+  function renderLineChart(containerId, seriesList, xLabels) {
+    const w = 600, h = 150, pad = 8;
+    const maxY = Math.max(1, ...seriesList.flatMap(s => s.values));
+    const n = xLabels.length;
+    const xStep = n > 1 ? (w - pad * 2) / (n - 1) : 0;
+    const toY = (v) => h - pad - (v / maxY) * (h - pad * 2);
+    const paths = seriesList.map(s => {
+      const d = s.values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(pad + i * xStep).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+      return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+    }).join('');
+    const legend = seriesList.map(s => `<span><i class="legend-dot" style="background:${s.color}"></i>${s.label}</span>`).join('');
+    document.getElementById(containerId).innerHTML = `
+      <div class="chart-legend">${legend}</div>
+      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:150px;">${paths}</svg>
+    `;
+  }
+
+  function renderTrends() {
+    document.getElementById('ytd-row').innerHTML = `
+      <div class="ytd-card"><div class="ytd-val" style="color:var(--blue)">${YEAR_SERIES.surgery.at(-1)}</div><div class="ytd-lbl">Surgeries this year</div></div>
+      <div class="ytd-card"><div class="ytd-val" style="color:var(--green)">${YEAR_SERIES.processing.at(-1)}</div><div class="ytd-lbl">Examinations this year</div></div>
+      <div class="ytd-card"><div class="ytd-val" style="color:var(--amber)">${YEAR_SERIES.sick_injured.at(-1)}</div><div class="ytd-lbl">Sick &amp; injured attended this year</div></div>
+    `;
+    renderLineChart('month-chart', [
+      { label: 'Surgeries', color: 'var(--blue)', values: MONTH_SERIES.surgery },
+      { label: 'Examinations (Processing)', color: 'var(--green)', values: MONTH_SERIES.processing },
+      { label: 'Sick & Injured revisits', color: 'var(--amber)', values: MONTH_SERIES.sick_injured },
+      { label: 'Flagged by Shelter Staff, completed', color: 'var(--violet)', values: MONTH_SERIES.attendant_flagged },
+    ], DAY_LABELS);
+    renderLineChart('year-chart', [
+      { label: 'Surgeries', color: 'var(--blue)', values: YEAR_SERIES.surgery },
+      { label: 'Examinations (Processing)', color: 'var(--green)', values: YEAR_SERIES.processing },
+      { label: 'Sick & Injured revisits', color: 'var(--amber)', values: YEAR_SERIES.sick_injured },
+      { label: 'Flagged by Shelter Staff, completed', color: 'var(--violet)', values: YEAR_SERIES.attendant_flagged },
+    ], MONTH_LABELS);
+  }
+
   function renderAll() {
     renderCompletion();
     renderShiftProgress();
     renderQueueTable();
-    renderAttention();
+    renderVetBoard();
     renderCompleted();
     renderMemos();
+    renderTrends();
   }
 
   applyRoleVisibility();
