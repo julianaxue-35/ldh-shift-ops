@@ -112,10 +112,21 @@ document.getElementById('run').addEventListener('click', async () => {
         !!syncSelErr || (Array.isArray(syncSelData) && syncSelData.length === 0),
         syncSelErr ? syncSelErr.message : `got ${syncSelData?.length ?? '?'} rows`
       ));
-      const { error: syncUpsertErr } = await syncClient.from('tasks').upsert({
-        title: 'verify-sync-test', location: 'Pound 1', shift: 'processing', done: true, completed_at: new Date().toISOString(),
-      }, { onConflict: 'title,location,shift' });
-      results.appendChild(row('Sync account CAN upsert a task', !syncUpsertErr, syncUpsertErr?.message));
+      // Raw fetch with explicit headers — bypasses any SDK-internal header
+      // timing, and PostgREST's raw JSON error body usually has more detail
+      // (a `details`/`hint` field) than the SDK's summarized error.
+      const rawResp = await fetch(`${url}/rest/v1/tasks?on_conflict=title,location,shift`, {
+        method: 'POST',
+        headers: {
+          'apikey': anon,
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify({ title: 'verify-sync-test', location: 'Pound 1', shift: 'processing', done: true, completed_at: new Date().toISOString() }),
+      });
+      const rawText = await rawResp.text();
+      results.appendChild(row('Sync account CAN upsert a task (raw fetch)', rawResp.ok, `HTTP ${rawResp.status} — ${rawText || '(empty body)'}`));
     }
   } else {
     results.appendChild(row('Sync account checks skipped (no credentials entered)', null));
