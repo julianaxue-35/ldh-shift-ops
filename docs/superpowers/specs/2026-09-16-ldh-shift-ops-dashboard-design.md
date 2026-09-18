@@ -172,16 +172,25 @@ buttons on a shared one** (amendment, 2026-09-18):
   logged as shift = Sick & Injured, since that's what Shelter Staff actually
   flag), the per-shift progress cards, and a flat searchable "Cases flagged"
   table.
-- **Vet/Nurse:** no per-shift progress cards (not useful to this role) and no
-  flat table — instead, "Cases flagged" is a 3-column board split by
-  urgency (Urgent / Soon / Routine), with a request-type filter bar above it
-  (All / Shelter / Foster / Rescue / Medication / Check-recheck). The type
-  filter exists specifically so remote staff who only help with medication
-  checks can filter straight to that queue. The memo board is Vet/Nurse-only
-  and moved here from being universally visible.
+- **Vet/Nurse:** no flat table — instead, "Cases flagged" is a 3-column
+  board split by urgency (Urgent / Soon / Routine), with a request-type
+  filter bar above it (All / Shelter / Foster / Rescue / Medication /
+  Check-recheck). The type filter exists specifically so remote staff who
+  only help with medication checks can filter straight to that queue. The
+  memo board is Vet/Nurse-only and moved here from being universally
+  visible.
 
-Both roles still see: the hero completion donut, "Recently completed," and
-the new annual/monthly trends section (below).
+**Correction, 2026-09-18 (same day):** the per-shift progress cards are
+visible to **both** roles, not Shelter-Staff-only as first built — Vet/Nurse
+needs them too, specifically so a vet can see at a glance which shift
+(Processing/Sick & Injured/Surgery) is falling behind and needs another
+vet's help partway through the day. Only the flat "Cases flagged" table is
+role-specific (Shelter Staff gets the table, Vet/Nurse gets the urgency
+board); the progress row is shared.
+
+Both roles still see: the hero completion donut, the per-shift progress
+cards, "Recently completed," and the new annual/monthly trends section
+(below).
 
 ## Request type taxonomy (amendment, 2026-09-18)
 
@@ -192,13 +201,24 @@ for placement-related requests (as opposed to clinical ones), added because
 "we will have different requests" down the road as this expands beyond
 purely clinical coordination.
 
+**Correction, 2026-09-18 (same day):** `check_recheck` is **not** offered on
+the Shelter Staff request form — a Shelter Staff member flagging something
+raises a Shelter/Foster/Rescue/Medication request, never a clinical
+check/recheck (that's Vet/Nurse's own follow-up work, not something
+Shelter Staff would originate). So the Shelter Staff form's `type` options
+are exactly `shelter` / `foster` / `rescue` / `medication` (four, not five).
+`check_recheck` still exists as a value in the schema and still appears as
+a filter option on the Vet/Nurse board, since check/recheck cases do occur
+in the system (e.g. from other sources such as the offline-tool sync) —
+it's just never selectable from the Shelter Staff form itself.
+
 ## Shifts, locations, shift-progress visuals
 
 - Three shifts — Processing, Sick & Injured, Surgery.
 - **Shift-progress visuals unified 2026-09-18** (see the first 2026-09-18
   amendment above) into one consistent card per shift: a progress bar,
-  "done / total processed today," and that shift's on-duty roster — visible
-  to Shelter Staff only, not Vet/Nurse (see Roles above).
+  "done / total processed today," and that shift's on-duty roster —
+  **visible to both roles** (see the Roles correction above).
 - Locations for physical routing: Cat Room 1-3, Adoption 1-2, FIR Room, Pound
   1-4, Transport.
 
@@ -292,25 +312,30 @@ headline ask: "how many surgeries have we done this year, how many
 examinations, how many sick animals attended" — three running annual
 totals, plus a shorter-horizon trend view.
 
-- **Three YTD counters:** Surgeries this year (`shift = 'surgery'`,
-  `done = true`, `completed_at` in current year), Examinations this year
-  (`shift = 'processing'`, same conditions — "examination" here means
-  Processing-shift work), Sick & injured attended this year
-  (`shift = 'sick_injured'`, same conditions).
-- **Past-30-days cumulative chart:** same three categories plus a fourth
-  line — tasks flagged by Shelter Staff that have since been completed —
-  plotted as a running cumulative total (not a bar-per-hour trend; a
-  monotonically-rising line avoids the earlier problem where an
-  hour-of-day chart always reads low at shift start).
-- **Granularity fallback:** daily buckets by default; if fewer than 30 days
-  of history exist yet (e.g. shortly after launch), fall back to weekly
-  buckets over whatever history does exist, rather than showing a
-  mostly-empty daily chart. Not yet implemented against real data — the
-  mock always renders synthetic daily data, since it has no real history to
-  be sparse in the first place.
-- **This-year cumulative chart:** the same four categories, monthly buckets,
-  January through the current month, cumulative — this is what backs the
-  three YTD counters (each counter is that series' latest value).
+- **Four categories, each fully on its own — never combined into one
+  multi-series chart** (correction, 2026-09-18, same day: the first version
+  overlaid all four as lines on two shared charts, which read as clutter;
+  each category now gets its own card with its own YTD number and its own
+  two graphs): Surgeries (`shift = 'surgery'`), Examinations
+  (`shift = 'processing'`), Sick & Injured attended (`shift = 'sick_injured'`),
+  and Flagged by Shelter Staff, completed (see the open question below on
+  what marks this cohort). Each category's `done = true` /
+  `completed_at`-in-range counts drive both its YTD number and its two
+  graphs.
+- **Two line graphs per category card**, not one: "Past 30 days" (daily,
+  cumulative) and "This year, by month" (monthly, cumulative) — both are
+  plain single-series line graphs, one colour per category, matching that
+  category's colour everywhere else in the app (blue/green/amber; violet
+  for the Shelter-Staff-flagged category, reusing the token that was
+  freed up when Processing's shift colour changed to green).
+- **Granularity fallback (past-30-days graph only):** daily buckets by
+  default; if fewer than 30 days of history exist yet (e.g. shortly after
+  launch), fall back to weekly buckets over whatever history does exist,
+  rather than showing a mostly-empty daily chart. Not yet implemented
+  against real data — the mock always renders synthetic daily data, since
+  it has no real history to be sparse in the first place.
+- Each category card's YTD number is simply the latest point of that
+  category's "this year, by month" series — no separate query needed.
 - **Open question — "flagged by Shelter Staff" needs a reliable marker:**
   right now, every task in the system originates from the Shelter Staff
   request form, so "flagged by Shelter Staff and completed" is currently

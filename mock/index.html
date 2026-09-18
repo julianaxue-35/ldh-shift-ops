@@ -146,19 +146,21 @@
   .memo strong { font-weight: 700; }
   #memo-post textarea { min-height: 60px; }
 
-  /* Annual / monthly trends */
-  .ytd-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
-  .ytd-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px; text-align: center; }
-  .ytd-card .ytd-val { font-size: 2rem; font-weight: 700; }
-  .ytd-card .ytd-lbl { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 4px; }
-  .chart-subhead { font-size: 0.85rem; margin: 18px 0 8px; }
-  .chart-subhead .fallback-note { font-weight: 400; color: var(--muted-light); font-size: 0.75rem; }
-  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; }
+  /* Annual / monthly trends — one card per category, each with its own
+     line graph. No combined multi-series chart. */
+  .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
+  .trend-card .trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+  .trend-card .trend-title { font-size: 0.9rem; font-weight: 700; }
+  .trend-card .trend-ytd { font-size: 1.5rem; font-weight: 700; }
+  .trend-card .trend-ytd-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .trend-card .chart-subhead { font-size: 0.75rem; margin: 12px 0 4px; color: var(--muted); }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
   .chart-legend span { display: flex; align-items: center; gap: 5px; }
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
   @media (max-width: 1000px) {
-    .shift-progress-row, .urgency-board, .ytd-row { grid-template-columns: 1fr; }
+    .shift-progress-row, .urgency-board, .trend-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
@@ -210,7 +212,6 @@
           <option value="foster">Foster request</option>
           <option value="rescue">Rescue request</option>
           <option value="medication">Medication</option>
-          <option value="check_recheck">Check/recheck</option>
         </select>
         <select id="req-urgency" style="margin:0;">
           <option value="routine">Routine</option>
@@ -275,12 +276,8 @@
 
     <section class="card" id="trends-section">
       <h2>Annual &amp; monthly progress</h2>
-      <p class="subtle">Completed work by category — surgeries, physical exams, and sick/injured animals attended.</p>
-      <div class="ytd-row" id="ytd-row"></div>
-      <h3 class="chart-subhead">Past 30 days (cumulative) <span class="fallback-note">— falls back to weekly buckets if less than 30 days of history exists yet</span></h3>
-      <div id="month-chart"></div>
-      <h3 class="chart-subhead">This year (cumulative, monthly)</h3>
-      <div id="year-chart"></div>
+      <p class="subtle">Each category tracked on its own — cumulative, so the line only ever climbs. Falls back to weekly buckets if less than 30 days of history exists yet.</p>
+      <div class="trend-grid" id="trend-grid"></div>
     </section>
   </main>
 </div>
@@ -315,7 +312,6 @@
     const isStaff = ROLE === 'attendant';
     document.getElementById('new-request-form').style.display = isStaff ? 'block' : 'none';
     document.getElementById('search-box').style.display = isStaff ? 'block' : 'none';
-    document.getElementById('shift-progress-row').style.display = isStaff ? 'grid' : 'none';
     document.getElementById('cases-flagged').style.display = isStaff ? 'block' : 'none';
     document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
     document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
@@ -482,41 +478,38 @@
     attendant_flagged: genCumulative(30, 1.4, 8),
   };
 
-  function renderLineChart(containerId, seriesList, xLabels) {
-    const w = 600, h = 150, pad = 8;
-    const maxY = Math.max(1, ...seriesList.flatMap(s => s.values));
+  function lineChartSvg(values, color, xLabels) {
+    const w = 300, h = 90, pad = 6;
+    const maxY = Math.max(1, ...values);
     const n = xLabels.length;
     const xStep = n > 1 ? (w - pad * 2) / (n - 1) : 0;
     const toY = (v) => h - pad - (v / maxY) * (h - pad * 2);
-    const paths = seriesList.map(s => {
-      const d = s.values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(pad + i * xStep).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-      return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
-    }).join('');
-    const legend = seriesList.map(s => `<span><i class="legend-dot" style="background:${s.color}"></i>${s.label}</span>`).join('');
-    document.getElementById(containerId).innerHTML = `
-      <div class="chart-legend">${legend}</div>
-      <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:150px;">${paths}</svg>
-    `;
+    const d = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(pad + i * xStep).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:90px;">
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+    </svg>`;
   }
 
+  const TREND_CATEGORIES = [
+    { key: 'surgery', title: 'Surgeries', color: 'var(--blue)' },
+    { key: 'processing', title: 'Examinations (Processing)', color: 'var(--green)' },
+    { key: 'sick_injured', title: 'Sick & Injured attended', color: 'var(--amber)' },
+    { key: 'attendant_flagged', title: 'Flagged by Shelter Staff, completed', color: 'var(--violet)' },
+  ];
+
   function renderTrends() {
-    document.getElementById('ytd-row').innerHTML = `
-      <div class="ytd-card"><div class="ytd-val" style="color:var(--blue)">${YEAR_SERIES.surgery.at(-1)}</div><div class="ytd-lbl">Surgeries this year</div></div>
-      <div class="ytd-card"><div class="ytd-val" style="color:var(--green)">${YEAR_SERIES.processing.at(-1)}</div><div class="ytd-lbl">Examinations this year</div></div>
-      <div class="ytd-card"><div class="ytd-val" style="color:var(--amber)">${YEAR_SERIES.sick_injured.at(-1)}</div><div class="ytd-lbl">Sick &amp; injured attended this year</div></div>
-    `;
-    renderLineChart('month-chart', [
-      { label: 'Surgeries', color: 'var(--blue)', values: MONTH_SERIES.surgery },
-      { label: 'Examinations (Processing)', color: 'var(--green)', values: MONTH_SERIES.processing },
-      { label: 'Sick & Injured revisits', color: 'var(--amber)', values: MONTH_SERIES.sick_injured },
-      { label: 'Flagged by Shelter Staff, completed', color: 'var(--violet)', values: MONTH_SERIES.attendant_flagged },
-    ], DAY_LABELS);
-    renderLineChart('year-chart', [
-      { label: 'Surgeries', color: 'var(--blue)', values: YEAR_SERIES.surgery },
-      { label: 'Examinations (Processing)', color: 'var(--green)', values: YEAR_SERIES.processing },
-      { label: 'Sick & Injured revisits', color: 'var(--amber)', values: YEAR_SERIES.sick_injured },
-      { label: 'Flagged by Shelter Staff, completed', color: 'var(--violet)', values: YEAR_SERIES.attendant_flagged },
-    ], MONTH_LABELS);
+    document.getElementById('trend-grid').innerHTML = TREND_CATEGORIES.map(c => `
+      <div class="trend-card">
+        <div class="trend-head">
+          <span class="trend-title" style="color:${c.color}">${c.title}</span>
+          <span><span class="trend-ytd" style="color:${c.color}">${YEAR_SERIES[c.key].at(-1)}</span> <span class="trend-ytd-lbl">this year</span></span>
+        </div>
+        <h4 class="chart-subhead">Past 30 days</h4>
+        ${lineChartSvg(MONTH_SERIES[c.key], c.color, DAY_LABELS)}
+        <h4 class="chart-subhead">This year, by month</h4>
+        ${lineChartSvg(YEAR_SERIES[c.key], c.color, MONTH_LABELS)}
+      </div>
+    `).join('');
   }
 
   function renderAll() {
