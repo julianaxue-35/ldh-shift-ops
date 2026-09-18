@@ -292,14 +292,79 @@ only this much —
   outbound-only write path instead of being entirely silent.
 - **What this requires of the offline tools (not yet built):** they currently
   have zero network calls. This adds the Supabase project URL + anon key
-  (safe to embed, same as the dashboard — RLS is the real gate) plus
-  whatever satisfies `auth.role() = 'authenticated'` under the shared-password
-  scheme, so the tools can authenticate the same way the dashboard does. The
-  write must be best-effort and non-blocking: if there's no connectivity at
-  the moment of ticking "Completed" (shelter wifi is not guaranteed), the
-  local completion still succeeds and the sync either retries quietly or is
-  simply skipped — it must never stop a vet from finishing their local
-  record because the dashboard couldn't be reached.
+  (safe to embed — RLS is the real gate) plus a sign-in. The write must be
+  best-effort and non-blocking: if there's no connectivity at the moment of
+  ticking "Completed" (shelter wifi is not guaranteed), the local completion
+  still succeeds and the sync either retries quietly or is simply skipped —
+  it must never stop a vet from finishing their local record because the
+  dashboard couldn't be reached.
+- **Decided, 2026-09-18: a dedicated low-privilege sync account, not the
+  shared staff login.** The three offline tools authenticate as their own
+  Supabase Auth user — separate from the shared staff account the dashboard
+  itself uses — scoped so it can `insert`/`update` on `tasks` only, and
+  cannot `select` from `tasks`, `memos`, or `roster` at all. This bounds the
+  damage if this credential ever leaks from the public GitHub Pages source:
+  worst case, someone can write junk completions, never read anything.
+  Implementation:
+  1. Create the account (Supabase Dashboard → Authentication → Add User —
+     any valid-format email, e.g. `sync@ldh-shift-tools.internal`).
+  2. Tag it via SQL Editor (this only works with `raw_app_meta_data`, never
+     `raw_user_meta_data` — the latter is client-settable and would let
+     anyone self-elevate):
+     ```sql
+     update auth.users
+     set raw_app_meta_data = raw_app_meta_data || '{"role": "sync_writer"}'::jsonb
+     where email = 'sync@ldh-shift-tools.internal';
+     ```
+  3. New migration, `0003_sync_account_scope.sql` — replace the blanket
+     `authenticated_select_*` policies (which would otherwise grant this
+     new account read access too, since RLS policies for the same
+     operation are OR'd together) with versions that exclude the
+     `sync_writer` role:
+     ```sql
+     drop policy "authenticated_select_tasks" on public.tasks;
+     drop policy "authenticated_select_memos" on public.memos;
+     drop policy "authenticated_insert_memos" on public.memos;
+     drop policy "authenticated_select_roster" on public.roster;
+     drop policy "authenticated_insert_roster" on public.roster;
+     drop policy "authenticated_update_roster" on public.roster;
+     drop policy "authenticated_delete_roster" on public.roster;
+
+     create policy "staff_select_tasks" on public.tasks for select using (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     create policy "staff_select_memos" on public.memos for select using (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     create policy "staff_insert_memos" on public.memos for insert with check (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     create policy "staff_select_roster" on public.roster for select using (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     create policy "staff_insert_roster" on public.roster for insert with check (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     create policy "staff_update_roster" on public.roster for update using (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     create policy "staff_delete_roster" on public.roster for delete using (
+       auth.role() = 'authenticated'
+       and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer'
+     );
+     ```
+     `authenticated_insert_tasks` / `authenticated_update_tasks` from
+     `0002_rls_policies.sql` stay exactly as they are — both the staff
+     account and the sync account need to write `tasks`, so that policy
+     was already correctly scoped and needs no change.
+  4. Each offline tool signs in as this account instead of the shared staff
+     login: `sb.auth.signInWithPassword({ email: 'sync@ldh-shift-tools.internal', password: '<sync-account-password>' })`.
 - **Not yet decided:** retry/queueing behaviour on failed sync, and whether a
   failed sync is surfaced to the user at all (leaning toward: no, keep it
   silent, since the offline tool's own record is always the source of truth
