@@ -114,11 +114,13 @@ keeps clinical content **out of the cloud database entirely**:
   task category plus a status flag. Not medically sensitive even if somehow
   exposed.
 - **Stays offline (in the existing `processing.html` / `sick-injured.html` /
-  `surgery.html` tools, localStorage only, never networked):** the actual
-  clinical detail — exam findings, treatment given, medical history. When a
-  vet marks a task done on the live board, the board just flips to "done";
-  the substance of what happened is written into the existing offline tool,
-  exactly as it is today.
+  `surgery.html` tools, localStorage only):** the actual clinical detail —
+  exam findings, treatment given, medical history — never leaves these
+  tools. The substance of what happened is written here, exactly as it is
+  today. (As of the 2026-09-18 amendment below, these tools do gain one
+  narrow outbound write — a completion signal carrying only animal ID,
+  location, and shift — but that's operational metadata, not clinical
+  content, and it's the same category of data the cloud side already holds.)
 - **The "Recently completed" panel** on the live board shows status plus a
   short free-text note (e.g. "needs recheck tomorrow", "moved to Cat Room
   2") — intended for coordination only, **not** clinical detail. This is a
@@ -195,9 +197,54 @@ misconfigured policy.
 
 ## Open items carried from the original prototype (unresolved, not blocking this spec)
 
-- Whether this dashboard should eventually feed into or replace a planned
-  separate "Sick & Injured" note-writing tool.
 - Roster is a manually-edited list, not imported from anywhere.
-- Design system (light neumorphic soft-UI, amber/royal-blue/violet accents
-  per shift) carries over from the most recent iteration of the original
-  prototype; system font stack only, no external dependencies.
+- Design system (light neumorphic soft-UI, amber/green/royal-blue accents
+  per shift — Processing green, Sick & Injured amber, Surgery blue) carries
+  over from the most recent iteration of the original prototype; system font
+  stack only, no external dependencies.
+
+## Amendment (2026-09-18): narrow, one-directional completion sync from the offline tools
+
+Resolves the open item above about whether the dashboard should connect to
+`processing.html` / `sick-injured.html` / `surgery.html`. Decided: yes, but
+only this much —
+
+- **What crosses the wire:** exactly three fields — animal ID, location,
+  shift — plus an implicit `done = true` and `completed_at = now()`. Nothing
+  else. No exam findings, no treatment notes, no medical history.
+- **When it fires:** only the moment an item is ticked **Completed** inside
+  one of the three offline tools. Loading/registering the day's list does
+  **not** push anything — there is no "here's today's roster" sync, only a
+  "this one's done" sync. This keeps the tools' default state unchanged:
+  silent and local unless a completion actually happens.
+- **What never crosses the wire:** the Word/Excel exports. They stay exactly
+  as they are today — generated locally, never touching Supabase. This isn't
+  an export-parsing integration; it's a write triggered directly by the
+  "Completed" action in the tool's own UI, at the moment it happens.
+- **Matching:** the push is an upsert against the `tasks` table keyed on
+  (title = animal ID, location, shift). If a matching open task already
+  exists (logged earlier via the dashboard's own "New task request" form),
+  it flips to done. If none exists — the common case, since attendants won't
+  always have pre-logged everything — a new, already-done task row is
+  inserted, so it still shows up in "Cases flagged"/completion history
+  without anyone having double-entered it.
+- **Why this doesn't break the online/offline privacy split:** the three
+  fields sent are the same category of "operational metadata" the dashboard
+  already holds in the cloud for manually-logged tasks (see "The
+  online/offline split" above) — an animal number, a location, a shift. No
+  new sensitive surface is created; the offline tools just gain one narrow,
+  outbound-only write path instead of being entirely silent.
+- **What this requires of the offline tools (not yet built):** they currently
+  have zero network calls. This adds the Supabase project URL + anon key
+  (safe to embed, same as the dashboard — RLS is the real gate) plus
+  whatever satisfies `auth.role() = 'authenticated'` under the shared-password
+  scheme, so the tools can authenticate the same way the dashboard does. The
+  write must be best-effort and non-blocking: if there's no connectivity at
+  the moment of ticking "Completed" (shelter wifi is not guaranteed), the
+  local completion still succeeds and the sync either retries quietly or is
+  simply skipped — it must never stop a vet from finishing their local
+  record because the dashboard couldn't be reached.
+- **Not yet decided:** retry/queueing behaviour on failed sync, and whether a
+  failed sync is surfaced to the user at all (leaning toward: no, keep it
+  silent, since the offline tool's own record is always the source of truth
+  and this is a convenience mirror, not the system of record).
