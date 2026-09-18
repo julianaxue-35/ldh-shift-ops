@@ -25,21 +25,36 @@ const SERVICE_KEY = Deno.env.get('SERVICE_KEY');
 
 const VALID_SHIFTS = ['processing', 'sick_injured', 'surgery'];
 
+// Called cross-origin from GitHub Pages (a different origin than this
+// function), so the browser sends a CORS preflight OPTIONS request before
+// the real POST. Missing this was the actual bug on the first deploy: curl
+// doesn't enforce CORS, so testing with curl looked fine while every real
+// browser call silently failed the preflight and was never sent.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'apikey, x-sync-secret, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: CORS_HEADERS });
   }
 
   const providedSecret = req.headers.get('x-sync-secret');
   if (!SYNC_SECRET || providedSecret !== SYNC_SECRET) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: CORS_HEADERS });
   }
 
   let body;
   try {
     body = await req.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: CORS_HEADERS });
   }
 
   const title = typeof body.title === 'string' ? body.title.trim() : '';
@@ -49,7 +64,7 @@ Deno.serve(async (req) => {
   if (!title || !location || !VALID_SHIFTS.includes(shift)) {
     return new Response(
       JSON.stringify({ error: 'title, location, and a valid shift (processing/sick_injured/surgery) are required' }),
-      { status: 400 },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
@@ -60,11 +75,11 @@ Deno.serve(async (req) => {
   );
 
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
   }
 
   return new Response(JSON.stringify({ ok: true }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
 });
