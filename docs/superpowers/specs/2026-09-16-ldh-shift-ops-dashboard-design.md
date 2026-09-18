@@ -277,13 +277,22 @@ only this much —
   as they are today — generated locally, never touching Supabase. This isn't
   an export-parsing integration; it's a write triggered directly by the
   "Completed" action in the tool's own UI, at the moment it happens.
-- **Matching:** the push is an upsert against the `tasks` table keyed on
-  (title = animal ID, location, shift). If a matching open task already
-  exists (logged earlier via the dashboard's own "New task request" form),
-  it flips to done. If none exists — the common case, since attendants won't
-  always have pre-logged everything — a new, already-done task row is
-  inserted, so it still shows up in "Cases flagged"/completion history
-  without anyone having double-entered it.
+- **Matching:** the push is an upsert against the `tasks` table keyed on a
+  unique index on (title = animal ID, location, shift). If a matching open
+  task already exists (logged earlier via the dashboard's own "New task
+  request" form), it flips to done. If none exists — the common case, since
+  attendants won't always have pre-logged everything — a new, already-done
+  task row is inserted, so it still shows up in "Cases flagged"/completion
+  history without anyone having double-entered it.
+- **Schema correction, 2026-09-18:** `type` and `urgency` are `NOT NULL`
+  with no default in the original migration, but the 3-field sync payload
+  deliberately never sets either — so the insert-a-new-row branch above
+  would fail on a constraint violation, not succeed as described. Fixed by
+  giving `type` a default of `'check_recheck'` and `urgency` a default of
+  `'routine'` in `0001_init_schema.sql`. These defaults only ever apply to
+  the insert-new-row case; an update to an existing matched row leaves its
+  real `type`/`urgency` untouched, since the upsert payload doesn't
+  reference those columns.
 - **Why this doesn't break the online/offline privacy split:** the three
   fields sent are the same category of "operational metadata" the dashboard
   already holds in the cloud for manually-logged tasks (see "The

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LDH Shift Ops — Supabase setup verifier</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; line-height: 1.5; }
+  input { width: 100%; padding: 8px; margin: 4px 0 14px; box-sizing: border-box; }
+  label { font-size: 0.85rem; font-weight: 600; }
+  button { padding: 10px 18px; font-weight: 700; cursor: pointer; margin-top: 10px; }
+  .row { margin: 10px 0; padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; }
+  .pass { background: #e6f7ee; color: #1a7a4c; }
+  .fail { background: #fdecec; color: #a3231a; }
+  .pending { background: #f2f2f2; color: #555; }
+  code { background: #f2f2f2; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>Supabase setup verifier</h1>
+<p>Runs directly in your browser, nothing is sent anywhere except your own Supabase project. Not committed with real credentials — fill these in locally each time.</p>
+
+<label>Project URL</label>
+<input id="url" placeholder="https://xxxx.supabase.co">
+<label>Anon key</label>
+<input id="anon" placeholder="anon public key from Settings → API">
+<label>Staff account email</label>
+<input id="staffEmail" placeholder="staff@...">
+<label>Staff account password</label>
+<input id="staffPass" type="password">
+<label>Sync account email</label>
+<input id="syncEmail" placeholder="sync@ldh-shift-tools.internal">
+<label>Sync account password</label>
+<input id="syncPass" type="password">
+
+<button id="run">Run checks</button>
+<div id="results"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+function row(label, pass, detail) {
+  const div = document.createElement('div');
+  div.className = 'row ' + (pass === null ? 'pending' : pass ? 'pass' : 'fail');
+  div.textContent = (pass === null ? '… ' : pass ? '✓ ' : '✗ ') + label + (detail ? ' — ' + detail : '');
+  return div;
+}
+
+document.getElementById('run').addEventListener('click', async () => {
+  const url = document.getElementById('url').value.trim();
+  const anon = document.getElementById('anon').value.trim();
+  const results = document.getElementById('results');
+  results.innerHTML = '';
+  if (!url || !anon) { results.appendChild(row('Fill in Project URL and Anon key first', false)); return; }
+
+  // Check 1: anonymous client cannot read tasks
+  const anonClient = supabase.createClient(url, anon);
+  const { data: anonTasks, error: anonErr } = await anonClient.from('tasks').select('*');
+  results.appendChild(row(
+    'Anonymous client reads zero tasks',
+    !anonErr && Array.isArray(anonTasks) && anonTasks.length === 0,
+    anonErr ? anonErr.message : `got ${anonTasks?.length ?? '?'} rows`
+  ));
+
+  // Check 2: anonymous client cannot insert
+  const { error: anonInsertErr } = await anonClient.from('tasks').insert({
+    title: 'verify-test', location: 'Pound 1', shift: 'processing', type: 'medication', urgency: 'routine',
+  });
+  results.appendChild(row('Anonymous client cannot insert a task', !!anonInsertErr, anonInsertErr?.message));
+
+  // Check 3: staff account can read + insert
+  const staffEmail = document.getElementById('staffEmail').value.trim();
+  const staffPass = document.getElementById('staffPass').value;
+  if (staffEmail && staffPass) {
+    const staffClient = supabase.createClient(url, anon);
+    const { error: signInErr } = await staffClient.auth.signInWithPassword({ email: staffEmail, password: staffPass });
+    if (signInErr) {
+      results.appendChild(row('Staff account sign-in', false, signInErr.message));
+    } else {
+      const { data: staffTasks, error: staffSelErr } = await staffClient.from('tasks').select('*');
+      results.appendChild(row('Staff account can read tasks', !staffSelErr, staffSelErr ? staffSelErr.message : `${staffTasks.length} rows`));
+    }
+  } else {
+    results.appendChild(row('Staff account checks skipped (no credentials entered)', null));
+  }
+
+  // Check 4: sync_writer account can insert/update but NOT select
+  const syncEmail = document.getElementById('syncEmail').value.trim();
+  const syncPass = document.getElementById('syncPass').value;
+  if (syncEmail && syncPass) {
+    const syncClient = supabase.createClient(url, anon);
+    const { error: syncSignInErr } = await syncClient.auth.signInWithPassword({ email: syncEmail, password: syncPass });
+    if (syncSignInErr) {
+      results.appendChild(row('Sync account sign-in', false, syncSignInErr.message));
+    } else {
+      const { data: syncSelData, error: syncSelErr } = await syncClient.from('tasks').select('*');
+      results.appendChild(row(
+        'Sync account CANNOT read tasks (should fail/empty)',
+        !!syncSelErr || (Array.isArray(syncSelData) && syncSelData.length === 0),
+        syncSelErr ? syncSelErr.message : `got ${syncSelData?.length ?? '?'} rows`
+      ));
+      const { error: syncUpsertErr } = await syncClient.from('tasks').upsert({
+        title: 'verify-sync-test', location: 'Pound 1', shift: 'processing', done: true, completed_at: new Date().toISOString(),
+      }, { onConflict: 'title,location,shift' });
+      results.appendChild(row('Sync account CAN upsert a task', !syncUpsertErr, syncUpsertErr?.message));
+    }
+  } else {
+    results.appendChild(row('Sync account checks skipped (no credentials entered)', null));
+  }
+});
+</script>
+</body>
+</html>
