@@ -84,6 +84,8 @@
   .completion-donut {
     width: 200px; height: 200px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; flex-direction: column;
+    border: 3px solid rgba(30,34,56,0.18);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.6) inset;
   }
   .completion-donut .val { font-size: 2.6rem; font-weight: 700; }
   .completion-donut .lbl { font-size: 0.8rem; color: var(--muted); }
@@ -356,7 +358,7 @@
     const total = TASKS.length || 1;
     const done = TASKS.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
-    document.getElementById('completion-donut').style.background = `conic-gradient(var(--blue) ${pct * 3.6}deg, var(--neutral-100) 0deg)`;
+    document.getElementById('completion-donut').style.background = `conic-gradient(var(--blue) ${pct * 3.6}deg, var(--neutral-300) 0deg)`;
     document.getElementById('completion-donut').innerHTML = `<span class="val">${pct}%</span><span class="lbl">TODAY</span>`;
     document.getElementById('completion-fraction').textContent = `${done} of ${total}`;
   }
