@@ -1,12 +1,20 @@
-// LDH Shift Ops — offline-tool completion sync.
+// LDH Shift Ops — offline-tool sync (completions + list-load).
 //
-// Called by processing.html / sick-injured.html / surgery.html at the
-// moment an item is ticked "Completed". Accepts exactly the 3 fields the
-// 2026-09-18 spec amendment allows (animal ID, location, shift) plus a
-// shared secret — never a Supabase Auth session. Runs with the service
-// role key, which bypasses RLS entirely, so this function itself is the
-// only thing that must be trusted to only ever touch `tasks`, and only
-// ever insert/update, never read anything back to the caller.
+// Two request shapes, same endpoint, same shared secret:
+//   1. { title, location, shift }        — one item just ticked "Completed"
+//      in an offline tool. Upserts done=true, completed_at=now().
+//   2. { items: [{title,location,shift}, ...] } — a whole list just got
+//      loaded/imported into an offline tool (2026-09-19 amendment, "Option
+//      1": the dashboard needs the total, not just completions, to show
+//      "X of Y" instead of just "X"). Insert-only, ON CONFLICT DO NOTHING —
+//      this must NEVER overwrite an existing row's done/completed_at, since
+//      an item already marked complete must stay complete even if the same
+//      list gets re-imported.
+//
+// Runs with the service role key, which bypasses RLS entirely, so this
+// function itself is the only thing that must be trusted to only ever
+// touch `tasks`, and only ever insert/update, never read anything back to
+// the caller.
 //
 // Why this exists instead of a scoped "sync_writer" Supabase Auth user:
 // that approach (see the design spec's Option 2) hit an unresolved,
@@ -57,6 +65,39 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: CORS_HEADERS });
   }
 
+  const supabase = createClient(PROJECT_URL, SERVICE_KEY);
+
+  // Shape 2: batch list-load. Insert-only — never touches an existing row's
+  // done/completed_at, so a re-imported list can't un-complete something.
+  if (Array.isArray(body.items)) {
+    const rows = body.items
+      .map((it) => ({
+        title: typeof it?.title === 'string' ? it.title.trim() : '',
+        location: typeof it?.location === 'string' ? it.location.trim() : '',
+        shift: it?.shift,
+      }))
+      .filter((it) => it.title && it.location && VALID_SHIFTS.includes(it.shift));
+
+    if (!rows.length) {
+      return new Response(JSON.stringify({ error: 'No valid items in the list' }), { status: 400, headers: CORS_HEADERS });
+    }
+
+    const { error } = await supabase.from('tasks').upsert(rows, {
+      onConflict: 'title,location,shift',
+      ignoreDuplicates: true,
+    });
+
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    }
+
+    return new Response(JSON.stringify({ ok: true, count: rows.length }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Shape 1: single completion.
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const location = typeof body.location === 'string' ? body.location.trim() : '';
   const shift = body.shift;
@@ -68,7 +109,6 @@ Deno.serve(async (req) => {
     );
   }
 
-  const supabase = createClient(PROJECT_URL, SERVICE_KEY);
   const { error } = await supabase.from('tasks').upsert(
     { title, location, shift, done: true, completed_at: new Date().toISOString() },
     { onConflict: 'title,location,shift' },
