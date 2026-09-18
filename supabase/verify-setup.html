@@ -51,8 +51,13 @@ document.getElementById('run').addEventListener('click', async () => {
   results.innerHTML = '';
   if (!url || !anon) { results.appendChild(row('Fill in Project URL and Anon key first', false)); return; }
 
+  // Each client gets its own isolated storage key — otherwise all three
+  // clients share the same localStorage slot (since they point at the same
+  // project URL), and one account's session can clobber another's mid-run.
+  const clientOpts = (key) => ({ auth: { storageKey: key, persistSession: true, autoRefreshToken: false } });
+
   // Check 1: anonymous client cannot read tasks
-  const anonClient = supabase.createClient(url, anon);
+  const anonClient = supabase.createClient(url, anon, clientOpts('verify-anon'));
   const { data: anonTasks, error: anonErr } = await anonClient.from('tasks').select('*');
   results.appendChild(row(
     'Anonymous client reads zero tasks',
@@ -70,7 +75,7 @@ document.getElementById('run').addEventListener('click', async () => {
   const staffEmail = document.getElementById('staffEmail').value.trim();
   const staffPass = document.getElementById('staffPass').value;
   if (staffEmail && staffPass) {
-    const staffClient = supabase.createClient(url, anon);
+    const staffClient = supabase.createClient(url, anon, clientOpts('verify-staff'));
     const { error: signInErr } = await staffClient.auth.signInWithPassword({ email: staffEmail, password: staffPass });
     if (signInErr) {
       results.appendChild(row('Staff account sign-in', false, signInErr.message));
@@ -86,7 +91,7 @@ document.getElementById('run').addEventListener('click', async () => {
   const syncEmail = document.getElementById('syncEmail').value.trim();
   const syncPass = document.getElementById('syncPass').value;
   if (syncEmail && syncPass) {
-    const syncClient = supabase.createClient(url, anon);
+    const syncClient = supabase.createClient(url, anon, clientOpts('verify-sync'));
     const { error: syncSignInErr } = await syncClient.auth.signInWithPassword({ email: syncEmail, password: syncPass });
     if (syncSignInErr) {
       results.appendChild(row('Sync account sign-in', false, syncSignInErr.message));
