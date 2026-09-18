@@ -82,6 +82,22 @@ document.getElementById('run').addEventListener('click', async () => {
     } else {
       const { data: staffTasks, error: staffSelErr } = await staffClient.from('tasks').select('*');
       results.appendChild(row('Staff account can read tasks', !staffSelErr, staffSelErr ? staffSelErr.message : `${staffTasks.length} rows`));
+
+      // Same raw-fetch pattern as the sync account's insert test below —
+      // if THIS also fails, the problem is project-wide, not sync-specific.
+      const { data: { session: staffSession } } = await staffClient.auth.getSession();
+      const staffRawResp = await fetch(`${url}/rest/v1/tasks?on_conflict=title,location,shift`, {
+        method: 'POST',
+        headers: {
+          'apikey': anon,
+          'Authorization': `Bearer ${staffSession.access_token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal',
+        },
+        body: JSON.stringify({ title: 'verify-staff-test', location: 'Pound 1', shift: 'processing', done: false }),
+      });
+      const staffRawText = await staffRawResp.text();
+      results.appendChild(row('Staff account CAN insert a task (raw fetch)', staffRawResp.ok, `HTTP ${staffRawResp.status} — ${staffRawText || '(empty body)'}`));
     }
   } else {
     results.appendChild(row('Staff account checks skipped (no credentials entered)', null));
