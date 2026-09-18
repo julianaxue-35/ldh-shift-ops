@@ -17,8 +17,60 @@
 - No clinical/medical-detail field anywhere in the Supabase schema. The only free-text field synced live is the short completion note, and its UI label/placeholder must say it is for coordination only, not clinical detail (per spec).
 - Every table (`tasks`, `memos`, `roster`) must have RLS enabled with an `authenticated`-only policy — verified by a direct anonymous-query test, not just UI behavior.
 - Frontend is a single `index.html` file, system font stack, no external font dependency (per spec — external JS SDK for Supabase is the one allowed exception, stated above).
-- Design tokens (verbatim from spec): background `#F4F6FB`; sidebar `#1E2238` with white text; card shadow `8px 8px 18px rgba(163,177,198,0.45), -8px -8px 18px rgba(255,255,255,0.85)` (inset variant for inputs); accent colors amber `#FF9F43` (primary / Sick & Injured), royal blue `#4A6CF7` (Surgery), violet `#8C62FF` (Processing); rounded corners 14-20px; thin dividers only, no hard borders elsewhere.
+- Design tokens (updated 2026-09-18, see amendment below — **verbatim from `mock/index.html`, which supersedes the values originally stated here**): background `#F4F6FB`; sidebar `#1E2238` with white text; card shadow `8px 8px 18px rgba(163,177,198,0.45), -8px -8px 18px rgba(255,255,255,0.85)` (inset variant for inputs); accent colors amber `#FF9F43` (Sick & Injured), royal blue `#4A6CF7` (Surgery), green `#229A63` (Processing — changed from the original violet); rounded corners 14-20px; thin dividers only, no hard borders elsewhere — **except** `#new-request-form`, which is deliberately flat (`#fff` background, `1px solid rgba(30,34,56,0.12)` border, no shadow) rather than a raised card, per Juliana's feedback that the fill-in form should read as a plain box, not a display tile.
 - Shifts are exactly: `processing`, `sick_injured`, `surgery`. Locations are exactly: Cat Room 1, Cat Room 2, Cat Room 3, Adoption 1, Adoption 2, FIR Room, Pound 1, Pound 2, Pound 3, Pound 4, Transport.
+
+## Design updates since this plan was first written (2026-09-18)
+
+The spec's original visual description (three different chart types, one per
+shift; location-grouped open queue; small "Urgent attention" rail card;
+"Recently completed" and memo board both in a sidebar-adjacent rail) was
+superseded through a design-review pass done directly against a working
+mock. **`mock/index.html` in this repo is now the authoritative reference for
+markup, CSS, and layout** — build the real frontend (Tasks 4-7) by adapting
+its structure directly, wiring in real Supabase calls per the data-flow
+guidance already in those tasks, rather than the original inline code
+samples below, which describe the pre-redesign layout and are now stale
+guidance for the specific UI, though their Supabase wiring/interface
+guidance still holds.
+
+Deltas from the original plan text, for anyone diffing against the tasks below:
+
+- **"Open queue" → "Cases flagged"**: a single table (Animal / Location /
+  Shift / Type / Urgency / action), sorted urgent-first, with a search-by-
+  animal-ID box — not the original location-grouped card list.
+- **Shift-progress charts unified**: the original spec gave each shift a
+  different chart type (paired bar / donut / horizontal bars). Replaced with
+  one consistent card per shift — a progress bar plus "`done` / `total`
+  processed today" plus that shift's on-duty roster chips folded in (roster
+  no longer has its own separate panel).
+- **New hero "Completion" donut**: one large donut above the shift-progress
+  row showing total tasks completed today across all shifts combined.
+- **"Recently completed" panel retained**, placed directly under "Cases
+  flagged" — this isn't optional polish, it's what the spec's
+  Progress/documentation-tracking cross-check (supervisor checks the board's
+  done list against the offline tool's export by animal ID) actually depends
+  on having a visible list to check against.
+- **"Urgent attention" split into two tiers**: "Needs immediate attention"
+  (`urgency = 'urgent'`) and "Due within 24 hours" (`urgency = 'soon'` — e.g.
+  medication requests), each its own list with a mark-done action for
+  vet/nurse. No new field was added for this — it's derived from the
+  existing `urgency` enum, not a new manual input.
+- **Memo board moved to the very bottom of the page**, full width, laid out
+  to wrap and grow rather than being height-constrained in a rail.
+- **Processing's colour changed from violet to green** (`#229A63`). Amber
+  (Sick & Injured) and blue (Surgery) are unchanged. Juliana's own words:
+  "we will refine it as it goes" — treat this palette as still open to
+  iteration, not finalized.
+
+**Not part of this plan** — tracked instead as the 2026-09-18 amendment to
+the spec (`docs/superpowers/specs/2026-09-16-ldh-shift-ops-dashboard-design.md`):
+a narrow, one-directional completion sync from `processing.html` /
+`sick-injured.html` / `surgery.html` (in `~/ldh-shift-tools`, a separate
+repo) that pushes animal ID + location + shift to this dashboard's `tasks`
+table, only at the moment an item is ticked Completed in those tools. That
+work touches a different repo and needs its own plan once this dashboard is
+live and its schema is stable — do not fold it into Tasks 1-8 below.
 
 ---
 
