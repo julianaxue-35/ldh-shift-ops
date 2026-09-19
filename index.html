@@ -164,6 +164,9 @@
   .completed-row .time { color: var(--muted-light); white-space: nowrap; }
 
   .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
   .filter-chip {
     border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
     font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
@@ -289,6 +292,16 @@
         <input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg" style="margin:0;">
       </div>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
+    </section>
+
+    <section class="card" id="start-shift-card" style="display:none">
+      <h2>Start a shift</h2>
+      <p class="subtle">Opens the shift tool in a new tab. Clinical detail is entered there, not here.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/processing.html" target="_blank" rel="noopener"><b>Processing</b><span>Intake, exams, vaccination</span></a>
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html" target="_blank" rel="noopener"><b>Sick &amp; Injured</b><span>Rechecks and flagged animals</span></a>
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/surgery.html" target="_blank" rel="noopener"><b>Surgery</b><span>Desexing list, notes, sharing</span></a>
+      </div>
     </section>
 
     <div class="kpi-row">
@@ -538,6 +551,7 @@
     document.getElementById('search-box').style.display = isStaff ? 'block' : 'none';
     document.getElementById('cases-flagged').style.display = isStaff ? 'block' : 'none';
     document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
+    document.getElementById('start-shift-card').style.display = isStaff ? 'none' : 'block';
     document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
     renderAll();
   }
