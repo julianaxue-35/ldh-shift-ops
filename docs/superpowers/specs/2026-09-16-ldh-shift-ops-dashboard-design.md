@@ -477,4 +477,42 @@ totals, plus a shorter-horizon trend view.
   than leaving it unused. **Not decided yet** — flagging so it isn't lost
   before that sync work starts, since fixing it retroactively (once
   historical rows already exist without the distinction) is harder than
-  deciding it now.
+  deciding it now. **Status update, 2026-09-19: still not decided** — the
+  sync described below is now live and does not set `origin` differently
+  for tool-synced rows (they get the schema default, `'add_on'`, same as
+  everything else), so this conflation is now actually happening in real
+  data, not just a hypothetical. Worth resolving before this metric is
+  trusted for anything real.
+
+## Amendment (2026-09-19): the sync also pushes the full list, not just completions
+
+Built and deployed. Resolves a gap Juliana noticed once the completion-only
+sync (the first 2026-09-18 amendment) was actually live: the dashboard could
+say "12 completed" but never "12 of 40" — with no denominator, "how many are
+there" was invisible to the team, only "how many I've done."
+
+- **Second request shape on the same `sync-completion` function**, same
+  shared secret: `{ items: [{title, location, shift}, ...] }`, sent once
+  when a whole list is loaded/imported into an offline tool (Excel/PDF
+  paste, ShelterMate export, AA Flag Log import — whichever bulk-add flow
+  the tool already has), rather than one row at a time.
+- **Insert-only, `ON CONFLICT DO NOTHING`** (`ignoreDuplicates: true` in the
+  upsert call) — critically, this must never touch an existing row's
+  `done`/`completed_at`. If the same list gets re-imported (e.g. she reopens
+  an Excel file she already added once), an item already marked complete
+  must stay complete. Verified directly: marked an item done, re-ran the
+  identical batch, confirmed `done` was still `true` and `completed_at`
+  unchanged afterward.
+- **Hooked into every bulk "confirm add" flow** across all three tools —
+  `processing.html`'s parsed-paste import, `sick-injured.html`'s two import
+  paths (recheck-list and AA Flag Log), `surgery.html`'s two Excel imports
+  (booking template and ShelterMate export). Single-animal manual-add
+  buttons were deliberately left alone — those add a blank stub with no
+  location yet, which the sync's own field validation silently skips
+  anyway, so there was nothing useful to push at that moment.
+- **Rows with a missing title or location are filtered out client-side**
+  before the request is even sent (e.g. `surgery.html`'s ShelterMate import
+  has no location column at all, so those rows never get synced — a
+  pre-existing gap in that specific import, not something this feature
+  needed to solve).
+- Single-completion pushes (shape 1) are unchanged.
