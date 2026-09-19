@@ -487,6 +487,17 @@
     if (error) alert('Could not mark done: ' + error.message);
   }
 
+  /* 2026-09-19 amendment: undo an accidental "Mark done" — clears the
+     completion fields back to their pre-completion state rather than just
+     flipping done to false, so a later real completion doesn't show a
+     stale completed_by_role/completed_at from the undone click. */
+  async function undoDone(id) {
+    const { error } = await sb.from('tasks').update({
+      done: false, completed_by_role: null, completed_at: null, note: null,
+    }).eq('id', id);
+    if (error) alert('Could not undo: ' + error.message);
+  }
+
   /* ---------- render ---------- */
   function renderCompletion() {
     const total = TASKS.length || 1;
@@ -600,12 +611,23 @@
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     const recent = TASKS.filter(t => t.done && t.completed_at && new Date(t.completed_at).getTime() > cutoff)
       .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
+    const canUndo = ROLE === 'vet_nurse';
     document.getElementById('completed-list').innerHTML = recent.map(t => `
       <div class="completed-row">
         <span>${esc(t.title)} — ${SHIFT_LABELS[t.shift]} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}${t.note ? ' — ' + esc(t.note) : ''}</span>
-        <span class="time">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          <span class="time">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+          ${canUndo ? `<button class="secondary undo-done" data-id="${t.id}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>` : ''}
+        </span>
       </div>
     `).join('') || '<p class="empty-state">Nothing completed recently.</p>';
+    document.getElementById('completed-list').querySelectorAll('.undo-done').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (confirm(`Undo completion for ${btn.closest('.completed-row').querySelector('span').textContent.split(' — ')[0]}? This puts it back in the open queue.`)) {
+          undoDone(btn.dataset.id);
+        }
+      });
+    });
   }
 
   function renderMemos() {
