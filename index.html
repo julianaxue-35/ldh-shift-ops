@@ -355,7 +355,7 @@
 
     <section class="card" id="surveillance-section">
       <h2>Disease surveillance export</h2>
-      <p class="subtle">Counts of each suspected condition flagged on new task requests, for a chosen month.</p>
+      <p class="subtle">Overall counts, a location breakdown, and a full case-by-case list for a chosen month — so you can spot clustering, e.g. kennel cough concentrated in one room.</p>
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <input type="month" id="surveillance-month" style="margin:0; width:auto;">
         <button class="secondary" id="surveillance-export" style="margin:0;">Export CSV</button>
@@ -854,6 +854,8 @@
     cat_flu: 'Cat flu (URI)', kennel_cough: 'Kennel cough', diarrhoea: 'Diarrhoea / GI upset',
     wounds_injury: 'Wounds / injury / trauma', other: 'Other', none: 'None flagged',
   };
+  function csvCell(v) { return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`; }
+
   document.getElementById('surveillance-month').value = todayDateStr().slice(0, 7);
   document.getElementById('surveillance-export').addEventListener('click', async () => {
     const monthStr = document.getElementById('surveillance-month').value;
@@ -861,13 +863,42 @@
     const [y, m] = monthStr.split('-').map(Number);
     const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 1);
-    const { data, error } = await sb.from('tasks').select('condition, created_at')
+    const { data, error } = await sb.from('tasks').select('title, location, condition, created_at')
       .gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
     if (error) { alert('Could not export: ' + error.message); return; }
-    const counts = { cat_flu: 0, kennel_cough: 0, diarrhoea: 0, wounds_injury: 0, other: 0, none: 0 };
-    (data || []).forEach(t => { counts[t.condition || 'none']++; });
-    let csv = 'Condition,Count\n';
-    Object.keys(counts).forEach(k => { csv += `"${CONDITION_LABELS[k]}",${counts[k]}\n`; });
+    const rows = data || [];
+
+    // Section 1: overall counts per condition (includes "None flagged").
+    const conditionCounts = { cat_flu: 0, kennel_cough: 0, diarrhoea: 0, wounds_injury: 0, other: 0, none: 0 };
+    rows.forEach(t => { conditionCounts[t.condition || 'none']++; });
+
+    // Section 2 & 3: location breakdown and full linelist — flagged cases
+    // only (excludes "none"), since a location count of unflagged routine
+    // requests isn't a surveillance signal. This is what lets her spot
+    // clustering, e.g. "kennel cough concentrated in Cat Room 2".
+    const flagged = rows.filter(t => t.condition).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const byLocation = {};
+    flagged.forEach(t => {
+      const loc = t.location || '(no location)';
+      (byLocation[loc] ??= {});
+      byLocation[loc][t.condition] = (byLocation[loc][t.condition] || 0) + 1;
+    });
+
+    let csv = `Disease surveillance — ${monthStr}\n\n`;
+    csv += 'Condition,Count\n';
+    Object.keys(conditionCounts).forEach(k => { csv += `${csvCell(CONDITION_LABELS[k])},${conditionCounts[k]}\n`; });
+    csv += '\nBy location\nLocation,Condition,Count\n';
+    Object.keys(byLocation).sort().forEach(loc => {
+      Object.keys(byLocation[loc]).forEach(cond => {
+        csv += `${csvCell(loc)},${csvCell(CONDITION_LABELS[cond])},${byLocation[loc][cond]}\n`;
+      });
+    });
+    csv += '\nFull list (flagged cases only)\nDate,Animal ID,Location,Condition\n';
+    flagged.forEach(t => {
+      const d = new Date(t.created_at).toLocaleDateString('en-AU');
+      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${csvCell(CONDITION_LABELS[t.condition])}\n`;
+    });
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
