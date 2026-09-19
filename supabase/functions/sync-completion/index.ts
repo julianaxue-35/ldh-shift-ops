@@ -97,10 +97,17 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Shape 1: single completion.
+  // Shape 1: single completion. `note` is optional — a short excerpt of the
+  // offline tool's Plan/Treatment field (2026-09-19 amendment), so staff
+  // looking at the dashboard can see what's actually being done for the
+  // animal without opening the offline tool. Hard-capped server-side too
+  // (defense in depth beyond whatever truncation the client already did)
+  // since this is the one field explicitly meant to stay short and
+  // non-clinical — see the spec's online/offline split.
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const location = typeof body.location === 'string' ? body.location.trim() : '';
   const shift = body.shift;
+  const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 200) : null;
 
   if (!title || !location || !VALID_SHIFTS.includes(shift)) {
     return new Response(
@@ -110,7 +117,7 @@ Deno.serve(async (req) => {
   }
 
   const { error } = await supabase.from('tasks').upsert(
-    { title, location, shift, done: true, completed_at: new Date().toISOString() },
+    { title, location, shift, done: true, completed_at: new Date().toISOString(), note },
     { onConflict: 'title,location,shift' },
   );
 
