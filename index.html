@@ -248,6 +248,7 @@
           <option value="urgent">Urgent</option>
         </select>
       </div>
+      <input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg" style="margin-top:0;">
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
 
@@ -280,6 +281,10 @@
         <button class="filter-chip" data-type="rescue">Rescue</button>
         <button class="filter-chip" data-type="medication">Medication</button>
         <button class="filter-chip" data-type="check_recheck">Check/recheck</button>
+      </div>
+      <div id="batch-pickup-bar" style="display:none; margin-bottom:14px;">
+        <a id="batch-pickup-link" href="#" target="_blank" rel="noopener" style="text-decoration:none; color:var(--ink); display:inline-block; padding:10px 16px; border-radius:14px; background:var(--amber); font-weight:700; font-size:0.85rem;">Pick up <span id="batch-pickup-count">0</span> selected, sorted by location →</a>
+        <button class="secondary" id="batch-pickup-clear" style="padding:10px 14px; font-size:0.82rem; margin-left:8px;">Clear selection</button>
       </div>
       <div class="urgency-board">
         <div class="urgency-col"><h3 class="urgent-h">Urgent</h3><div id="board-urgent"></div></div>
@@ -321,10 +326,55 @@
   let ROSTER = {};
   let ROLE = 'attendant';
   let typeFilter = 'all';
+  let selectedPickup = new Set();
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
   const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
   const URGENCY_COLOR = { urgent: 'var(--critical)', soon: 'var(--neutral-500)', routine: 'var(--neutral-300)' };
   const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
+  /* 2026-09-19: "Pick up" hand-off — opens the matching offline tool with
+     the animal's ID/location/issue pre-filled via URL params, so a vet
+     doesn't have to re-type what's already on the dashboard. Supports
+     picking up several at once, sorted by location, so a vet can walk
+     the shelter once instead of back-and-forth — the offline tool already
+     groups its own list by location regardless of add order, so this only
+     needs to hand off a location-sorted batch, not reorder anything there.
+     Only sick_injured has the receiving code in the offline tool so far;
+     a batch is only ever built from one shift at a time (checkboxes are
+     disabled for shifts with no tool URL yet). */
+  const SHIFT_TOOL_URLS = {
+    sick_injured: 'https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html',
+  };
+  function pickUpUrl(tasks) {
+    if (!tasks.length) return null;
+    const base = SHIFT_TOOL_URLS[tasks[0].shift];
+    if (!base) return null;
+    const sorted = [...tasks].sort((a, b) => (a.location || '').localeCompare(b.location || ''));
+    const items = sorted.map(t => ({ id: t.title, location: t.location || '', problem: t.problem || '' }));
+    const params = new URLSearchParams({ items: JSON.stringify(items) });
+    return `${base}?${params.toString()}`;
+  }
+  function updatePickupBar() {
+    const bar = document.getElementById('batch-pickup-bar');
+    // Re-derive from TASKS, not just the Set's size — a selected task can
+    // vanish out from under a viewer (someone else marks it done via
+    // realtime) without this tab's checkbox ever firing a change event.
+    const tasks = TASKS.filter(t => selectedPickup.has(t.id));
+    if (!tasks.length) { selectedPickup.clear(); bar.style.display = 'none'; return; }
+    const url = pickUpUrl(tasks);
+    document.getElementById('batch-pickup-count').textContent = tasks.length;
+    const link = document.getElementById('batch-pickup-link');
+    if (url) { link.href = url; link.style.opacity = 1; link.style.pointerEvents = 'auto'; }
+    else { link.removeAttribute('href'); link.style.opacity = 0.5; link.style.pointerEvents = 'none'; }
+    bar.style.display = 'block';
+  }
+  document.getElementById('batch-pickup-link').addEventListener('click', () => {
+    selectedPickup.clear();
+    setTimeout(() => renderVetBoard(), 300);
+  });
+  document.getElementById('batch-pickup-clear').addEventListener('click', () => {
+    selectedPickup.clear();
+    renderVetBoard();
+  });
 
   function todayDateStr() {
     const d = new Date();
@@ -411,11 +461,13 @@
       shift: 'sick_injured',
       type: document.getElementById('req-type').value,
       urgency: document.getElementById('req-urgency').value,
+      problem: document.getElementById('req-problem').value.trim() || null,
       done: false,
     });
     btn.disabled = false;
     if (error) { alert('Could not submit: ' + error.message); return; }
     document.getElementById('req-title').value = '';
+    document.getElementById('req-problem').value = '';
   });
 
   document.getElementById('search-box').addEventListener('input', renderQueueTable);
@@ -513,13 +565,27 @@
   function renderBoardCol(containerId, tasks) {
     const el = document.getElementById(containerId);
     if (!tasks.length) { el.innerHTML = '<p class="empty-state">Nothing here.</p>'; return; }
-    el.innerHTML = tasks.map(t => `
+    el.innerHTML = tasks.map(t => {
+      const url = pickUpUrl([t]);
+      const canPickUp = !!SHIFT_TOOL_URLS[t.shift];
+      return `
       <div class="attn-item">
-        <div><div class="aname">${esc(t.title)}</div><div class="ameta">${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}</div></div>
-        <button class="secondary mark-done" data-id="${t.id}">Mark done</button>
+        <label style="display:flex; align-items:center; gap:8px; flex:1; margin:0; cursor:${canPickUp ? 'pointer' : 'default'};">
+          <input type="checkbox" class="pickup-check" data-id="${t.id}" ${selectedPickup.has(t.id) ? 'checked' : ''} ${canPickUp ? '' : 'disabled'}>
+          <div><div class="aname">${esc(t.title)}</div><div class="ameta">${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}${t.problem ? ' · ' + esc(t.problem) : ''}</div></div>
+        </label>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          ${url ? `<a class="secondary pick-up" href="${url}" target="_blank" rel="noopener" style="padding:5px 10px; font-size:0.72rem; border-radius:14px; text-decoration:none; color:var(--ink); display:inline-block;">Pick up →</a>` : ''}
+          <button class="secondary mark-done" data-id="${t.id}">Mark done</button>
+        </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
     el.querySelectorAll('.mark-done').forEach(btn => btn.addEventListener('click', () => markDone(btn.dataset.id)));
+    el.querySelectorAll('.pickup-check').forEach(cb => cb.addEventListener('change', () => {
+      if (cb.checked) selectedPickup.add(cb.dataset.id); else selectedPickup.delete(cb.dataset.id);
+      updatePickupBar();
+    }));
   }
 
   function renderVetBoard() {
@@ -527,6 +593,7 @@
     renderBoardCol('board-urgent', open.filter(t => t.urgency === 'urgent'));
     renderBoardCol('board-soon', open.filter(t => t.urgency === 'soon'));
     renderBoardCol('board-routine', open.filter(t => t.urgency === 'routine'));
+    updatePickupBar();
   }
 
   function renderCompleted() {
