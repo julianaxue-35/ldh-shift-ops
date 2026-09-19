@@ -125,8 +125,9 @@
   /* Two-column dashboard body — wider main column for the case queues,
      narrower side rail for completed/memos, instead of every section
      stacked full-width one after another. */
-  .dashboard-body { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
-  .main-col, .side-col { display: flex; flex-direction: column; gap: 20px; }
+  .dashboard-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+  .main-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .side-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; align-items: start; min-width: 0; }
 
   .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
   .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
@@ -180,8 +181,11 @@
   .urgency-col h3.routine-h { color: var(--muted); }
   .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
   .attn-item:last-child { border-bottom: none; }
-  .attn-item .aname { font-size: 0.85rem; font-weight: 600; }
-  .attn-item .ameta { font-size: 0.7rem; color: var(--muted); }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .urgency-col .attn-item .ameta { margin-top: 2px; }
+  .attn-item .pickup-check { width: 18px; height: 18px; margin: 0; padding: 0; flex: none; }
   .attn-item button.mark-done { padding: 5px 10px; font-size: 0.72rem; }
 
   #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
@@ -367,12 +371,6 @@
       </div>
     </div>
 
-    <section class="card" id="surgery-summary-section" style="display:none">
-      <h2>Surgery today</h2>
-      <p class="subtle">Counts only, from the surgery tool's shared shift — no patient detail is shown here.</p>
-      <div id="surgery-summary"></div>
-    </section>
-
     <section class="card" id="response-rate-section">
       <h2>Response rate by department</h2>
       <p class="subtle">Share of flagged cases completed each month, by shift — shows where requests are backing up, not just how many came in.</p>
@@ -510,31 +508,8 @@
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     await loadTrends();
     await loadResponseRates();
-    await loadSurgerySummary().catch(() => {});
     renderAll();
   }
-
-  /* ---------- surgery summary (counts only, via surgery_summary()) ---------- */
-  const SURG_LABELS = {
-    castrate: 'Routine castration', cryptorchid: 'Cryptorchid castration',
-    spey: 'Routine spey (midline)', 'spey-flank': 'Routine spey (flank)',
-    preg1: 'Pregnant spey — stage 1', preg2: 'Pregnant spey — stage 2', preg3: 'Pregnant spey — stage 3',
-    pyometra: 'Pyometra OVH', unspecified: 'Type not set'
-  };
-  async function loadSurgerySummary() {
-    const sec = document.getElementById('surgery-summary-section');
-    const { data, error } = await sb.rpc('surgery_summary', { p_shift_date: todayDateStr() });
-    if (error || !data || !data.length) { sec.style.display = 'none'; return; }
-    const total = data.reduce((n, r) => n + Number(r.total), 0);
-    const done = data.reduce((n, r) => n + Number(r.completed), 0);
-    const rows = data.map(r => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line, #e3e3e3);font-size:0.9rem;">
-        <span>${esc(SURG_LABELS[r.surg_type] || r.surg_type)}</span>
-        <span><b>${Number(r.completed)}</b> of ${Number(r.total)} done</span></div>`).join('');
-    document.getElementById('surgery-summary').innerHTML =
-      `<div style="font-size:1.6rem;font-weight:700;margin-bottom:8px;">${done} <span style="font-size:0.9rem;font-weight:500;color:var(--muted);">of ${total} surgeries completed</span></div>${rows}`;
-    sec.style.display = 'block';
-  }
-  setInterval(() => { if (typeof sb !== 'undefined') loadSurgerySummary().catch(() => {}); }, 30000);
 
   function subscribeRealtime() {
     sb.channel('tasks-changes')
