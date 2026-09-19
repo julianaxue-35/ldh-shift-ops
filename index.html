@@ -354,6 +354,12 @@
       </div>
     </div>
 
+    <section class="card" id="surgery-summary-section" style="display:none">
+      <h2>Surgery today</h2>
+      <p class="subtle">Counts only, from the surgery tool's shared shift — no patient detail is shown here.</p>
+      <div id="surgery-summary"></div>
+    </section>
+
     <section class="card" id="response-rate-section">
       <h2>Response rate by department</h2>
       <p class="subtle">Share of flagged cases completed each month, by shift — shows where requests are backing up, not just how many came in.</p>
@@ -491,8 +497,31 @@
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     await loadTrends();
     await loadResponseRates();
+    await loadSurgerySummary().catch(() => {});
     renderAll();
   }
+
+  /* ---------- surgery summary (counts only, via surgery_summary()) ---------- */
+  const SURG_LABELS = {
+    castrate: 'Routine castration', cryptorchid: 'Cryptorchid castration',
+    spey: 'Routine spey (midline)', 'spey-flank': 'Routine spey (flank)',
+    preg1: 'Pregnant spey — stage 1', preg2: 'Pregnant spey — stage 2', preg3: 'Pregnant spey — stage 3',
+    pyometra: 'Pyometra OVH', unspecified: 'Type not set'
+  };
+  async function loadSurgerySummary() {
+    const sec = document.getElementById('surgery-summary-section');
+    const { data, error } = await sb.rpc('surgery_summary', { p_shift_date: todayDateStr() });
+    if (error || !data || !data.length) { sec.style.display = 'none'; return; }
+    const total = data.reduce((n, r) => n + Number(r.total), 0);
+    const done = data.reduce((n, r) => n + Number(r.completed), 0);
+    const rows = data.map(r => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--line, #e3e3e3);font-size:0.9rem;">
+        <span>${esc(SURG_LABELS[r.surg_type] || r.surg_type)}</span>
+        <span><b>${Number(r.completed)}</b> of ${Number(r.total)} done</span></div>`).join('');
+    document.getElementById('surgery-summary').innerHTML =
+      `<div style="font-size:1.6rem;font-weight:700;margin-bottom:8px;">${done} <span style="font-size:0.9rem;font-weight:500;color:var(--muted);">of ${total} surgeries completed</span></div>${rows}`;
+    sec.style.display = 'block';
+  }
+  setInterval(() => { if (typeof sb !== 'undefined') loadSurgerySummary().catch(() => {}); }, 30000);
 
   function subscribeRealtime() {
     sb.channel('tasks-changes')
