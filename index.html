@@ -659,6 +659,23 @@
       `;
       container.appendChild(card);
     }
+    // Foster consult: roster only (no task board of its own), slim full-width card
+    {
+      const roster = ROSTER.foster_consult || [];
+      const card = document.createElement('section');
+      card.className = 'card';
+      card.style.gridColumn = '1 / -1';
+      card.innerHTML = `
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <h2 style="margin:0;">Foster consult vet</h2>
+          <div style="flex:1; min-width:120px;">${roster.map(r => `<span class="chip roster-chip" data-id="${r.id}" title="Click to remove">${esc(r.staff_name)} ✕</span>`).join('') || '<span class="empty-state">Unassigned</span>'}</div>
+          <div class="roster-add-row" style="margin:0;">
+            <input type="text" class="roster-add-input" data-shift="foster_consult" placeholder="Add name">
+            <button class="secondary roster-add-btn" data-shift="foster_consult">Add</button>
+          </div>
+        </div>`;
+      container.appendChild(card);
+    }
     container.querySelectorAll('.roster-chip').forEach(chip => {
       chip.addEventListener('click', async () => {
         await sb.from('roster').delete().eq('id', chip.dataset.id);
