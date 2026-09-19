@@ -20,14 +20,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — MOCK</title>
 <style>
+  /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
+     crisp borders and a soft drop shadow, replacing the earlier neumorphic
+     soft-UI look. Accent hues unchanged — only how surfaces render did. */
   :root {
     --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
     --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
     --amber: #FF9F43;
     --blue: #4A6CF7;
     --violet: #8C62FF;
     --green: #229A63;
     --light-blue: #93C5FD;
+    --donut-navy: #2D2A5E;
     --ink: #1E2238;
     --muted: #6B7280;
     --muted-light: #9CA3AF;
@@ -35,8 +42,8 @@
     --neutral-100: #F3F2EF;
     --neutral-300: #D8D6CE;
     --neutral-500: #9C9A90;
-    --shadow-raised: 8px 8px 18px rgba(163,177,198,0.45), -8px -8px 18px rgba(255,255,255,0.85);
-    --shadow-inset: inset 6px 6px 12px rgba(163,177,198,0.4), inset -6px -6px 12px rgba(255,255,255,0.8);
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
   }
   * { box-sizing: border-box; }
   html { font-size: 15px; }
@@ -51,7 +58,7 @@
   }
   h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
   #mock-banner {
-    background: var(--sidebar);
+    background: #1E2238;
     color: #fff;
     text-align: center;
     padding: 10px;
@@ -61,62 +68,67 @@
   }
   #mock-banner b { color: var(--amber); font-weight: 700; }
   .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 41px); }
-  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; }
-  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
   aside label {
     display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
-    text-transform: uppercase; color: #B4B8CC; margin-bottom: 8px;
+    text-transform: uppercase; color: var(--sidebar-text-muted); margin-bottom: 8px;
   }
-  aside select { width: 100%; background: #2A2F4A; color: #fff; box-shadow: none; margin-bottom: 24px; font-size: 0.9rem; }
-  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: #9BA0BC; margin: 0; }
+  aside select { width: 100%; background: #2A2F4A; color: #fff; border: none; box-shadow: none; margin-bottom: 24px; font-size: 0.9rem; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
   main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
   .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
   .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
   #search-box {
-    border: none; border-radius: 14px; box-shadow: var(--shadow-inset); padding: 10px 16px;
-    background: var(--bg); font: inherit; font-size: 0.85rem; width: 220px;
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px;
+    background: var(--card-bg); font: inherit; font-size: 0.85rem; width: 220px;
   }
-  .card { background: var(--bg); border-radius: 18px; box-shadow: var(--shadow-raised); padding: 20px; }
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
   .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
   .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
   input, select, textarea {
-    border: none; border-radius: 14px; box-shadow: var(--shadow-inset); padding: 10px 14px;
-    background: var(--bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
   }
   button {
-    border: none; border-radius: 14px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
     font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
   }
-  button.secondary { background: var(--bg); box-shadow: var(--shadow-raised); }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
 
-  /* Plain flat box for the fill-in form — no neumorphic shadow, just a
-     simple bordered card so it reads as "fill this in", not a raised tile. */
-  #new-request-form { background: #fff; box-shadow: none; border: 1px solid rgba(30,34,56,0.12); }
-  #new-request-form input, #new-request-form select { box-shadow: none; border: 1px solid rgba(30,34,56,0.15); background: #fff; }
-
-  /* Hero completion graph */
-  .completion-card { display: flex; align-items: center; justify-content: center; gap: 28px; padding: 30px 20px; }
+  /* Top KPI row — completion donut and the 3 shift cards as 4 equal,
+     same-weight columns, instead of the donut sitting alone in its own
+     full-width row above them (2026-09-19 layout redesign). */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
   .completion-donut {
-    width: 200px; height: 200px; border-radius: 50%;
+    width: 110px; height: 110px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; flex-direction: column;
     border: 3px solid rgba(30,34,56,0.18);
     box-shadow: 0 0 0 1px rgba(255,255,255,0.6) inset;
   }
-  .completion-donut .val { font-size: 2.6rem; font-weight: 700; }
-  .completion-donut .lbl { font-size: 0.8rem; color: var(--muted); }
-  .completion-side { font-size: 0.85rem; color: var(--muted); max-width: 220px; }
-  .completion-side b { display: block; font-size: 1.4rem; color: var(--ink); }
+  .completion-donut .val { font-size: 1.5rem; font-weight: 700; }
+  .completion-donut .lbl { font-size: 0.62rem; color: var(--muted); }
+  .completion-side { font-size: 0.78rem; color: var(--muted); }
+  .completion-side b { display: block; font-size: 1.1rem; color: var(--ink); }
 
-  /* Per-shift progress cards (Shelter Staff view only) */
-  .shift-progress-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  /* Two-column dashboard body — wider main column for the case queues,
+     narrower side rail for completed/memos. */
+  .dashboard-body { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+  .main-col, .side-col { display: flex; flex-direction: column; gap: 20px; }
+
   .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
   .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
-  .bar-track { height: 10px; border-radius: 6px; box-shadow: var(--shadow-inset); overflow: hidden; margin-bottom: 10px; }
+  .bar-track { height: 10px; border-radius: 6px; background: var(--neutral-100); overflow: hidden; margin-bottom: 10px; }
   .bar-fill { height: 100%; border-radius: 6px; }
   .shift-card .onshift { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .shift-card .shift-icon {
+    float: right; width: 30px; height: 30px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 0.95rem; color: #fff;
+  }
   .chip {
-    display: inline-block; padding: 5px 12px; border-radius: 12px; box-shadow: var(--shadow-raised);
+    display: inline-block; padding: 5px 12px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border);
     margin: 2px; font-size: 0.78rem; font-weight: 600;
   }
 
@@ -142,10 +154,10 @@
   /* Vet/Nurse cases board — split by urgency (columns) and request type (filter) */
   .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
   .filter-chip {
-    border: none; border-radius: 12px; padding: 7px 14px; background: var(--bg);
-    box-shadow: var(--shadow-raised); font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
   }
-  .filter-chip.active { box-shadow: var(--shadow-inset); color: var(--ink); }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
   .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
   .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -178,11 +190,13 @@
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
   @media (max-width: 1000px) {
-    .shift-progress-row, .urgency-board, .trend-grid { grid-template-columns: 1fr; }
+    .urgency-board, .trend-grid { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-body { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
-    .completion-card { flex-direction: column; text-align: center; }
+    .kpi-row { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -237,60 +251,75 @@
           <option value="urgent">Urgent</option>
         </select>
       </div>
+      <select id="req-condition">
+        <option value="">Suspected condition (optional)</option>
+        <option value="cat_flu">Cat flu (URI)</option>
+        <option value="kennel_cough">Kennel cough</option>
+        <option value="diarrhoea">Diarrhoea / GI upset</option>
+        <option value="wounds_injury">Wounds / injury / trauma</option>
+        <option value="other">Other</option>
+      </select>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
 
-    <section class="card completion-card">
-      <div class="completion-donut" id="completion-donut"></div>
-      <div class="completion-side">
-        <b id="completion-fraction">–</b>
-        tasks completed today, across all shifts.
+    <div class="kpi-row">
+      <section class="card completion-card">
+        <div class="completion-donut" id="completion-donut"></div>
+        <div class="completion-side">
+          <b id="completion-fraction">–</b>
+          tasks completed today, across all shifts.
+        </div>
+      </section>
+      <div id="shift-progress-row" style="display:contents;"></div>
+    </div>
+
+    <div class="dashboard-body">
+      <div class="main-col">
+        <section class="card" id="cases-flagged">
+          <h2>Cases flagged</h2>
+          <p class="subtle">Open cases across all shifts.</p>
+          <table class="queue-table">
+            <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th></tr></thead>
+            <tbody id="queue-tbody"></tbody>
+          </table>
+        </section>
+
+        <section class="card" id="vet-board">
+          <h2>Cases flagged</h2>
+          <p class="subtle">Split by urgency and request type — pick up as available. Filter to Medication for remote-only cases.</p>
+          <div class="filter-bar" id="type-filter-bar">
+            <button class="filter-chip active" data-type="all">All types</button>
+            <button class="filter-chip" data-type="shelter">Shelter</button>
+            <button class="filter-chip" data-type="foster">Foster</button>
+            <button class="filter-chip" data-type="rescue">Rescue</button>
+            <button class="filter-chip" data-type="medication">Medication</button>
+            <button class="filter-chip" data-type="check_recheck">Check/recheck</button>
+          </div>
+          <div class="urgency-board">
+            <div class="urgency-col"><h3 class="urgent-h">Urgent</h3><div id="board-urgent"></div></div>
+            <div class="urgency-col"><h3 class="soon-h">Soon</h3><div id="board-soon"></div></div>
+            <div class="urgency-col"><h3 class="routine-h">Routine</h3><div id="board-routine"></div></div>
+          </div>
+        </section>
       </div>
-    </section>
 
-    <div class="shift-progress-row" id="shift-progress-row"></div>
+      <div class="side-col">
+        <section class="card" id="completed-panel">
+          <h2>Recently completed</h2>
+          <p class="subtle">Status only, for the documentation cross-check — clinical detail stays in the offline shift tool.</p>
+          <div id="completed-list"></div>
+        </section>
 
-    <section class="card" id="cases-flagged">
-      <h2>Cases flagged</h2>
-      <p class="subtle">Open cases across all shifts.</p>
-      <table class="queue-table">
-        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th></tr></thead>
-        <tbody id="queue-tbody"></tbody>
-      </table>
-    </section>
-
-    <section class="card" id="vet-board">
-      <h2>Cases flagged</h2>
-      <p class="subtle">Split by urgency and request type — pick up as available. Filter to Medication for remote-only cases.</p>
-      <div class="filter-bar" id="type-filter-bar">
-        <button class="filter-chip active" data-type="all">All types</button>
-        <button class="filter-chip" data-type="shelter">Shelter</button>
-        <button class="filter-chip" data-type="foster">Foster</button>
-        <button class="filter-chip" data-type="rescue">Rescue</button>
-        <button class="filter-chip" data-type="medication">Medication</button>
-        <button class="filter-chip" data-type="check_recheck">Check/recheck</button>
+        <section class="card" id="memo-board">
+          <h2>Memo board</h2>
+          <div id="memo-list"></div>
+          <div id="memo-post">
+            <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
+            <button id="memo-submit">Post</button>
+          </div>
+        </section>
       </div>
-      <div class="urgency-board">
-        <div class="urgency-col"><h3 class="urgent-h">Urgent</h3><div id="board-urgent"></div></div>
-        <div class="urgency-col"><h3 class="soon-h">Soon</h3><div id="board-soon"></div></div>
-        <div class="urgency-col"><h3 class="routine-h">Routine</h3><div id="board-routine"></div></div>
-      </div>
-    </section>
-
-    <section class="card" id="completed-panel">
-      <h2>Recently completed</h2>
-      <p class="subtle">Status only, for the documentation cross-check — clinical detail stays in the offline shift tool.</p>
-      <div id="completed-list"></div>
-    </section>
-
-    <section class="card" id="memo-board">
-      <h2>Memo board</h2>
-      <div id="memo-list"></div>
-      <div id="memo-post">
-        <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
-        <button id="memo-submit">Post</button>
-      </div>
-    </section>
+    </div>
 
     <section class="card" id="trends-section">
       <h2>Annual &amp; monthly progress</h2>
@@ -323,6 +352,7 @@
   let nextId = 11;
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
   const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
+  const SHIFT_ICONS = { processing: '👥', sick_injured: '➕', surgery: '✂️' };
   const URGENCY_COLOR = { urgent: 'var(--critical)', soon: 'var(--neutral-500)', routine: 'var(--neutral-300)' };
   const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
 
@@ -374,7 +404,7 @@
     const total = TASKS.length || 1;
     const done = TASKS.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
-    document.getElementById('completion-donut').style.background = `conic-gradient(var(--light-blue) ${pct * 3.6}deg, #fff 0deg)`;
+    document.getElementById('completion-donut').style.background = `conic-gradient(var(--donut-navy) ${pct * 3.6}deg, var(--neutral-100) 0deg)`;
     document.getElementById('completion-donut').innerHTML = `<span class="val">${pct}%</span><span class="lbl">TODAY</span>`;
     document.getElementById('completion-fraction').textContent = `${done} of ${total}`;
   }
@@ -390,6 +420,7 @@
       const card = document.createElement('section');
       card.className = 'card shift-card';
       card.innerHTML = `
+        <span class="shift-icon" style="background:${SHIFT_COLORS[shift]}">${SHIFT_ICONS[shift]}</span>
         <h2 style="color:${SHIFT_COLORS[shift]}">${SHIFT_LABELS[shift]}</h2>
         <div class="totals">${done} <span>/ ${total} processed today</span></div>
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${SHIFT_COLORS[shift]};"></div></div>
