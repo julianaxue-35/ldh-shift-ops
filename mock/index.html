@@ -34,7 +34,8 @@
     --violet: #8C62FF;
     --green: #229A63;
     --light-blue: #93C5FD;
-    --donut-navy: #2D2A5E;
+    --donut-teal: #4FC1D6;
+    --donut-track: #E5E7EB;
     --ink: #1E2238;
     --muted: #6B7280;
     --muted-light: #9CA3AF;
@@ -103,13 +104,12 @@
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
   .completion-donut {
-    width: 110px; height: 110px; border-radius: 50%;
+    width: 110px; height: 110px; position: relative;
     display: flex; align-items: center; justify-content: center; flex-direction: column;
-    border: 3px solid rgba(30,34,56,0.18);
-    box-shadow: 0 0 0 1px rgba(255,255,255,0.6) inset;
   }
-  .completion-donut .val { font-size: 1.5rem; font-weight: 700; }
-  .completion-donut .lbl { font-size: 0.62rem; color: var(--muted); }
+  .completion-donut svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .completion-donut .val { position: relative; font-size: 1.5rem; font-weight: 700; }
+  .completion-donut .lbl { position: relative; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.04em; }
   .completion-side { font-size: 0.78rem; color: var(--muted); }
   .completion-side b { display: block; font-size: 1.1rem; color: var(--ink); }
 
@@ -404,8 +404,16 @@
     const total = TASKS.length || 1;
     const done = TASKS.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
-    document.getElementById('completion-donut').style.background = `conic-gradient(var(--donut-navy) ${pct * 3.6}deg, var(--neutral-100) 0deg)`;
-    document.getElementById('completion-donut').innerHTML = `<span class="val">${pct}%</span><span class="lbl">TODAY</span>`;
+    const r = 46, stroke = 12, c = 2 * Math.PI * r;
+    const offset = c * (1 - pct / 100);
+    document.getElementById('completion-donut').innerHTML = `
+      <svg viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="${r}" fill="var(--neutral-100)" stroke="var(--donut-track)" stroke-width="${stroke}"/>
+        <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--donut-teal)" stroke-width="${stroke}"
+          stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+      </svg>
+      <span class="val">${pct}%</span><span class="lbl">TODAY</span>
+    `;
     document.getElementById('completion-fraction').textContent = `${done} of ${total}`;
   }
 
