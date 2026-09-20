@@ -28,7 +28,10 @@ Three time-based tiers (emergencies are radioed and are outside this board):
 
 - **Red flag — check within 2 hours.** Any red flag ticked (not eating, laboured breathing, bleeding,
   can't stand, repeated vomiting; list editable).
-- **Urgent — check within 12–24 hours.** How a case becomes "urgent": see open question 1.
+- **Urgent — check within 12–24 hours.** Decided by a vet or nurse on first look: everything without a
+  red flag starts as routine, and anyone on the Vet desk can bump it to urgent with one tap (Juliana's
+  decision). Urgent `due_by` = `flagged_at` + 24 h, amber from 12 h; a case bumped late simply shows
+  as overdue.
 - **Routine — check within 24–48 hours.** Colour by time since flagged and still not seen: under 24 h
   normal; 24–48 h (day 2) **amber**; 48 h onward (day 3) **red**. (Confirmed by Juliana.)
 
@@ -135,10 +138,10 @@ client for each view; a short trial on live Supabase with fake animals before ea
 the floor; verifier for the "DDx ignored" rule and the rate calculation against hand-worked examples.
 
 ## 11. Open questions
-1. What makes a case **urgent** (12–24 h) rather than routine — see Claude's question to Juliana.
-2. Red-flag list wording; how long a case can sit unseen before it alerts.
-3. Roster initials import is a separate small task; Juliana will say when she is ready.
+1. Red-flag list wording; how long a case can sit unseen before it alerts.
+2. Roster initials import is a separate small task; Juliana will say when she is ready.
 
-Resolved: routine colours confirmed; red flag = 2 h; no nurse tasks beyond vaccination and ward
-treatments; council-seized animals need no special handling; plan lines last 24 h; active window is
-3 days; UV positive counts as RW; nurse treatments are requested from a Vet-desk form first.
+Resolved: three tiers (red flag 2 h, urgent 12–24 h set by a vet/nurse, routine 24–48 h); routine
+colours confirmed; no nurse tasks beyond vaccination and ward treatments; council-seized animals need
+no special handling; plan lines last 24 h; active window is 3 days; UV positive counts as RW; nurse
+treatments are requested from a Vet-desk form first.
