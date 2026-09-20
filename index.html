@@ -20,6 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -261,15 +262,10 @@
     <section class="card" id="new-request-form">
       <h2>New task request</h2>
       <p class="subtle">Logged under Sick &amp; Injured, today's list.</p>
-      <div style="display:grid; grid-template-columns: repeat(4,1fr); gap:10px;">
+      <div style="display:grid; grid-template-columns: repeat(3,1fr); gap:10px;">
         <input id="req-title" placeholder="Animal ID" style="margin:0;">
         <div style="display:flex; gap:6px;">
-          <select id="req-location" style="margin:0; flex:2;">
-            <option>Cat Room 1</option><option>Cat Room 2</option><option>Cat Room 3</option>
-            <option>Adoption 1</option><option>Adoption 2</option><option>FIR Room</option>
-            <option>Pound 1</option><option>Pound 2</option><option>Pound 3</option><option>Pound 4</option>
-            <option>Transport</option>
-          </select>
+          <select id="req-location" style="margin:0; flex:2;"></select>
           <input id="req-pen" placeholder="Pen #" style="margin:0; flex:1; min-width:0;">
         </div>
         <select id="req-type" style="margin:0;">
@@ -277,11 +273,6 @@
           <option value="foster">Foster request</option>
           <option value="rescue">Rescue request</option>
           <option value="medication">Medication</option>
-        </select>
-        <select id="req-urgency" style="margin:0;">
-          <option value="routine">Routine</option>
-          <option value="soon">Soon</option>
-          <option value="urgent">Urgent</option>
         </select>
       </div>
       <div style="display:grid; grid-template-columns: 1fr 2fr; gap:10px;">
@@ -294,6 +285,12 @@
           <option value="other">Other</option>
         </select>
         <input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg" style="margin:0;">
+      </div>
+      <div id="req-redflags-wrap" style="margin:12px 0 4px;">
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Red flags — tick any that apply</div>
+        <div id="req-redflags" style="display:flex; flex-wrap:wrap; gap:8px 18px;"></div>
+        <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">Emergency? Radio the vet — don't wait for this board.</div>
       </div>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
@@ -547,7 +544,8 @@
       location: pen ? `${room} / ${pen}` : room,
       shift: 'sick_injured',
       type: document.getElementById('req-type').value,
-      urgency: document.getElementById('req-urgency').value,
+      urgency: LDHLogic.tierFromFlags(selectedFlags()),
+      red_flags: selectedFlags(),
       problem: document.getElementById('req-problem').value.trim() || null,
       condition: document.getElementById('req-condition').value || null,
       done: false,
@@ -558,6 +556,8 @@
     document.getElementById('req-pen').value = '';
     document.getElementById('req-problem').value = '';
     document.getElementById('req-condition').value = '';
+    document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });
+    updateTierPreview();
   });
 
   document.getElementById('search-box').addEventListener('input', renderQueueTable);
@@ -977,6 +977,27 @@
     renderTrends();
     renderResponseRateChart();
   }
+
+  function fillLocationSelects() {
+    ['req-location', 'nr-location', 'nt-location'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    });
+  }
+  function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
+  function updateTierPreview() {
+    const tier = LDHLogic.tierFromFlags(selectedFlags());
+    document.getElementById('req-tier-preview').textContent = LDHLogic.TIER_LABELS[tier] + ' — check ' + LDHLogic.TIER_TARGETS[tier];
+  }
+  function renderRedFlagForm() {
+    const wrap = document.getElementById('req-redflags');
+    wrap.innerHTML = LDHLogic.RED_FLAGS.map(f =>
+      `<label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; margin:0;"><input type="checkbox" class="req-flag" value="${f.key}" style="width:auto; margin:0;"> ${esc(f.label)}</label>`).join('');
+    wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', updateTierPreview));
+    updateTierPreview();
+  }
+  fillLocationSelects();
+  renderRedFlagForm();
 
   initAuth();
 </script>
