@@ -226,6 +226,8 @@
     .layout { grid-template-columns: 1fr; }
     .kpi-row { grid-template-columns: 1fr; }
   }
+  .sweep-sec h3 { font-size: 0.8rem; margin: 12px 0 4px; }
+  .sweep-n { background: var(--critical); color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 0.7rem; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -315,6 +317,15 @@
         <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html" target="_blank" rel="noopener"><b>Sick &amp; Injured</b><span>Rechecks and flagged animals</span></a>
         <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/surgery.html" target="_blank" rel="noopener"><b>Surgery</b><span>Desexing list, notes, sharing</span></a>
       </div>
+    </section>
+
+    <section class="card" id="sweep-card" style="display:none">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <h2 style="margin:0;">Shift-change sweep</h2>
+        <button class="secondary" id="sweep-copy" type="button">Copy handover</button>
+      </div>
+      <p class="subtle" style="margin-top:6px;">Everything still open, overdue or unclaimed — check this before you hand over.</p>
+      <div id="sweep-body"></div>
     </section>
 
     <section class="card" id="nurse-requests">
@@ -584,6 +595,7 @@
     document.getElementById('start-shift-card').style.display = isStaff ? 'none' : 'block';
     document.getElementById('nurse-treatments').style.display = isStaff ? 'none' : 'block';
     document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
+    document.getElementById('sweep-card').style.display = isStaff ? 'none' : 'block';
     renderAll();
   }
   document.getElementById('role-select').addEventListener('change', (e) => { ROLE = e.target.value; applyRoleVisibility(); });
@@ -1105,6 +1117,7 @@
     renderMemos();
     renderNurseRequests();
     renderNurseTreatments();
+    renderSweep();
     renderTrends();
     renderResponseRateChart();
   }
@@ -1276,6 +1289,27 @@
     const { error } = await sb.from('nurse_treatments').update({ stopped: true }).eq('id', btn.dataset.id);
     if (error) alert('Could not stop the course: ' + error.message);
     loadAll();
+  });
+  function currentSweep(now) {
+    return LDHLogic.buildSweep({ tasks: TASKS, requests: NURSE_REQUESTS, doses: activeDoses() }, now);
+  }
+  function renderSweep() {
+    const now = Date.now();
+    const sw = currentSweep(now);
+    const overdueIds = new Set(sw.overdueCases.map(t => t.id));
+    const tier = t => LDHLogic.TIER_LABELS[LDHLogic.normTier(t.urgency)];
+    const sec = (title, lines) => `<div class="sweep-sec"><h3>${title} <span class="sweep-n">${lines.length}</span></h3>${
+      lines.length ? lines.map(l => `<div class="ameta">${esc(l)}</div>`).join('') : '<div class="ameta">None</div>'}</div>`;
+    document.getElementById('sweep-body').innerHTML =
+      sec('Overdue cases', sw.overdueCases.map(t => `${t.title} — ${t.location} — ${tier(t)}, ${LDHLogic.statusOf(t, now).label}`)) +
+      sec('Not yet claimed', sw.unclaimed.filter(t => !overdueIds.has(t.id)).map(t => `${t.title} — ${t.location} — ${tier(t)}`)) +
+      sec('Overdue nurse requests', sw.overdueRequests.map(r => `${r.location} — ${r.animal_count} ${r.species}(s) to vaccinate, ${LDHLogic.vaccStatus(r, now).label}`)) +
+      sec('Overdue treatment doses', sw.overdueDoses.map(d => `${d.animal_id} — ${d.location} — ${d.treatment} (${d.due_date} ${d.slot_label})`));
+  }
+  document.getElementById('sweep-copy').addEventListener('click', async () => {
+    const text = LDHLogic.sweepText(currentSweep(Date.now()), Date.now());
+    try { await navigator.clipboard.writeText(text); alert('Handover copied.'); }
+    catch (e) { window.prompt('Copy this handover text:', text); }
   });
   function refreshTimers() {
     renderQueueTable();
