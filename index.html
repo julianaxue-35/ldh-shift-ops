@@ -156,6 +156,12 @@
   .status-pill.urgent { background: rgba(208,59,59,0.12); color: var(--critical); }
   .status-pill.soon { background: rgba(156,154,144,0.18); color: var(--neutral-500); }
   .status-pill.routine { background: rgba(216,214,206,0.35); color: var(--muted); }
+  .status-pill.red_flag { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
   .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
 
   .completed-row {
@@ -177,7 +183,8 @@
   .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
   .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
-  .urgency-col h3.urgent-h { color: var(--critical); }
+  .urgency-col h3.red-h { color: var(--critical); }
+  .urgency-col h3.urgent-h { color: #c26a00; }
   .urgency-col h3.soon-h { color: var(--neutral-500); }
   .urgency-col h3.routine-h { color: var(--muted); }
   .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
@@ -343,9 +350,9 @@
             <button class="secondary" id="batch-pickup-clear" style="padding:10px 14px; font-size:0.82rem; margin-left:8px;">Clear selection</button>
           </div>
           <div class="urgency-board">
-            <div class="urgency-col"><h3 class="urgent-h">Urgent</h3><div id="board-urgent"></div></div>
-            <div class="urgency-col"><h3 class="soon-h">Soon</h3><div id="board-soon"></div></div>
-            <div class="urgency-col"><h3 class="routine-h">Routine</h3><div id="board-routine"></div></div>
+            <div class="urgency-col"><h3 class="red-h">Red flag · within 2 h</h3><div id="board-redflag"></div></div>
+            <div class="urgency-col"><h3 class="urgent-h">Urgent · 12–24 h</h3><div id="board-urgent"></div></div>
+            <div class="urgency-col"><h3 class="routine-h">Routine · 24–48 h</h3><div id="board-routine"></div></div>
           </div>
         </section>
       </div>
@@ -406,7 +413,7 @@
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
   const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
   const SHIFT_ICONS = { processing: '👥', sick_injured: '➕', surgery: '✂️' };
-  const URGENCY_COLOR = { urgent: 'var(--critical)', soon: 'var(--neutral-500)', routine: 'var(--neutral-300)' };
+  const URGENCY_COLOR = { red_flag: 'var(--critical)', urgent: 'var(--amber)', soon: 'var(--amber)', routine: 'var(--neutral-300)' };
   const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
   /* 2026-09-19: "Pick up" hand-off — opens the matching offline tool with
      the animal's ID/location/issue pre-filled via URL params, so a vet
@@ -672,10 +679,9 @@
 
   function renderQueueTable() {
     const q = document.getElementById('search-box').value.trim().toLowerCase();
-    const order = { urgent: 0, soon: 1, routine: 2 };
     let open = TASKS.filter(t => !t.done);
     if (q) open = open.filter(t => t.title.toLowerCase().includes(q));
-    open.sort((a, b) => order[a.urgency] - order[b.urgency]);
+    open = LDHLogic.sortQueue(open, Date.now());
     const tbody = document.getElementById('queue-tbody');
     if (!open.length) {
       tbody.innerHTML = `<tr><td colspan="5"><p class="empty-state">Nothing matches.</p></td></tr>`;
@@ -687,9 +693,39 @@
         <td>${esc(t.location)}</td>
         <td style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
         <td>${TYPE_LABELS[t.type] || t.type}</td>
-        <td><span class="status-pill ${t.urgency}">${t.urgency}</span></td>
+        <td><span class="status-pill ${LDHLogic.normTier(t.urgency)}">${LDHLogic.TIER_LABELS[LDHLogic.normTier(t.urgency)]}</span> ${statusChipHtml(t)}</td>
       </tr>
     `).join('');
+  }
+
+  function statusChipHtml(t) {
+    const st = LDHLogic.statusOf(t, Date.now());
+    if (st.level === 'seen') return `<span class="lvl lvl-seen">${t.claimed_at ? 'Claimed by ' + esc(t.claimed_by || '?') : 'Done'}</span>`;
+    return `<span class="lvl lvl-${st.level}">${esc(st.label)}</span>`;
+  }
+  function myInitials() {
+    let v = localStorage.getItem('ldh_ops_initials') || '';
+    if (!v) {
+      v = (window.prompt('Your initials (saved on this device):') || '').trim().toUpperCase().slice(0, 4);
+      if (v) localStorage.setItem('ldh_ops_initials', v);
+    }
+    return v;
+  }
+  async function claimTask(id) {
+    const who = myInitials(); if (!who) return;
+    const { error } = await sb.from('tasks').update({ claimed_by: who, claimed_at: new Date().toISOString() }).eq('id', id);
+    if (error) alert('Could not claim: ' + error.message);
+    loadAll();
+  }
+  async function unclaimTask(id) {
+    const { error } = await sb.from('tasks').update({ claimed_by: null, claimed_at: null }).eq('id', id);
+    if (error) alert('Could not release: ' + error.message);
+    loadAll();
+  }
+  async function bumpToUrgent(id) {
+    const { error } = await sb.from('tasks').update({ urgency: 'urgent' }).eq('id', id);
+    if (error) alert('Could not update: ' + error.message);
+    loadAll();
   }
 
   function renderBoardCol(containerId, tasks) {
@@ -698,13 +734,18 @@
     el.innerHTML = tasks.map(t => {
       const url = pickUpUrl([t]);
       const canPickUp = !!SHIFT_TOOL_URLS[t.shift];
+      const tier = LDHLogic.normTier(t.urgency);
       return `
       <div class="attn-item">
         <label style="display:flex; align-items:center; gap:8px; flex:1; margin:0; cursor:${canPickUp ? 'pointer' : 'default'};">
           <input type="checkbox" class="pickup-check" data-id="${t.id}" ${selectedPickup.has(t.id) ? 'checked' : ''} ${canPickUp ? '' : 'disabled'}>
-          <div><div class="aname">${esc(t.title)}</div><div class="ameta">${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}${t.problem ? ' · ' + esc(t.problem) : ''}</div></div>
+          <div><div class="aname">${esc(t.title)} ${statusChipHtml(t)}</div><div class="ameta">${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}${t.problem ? ' · ' + esc(t.problem) : ''}${(t.red_flags && t.red_flags.length) ? ' · flags: ' + esc(t.red_flags.join(', ').replace(/_/g, ' ')) : ''}</div></div>
         </label>
-        <div style="display:flex; gap:6px; flex-shrink:0;">
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${t.claimed_at
+            ? `<button class="secondary unclaim-btn" data-id="${t.id}">Release</button>`
+            : `<button class="secondary claim-btn" data-id="${t.id}">I've got this</button>`}
+          ${tier === 'routine' && !t.claimed_at ? `<button class="secondary bump-btn" data-id="${t.id}">Bump to urgent</button>` : ''}
           ${url ? `<a class="secondary pick-up" href="${url}" target="_blank" rel="noopener" style="padding:5px 10px; font-size:0.72rem; border-radius:14px; text-decoration:none; color:var(--ink); display:inline-block;">Pick up →</a>` : ''}
           <button class="secondary mark-done" data-id="${t.id}">Mark done</button>
         </div>
@@ -712,6 +753,9 @@
     `;
     }).join('');
     el.querySelectorAll('.mark-done').forEach(btn => btn.addEventListener('click', () => markDone(btn.dataset.id)));
+    el.querySelectorAll('.claim-btn').forEach(btn => btn.addEventListener('click', () => claimTask(btn.dataset.id)));
+    el.querySelectorAll('.unclaim-btn').forEach(btn => btn.addEventListener('click', () => unclaimTask(btn.dataset.id)));
+    el.querySelectorAll('.bump-btn').forEach(btn => btn.addEventListener('click', () => bumpToUrgent(btn.dataset.id)));
     el.querySelectorAll('.pickup-check').forEach(cb => cb.addEventListener('change', () => {
       if (cb.checked) selectedPickup.add(cb.dataset.id); else selectedPickup.delete(cb.dataset.id);
       updatePickupBar();
@@ -719,10 +763,10 @@
   }
 
   function renderVetBoard() {
-    const open = TASKS.filter(t => !t.done && (typeFilter === 'all' || t.type === typeFilter));
-    renderBoardCol('board-urgent', open.filter(t => t.urgency === 'urgent'));
-    renderBoardCol('board-soon', open.filter(t => t.urgency === 'soon'));
-    renderBoardCol('board-routine', open.filter(t => t.urgency === 'routine'));
+    const open = LDHLogic.sortQueue(TASKS.filter(t => !t.done && (typeFilter === 'all' || t.type === typeFilter)), Date.now());
+    renderBoardCol('board-redflag', open.filter(t => LDHLogic.normTier(t.urgency) === 'red_flag'));
+    renderBoardCol('board-urgent', open.filter(t => LDHLogic.normTier(t.urgency) === 'urgent'));
+    renderBoardCol('board-routine', open.filter(t => LDHLogic.normTier(t.urgency) === 'routine'));
     updatePickupBar();
   }
 
@@ -996,6 +1040,14 @@
     wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', updateTierPreview));
     updateTierPreview();
   }
+  function refreshTimers() {
+    renderQueueTable();
+    renderVetBoard();
+    if (typeof renderNurseRequests === 'function') renderNurseRequests();
+    if (typeof renderNurseTreatments === 'function') renderNurseTreatments();
+    if (typeof renderSweep === 'function') renderSweep();
+  }
+  setInterval(refreshTimers, 60000);
   fillLocationSelects();
   renderRedFlagForm();
 
