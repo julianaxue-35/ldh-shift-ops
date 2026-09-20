@@ -191,6 +191,9 @@
   .urgency-col h3.routine-h { color: var(--muted); }
   .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
   .attn-item:last-child { border-bottom: none; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+  .nt-h.overdue { color: var(--critical); }
   .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
   .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); }
   .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
@@ -326,6 +329,23 @@
         <button class="secondary" id="nr-now" type="button">Arrived now</button>
         <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
         <button id="nr-submit" type="button">Log request</button>
+      </div>
+    </section>
+    <section class="card" id="nurse-treatments" style="display:none">
+      <h2>Nurse treatments</h2>
+      <p class="subtle">Vets request a treatment for an animal in the ward; nurses tick each dose off.</p>
+      <div id="nt-overdue"></div>
+      <div id="nt-today"></div>
+      <div id="nt-courses"></div>
+      <h3 style="font-size:0.85rem; margin:18px 0 0;">Request a treatment</h3>
+      <div class="nt-form">
+        <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="nt-location"></select></label>
+        <label>Treatment<input id="nt-treatment" placeholder="e.g. flush dental extraction site"></label>
+        <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+        <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
+        <label>Start date<input id="nt-start" type="date"></label>
+        <button id="nt-submit" type="button">Request</button>
       </div>
     </section>
 
@@ -562,6 +582,7 @@
     document.getElementById('cases-flagged').style.display = isStaff ? 'block' : 'none';
     document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
     document.getElementById('start-shift-card').style.display = isStaff ? 'none' : 'block';
+    document.getElementById('nurse-treatments').style.display = isStaff ? 'none' : 'block';
     document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
     renderAll();
   }
@@ -1083,6 +1104,7 @@
     renderCompleted();
     renderMemos();
     renderNurseRequests();
+    renderNurseTreatments();
     renderTrends();
     renderResponseRateChart();
   }
@@ -1164,6 +1186,95 @@
     if (!patch) return;
     const { error } = await sb.from('nurse_requests').update(patch).eq('id', r.id);
     if (error) alert('Could not update: ' + error.message);
+    loadAll();
+  });
+  function activeDoses() {
+    const by = new Map(NURSE_TREATMENTS.map(t => [t.id, t]));
+    return NURSE_DOSES
+      .filter(d => by.has(d.treatment_id) && !by.get(d.treatment_id).stopped)
+      .map(d => {
+        const t = by.get(d.treatment_id);
+        return Object.assign({}, d, { animal_id: t.animal_id, location: t.location, treatment: t.treatment,
+          times_per_day: t.times_per_day, slot_label: LDHLogic.slotLabel(t.times_per_day, d.slot_no) });
+      });
+  }
+  function doseRowHtml(d, todayISO) {
+    const done = !!d.done_at;
+    return `<label class="attn-item" style="cursor:pointer;">
+      <span style="display:flex; gap:10px; align-items:center;">
+        <input type="checkbox" class="nt-tick" data-id="${esc(d.id)}" ${done ? 'checked' : ''} style="width:20px; height:20px; margin:0;">
+        <span><span class="aname">${esc(d.animal_id)} — ${esc(d.treatment)}</span><br>
+          <span class="ameta">${esc(d.slot_label)}${d.due_date !== todayISO ? ' · due ' + esc(d.due_date) : ''}${done ? ' · done by ' + esc(d.done_by || '?') + ' ' + fmtTime(d.done_at) : ''}</span></span>
+      </span></label>`;
+  }
+  function groupedDoseHtml(list, todayISO) {
+    const by = {};
+    list.forEach(d => { (by[d.location] = by[d.location] || []).push(d); });
+    return Object.keys(by).sort().map(loc =>
+      `<div><div class="nt-loc-h">${esc(loc)}</div>${by[loc].map(d => doseRowHtml(d, todayISO)).join('')}</div>`).join('');
+  }
+  function renderNurseTreatments() {
+    const todayISO = LDHLogic.localISO(new Date());
+    const doses = activeDoses();
+    const overdue = doses.filter(d => LDHLogic.doseLevel(d, todayISO) === 'overdue');
+    const today = doses.filter(d => d.due_date === todayISO);
+    document.getElementById('nt-overdue').innerHTML = overdue.length
+      ? `<div class="nt-h overdue">Overdue (${overdue.length})</div>${groupedDoseHtml(overdue, todayISO)}` : '';
+    const todayDone = today.filter(d => d.done_at).length;
+    document.getElementById('nt-today').innerHTML = today.length
+      ? `<div class="nt-h">Due today (${todayDone} of ${today.length} done)</div>${groupedDoseHtml(today, todayISO)}`
+      : '<p class="empty-state">No treatments due today.</p>';
+    const courses = NURSE_TREATMENTS.filter(t => !t.stopped).map(t => {
+      const p = LDHLogic.courseProgress(NURSE_DOSES.filter(d => d.treatment_id === t.id));
+      return { t, p };
+    }).filter(c => c.p.total === 0 || c.p.done < c.p.total);
+    document.getElementById('nt-courses').innerHTML = courses.length
+      ? `<div class="nt-h">Courses in progress</div>` + courses.map(c => `<div class="attn-item">
+          <div><div class="aname">${esc(c.t.animal_id)} — ${esc(c.t.treatment)}</div>
+            <div class="ameta">${esc(c.t.location)} · ${c.t.times_per_day}× a day for ${c.t.days} days · ${c.p.done} of ${c.p.total} done${c.t.requested_by ? ' · requested by ' + esc(c.t.requested_by) : ''}</div></div>
+          <button class="secondary nt-stop" data-id="${esc(c.t.id)}">Stop course</button></div>`).join('')
+      : '';
+  }
+  document.getElementById('nt-start').value = LDHLogic.localISO(new Date());
+  document.getElementById('nt-submit').addEventListener('click', async () => {
+    const animal = document.getElementById('nt-animal').value.trim();
+    const treatment = document.getElementById('nt-treatment').value.trim();
+    const times = parseInt(document.getElementById('nt-times').value, 10);
+    const days = parseInt(document.getElementById('nt-days').value, 10);
+    const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
+    if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
+    if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
+    const who = myInitials() || 'Vet team';
+    const { data: tr, error } = await sb.from('nurse_treatments').insert({
+      animal_id: animal, location: document.getElementById('nt-location').value, treatment,
+      times_per_day: times, days, start_date: start, requested_by: who
+    }).select().single();
+    if (error) { alert('Could not save the request: ' + error.message); return; }
+    const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
+    const { error: doseErr } = await sb.from('nurse_treatment_doses').insert(slots);
+    if (doseErr) {
+      await sb.from('nurse_treatments').delete().eq('id', tr.id);   // never leave a course without its doses
+      alert('Could not create the dose list: ' + doseErr.message);
+      return;
+    }
+    document.getElementById('nt-animal').value = '';
+    document.getElementById('nt-treatment').value = '';
+    loadAll();
+  });
+  document.getElementById('nurse-treatments').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.nt-tick'); if (!cb) return;
+    let who = null;
+    if (cb.checked) { who = myInitials(); if (!who) { cb.checked = false; return; } }
+    const { error } = await sb.from('nurse_treatment_doses')
+      .update({ done_by: who, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
+    if (error) alert('Could not save the tick: ' + error.message);
+    loadAll();
+  });
+  document.getElementById('nurse-treatments').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.nt-stop'); if (!btn) return;
+    if (!confirm('Stop this course? Its remaining doses will disappear from the lists.')) return;
+    const { error } = await sb.from('nurse_treatments').update({ stopped: true }).eq('id', btn.dataset.id);
+    if (error) alert('Could not stop the course: ' + error.message);
     loadAll();
   });
   function refreshTimers() {
