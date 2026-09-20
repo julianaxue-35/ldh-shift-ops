@@ -1,0 +1,499 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stats — LDH Shift Ops</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
+<style>
+  /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
+     crisp borders and a soft drop shadow, replacing the earlier neumorphic
+     soft-UI look (same-color raised/inset shadows on a single background
+     tone). Accent hues (amber/blue/green/critical) are unchanged from
+     before — only how surfaces render changed, not the color coding. */
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --light-blue: #93C5FD;
+    --donut-teal: #4FC1D6;
+    --donut-track: #E5E7EB;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --neutral-500: #9C9A90;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  /* Login gate — shown before anything else; nothing is fetched until a
+     session exists (spec: "no data until a valid session exists"). */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  #login-card {
+    background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card);
+    padding: 32px; width: 320px;
+  }
+  #login-card h1 { font-size: 1.2rem; margin: 0 0 6px; }
+  #login-card p { font-size: 0.85rem; color: var(--muted); margin: 0 0 20px; }
+  #login-error { color: var(--critical); font-size: 0.82rem; margin: -6px 0 10px; display: none; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside label {
+    display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--sidebar-text-muted); margin-bottom: 8px;
+  }
+  aside select { width: 100%; background: #2A2F4A; color: #fff; border: none; box-shadow: none; margin-bottom: 24px; font-size: 0.9rem; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+  #search-box {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px;
+    background: var(--card-bg); font: inherit; font-size: 0.85rem; width: 220px;
+  }
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
+  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+  }
+  button {
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  /* Top KPI row — completion donut and the 3 shift cards as 4 equal,
+     same-weight columns, instead of the donut sitting alone in its own
+     full-width row above them. */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
+  .completion-donut {
+    width: 110px; height: 110px; position: relative;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  .completion-donut svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .completion-donut .val { position: relative; font-size: 1.5rem; font-weight: 700; }
+  .completion-donut .lbl { position: relative; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.04em; }
+  .completion-side { font-size: 0.78rem; color: var(--muted); }
+  .completion-side b { display: block; font-size: 1.1rem; color: var(--ink); }
+
+  /* Two-column dashboard body — wider main column for the case queues,
+     narrower side rail for completed/memos, instead of every section
+     stacked full-width one after another. */
+  .dashboard-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+  .main-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .side-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; align-items: start; min-width: 0; }
+
+  .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
+  .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+  .bar-track { height: 10px; border-radius: 6px; background: var(--neutral-100); overflow: hidden; margin-bottom: 10px; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .shift-card .onshift { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .shift-card .shift-icon {
+    float: right; width: 30px; height: 30px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 0.95rem; color: #fff;
+  }
+  .chip {
+    display: inline-block; padding: 5px 12px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border);
+    margin: 2px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  }
+  .roster-add-row { display: flex; gap: 6px; margin-top: 8px; }
+  .roster-add-row input { margin: 0; }
+  .roster-add-row button { padding: 8px 12px; font-size: 0.75rem; white-space: nowrap; }
+
+  table.queue-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.queue-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0 10px 10px; }
+  table.queue-table td { padding: 10px; border-top: 1px solid rgba(30,34,56,0.06); }
+  table.queue-table tr:first-child td { border-top: none; }
+  .row-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  .status-pill { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .status-pill.urgent { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .status-pill.routine { background: rgba(216,214,206,0.35); color: var(--muted); }
+  .status-pill.red_flag { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .nr-form, .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nr-form label, .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .completed-row {
+    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
+    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
+  .filter-chip {
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgency-col h3.red-h { color: var(--critical); }
+  .urgency-col h3.urgent-h { color: #c26a00; }
+  .urgency-col h3.routine-h { color: var(--muted); }
+  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
+  .attn-item:last-child { border-bottom: none; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+  .nt-h.overdue { color: var(--critical); }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .urgency-col .attn-item .ameta { margin-top: 2px; }
+  .attn-item .pickup-check { width: 18px; height: 18px; margin: 0; padding: 0; flex: none; }
+  .attn-item button.mark-done { padding: 5px 10px; font-size: 0.72rem; }
+
+  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  #memo-post textarea { min-height: 60px; }
+
+  .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
+  .trend-card .trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+  .trend-card .trend-title { font-size: 0.9rem; font-weight: 700; }
+  .trend-card .trend-ytd { font-size: 1.5rem; font-weight: 700; }
+  .trend-card .trend-ytd-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .trend-card .chart-subhead { font-size: 0.75rem; margin: 12px 0 4px; color: var(--muted); }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .chart-legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  @media (max-width: 1000px) {
+    .urgency-board, .trend-grid { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-body { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <p class="hint">Stats — all Processing, Sick &amp; Injured and Surgery shifts. Live from the same data as the dashboard.</p>
+    <p class="hint" style="margin-top:14px;"><a href="index.html" style="color:var(--sidebar-text-muted);">← Back to the dashboard</a></p>
+  </aside>
+  <main>
+    <div class="page-head">
+      <h1>Stats review</h1>
+      <p>Overall stats for every shift — trends, response rates and disease surveillance.</p>
+    </div>
+    <section class="card" id="response-rate-section">
+      <h2>Response rate by department</h2>
+      <p class="subtle">Share of flagged cases completed each month, by shift — shows where requests are backing up, not just how many came in.</p>
+      <div class="chart-legend" id="response-rate-legend"></div>
+      <div id="response-rate-chart"></div>
+    </section>
+
+    <section class="card" id="surveillance-section">
+      <h2>Disease surveillance export</h2>
+      <p class="subtle">Overall counts, a location breakdown, and a full case-by-case list for a chosen month — so you can spot clustering, e.g. kennel cough concentrated in one room.</p>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <input type="month" id="surveillance-month" style="margin:0; width:auto;">
+        <button class="secondary" id="surveillance-export" style="margin:0;">Export CSV</button>
+      </div>
+    </section>
+
+    <section class="card" id="trends-section">
+      <h2>Annual &amp; monthly progress</h2>
+      <p class="subtle">Each category tracked on its own — cumulative, so the line only ever climbs.</p>
+      <div class="trend-grid" id="trend-grid"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://yeazfafvylawwgoxlhbl.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_fow5B_VGO3gKPf4BaULsOQ_ZiSH8q8Y';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
+  const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
+  const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function todayDateStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* ---------- annual / monthly trends — computed from real completed tasks ----------
+     "Flagged by Shelter Staff, completed" is currently the same as "every
+     completed task" (see the spec's open question on origin/staff_flagged
+     vs tool_sync — not yet resolved), so that category totals every
+     completion regardless of shift. */
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let YEAR_SERIES = { surgery: [], processing: [], sick_injured: [], attendant_flagged: [] };
+  let MONTH_SERIES = { surgery: [], processing: [], sick_injured: [], attendant_flagged: [] };
+  let MONTH_LABELS = [];
+  let DAY_LABELS = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
+
+  function cumulative(arr) { let t = 0; return arr.map(v => t += v); }
+
+  async function loadTrends() {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const { data, error } = await sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
+    const rows = error ? [] : (data || []);
+
+    const monthsSoFar = now.getMonth() + 1;
+    MONTH_LABELS = MONTH_NAMES.slice(0, monthsSoFar);
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const zeros = (n) => Array.from({ length: n }, () => 0);
+    const monthCounts = { surgery: zeros(monthsSoFar), processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), attendant_flagged: zeros(monthsSoFar) };
+    const dayCounts = { surgery: zeros(30), processing: zeros(30), sick_injured: zeros(30), attendant_flagged: zeros(30) };
+
+    rows.forEach(r => {
+      if (!r.completed_at) return;
+      const dt = new Date(r.completed_at);
+      const shift = r.shift;
+      const m = dt.getMonth();
+      if (m < monthsSoFar) {
+        if (monthCounts[shift]) monthCounts[shift][m]++;
+        monthCounts.attendant_flagged[m]++;
+      }
+      if (dt >= thirtyDaysAgo) {
+        const dayIdx = Math.floor((dt - thirtyDaysAgo) / (24 * 60 * 60 * 1000));
+        if (dayIdx >= 0 && dayIdx < 30) {
+          if (dayCounts[shift]) dayCounts[shift][dayIdx]++;
+          dayCounts.attendant_flagged[dayIdx]++;
+        }
+      }
+    });
+
+    YEAR_SERIES = {
+      surgery: cumulative(monthCounts.surgery), processing: cumulative(monthCounts.processing),
+      sick_injured: cumulative(monthCounts.sick_injured), attendant_flagged: cumulative(monthCounts.attendant_flagged),
+    };
+    MONTH_SERIES = {
+      surgery: cumulative(dayCounts.surgery), processing: cumulative(dayCounts.processing),
+      sick_injured: cumulative(dayCounts.sick_injured), attendant_flagged: cumulative(dayCounts.attendant_flagged),
+    };
+  }
+
+  function lineChartSvg(values, color, xLabels) {
+    const w = 300, h = 90, pad = 6;
+    const maxY = Math.max(1, ...values);
+    const n = xLabels.length;
+    const xStep = n > 1 ? (w - pad * 2) / (n - 1) : 0;
+    const toY = (v) => h - pad - (v / maxY) * (h - pad * 2);
+    const d = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(pad + i * xStep).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:90px;">
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
+    </svg>`;
+  }
+
+  const TREND_CATEGORIES = [
+    { key: 'surgery', title: 'Surgeries', color: 'var(--blue)' },
+    { key: 'processing', title: 'Examinations (Processing)', color: 'var(--green)' },
+    { key: 'sick_injured', title: 'Sick & Injured attended', color: 'var(--amber)' },
+    { key: 'attendant_flagged', title: 'Flagged by Shelter Staff, completed', color: 'var(--violet)' },
+  ];
+
+  function renderTrends() {
+    document.getElementById('trend-grid').innerHTML = TREND_CATEGORIES.map(c => `
+      <div class="trend-card">
+        <div class="trend-head">
+          <span class="trend-title" style="color:${c.color}">${c.title}</span>
+          <span><span class="trend-ytd" style="color:${c.color}">${(YEAR_SERIES[c.key].at(-1)) || 0}</span> <span class="trend-ytd-lbl">this year</span></span>
+        </div>
+        <h4 class="chart-subhead">Past 30 days</h4>
+        ${lineChartSvg(MONTH_SERIES[c.key], c.color, DAY_LABELS)}
+        <h4 class="chart-subhead">This year, by month</h4>
+        ${lineChartSvg(YEAR_SERIES[c.key], c.color, MONTH_LABELS)}
+      </div>
+    `).join('');
+  }
+
+  /* 2026-09-19: response rate by department — % of that month's flagged
+     cases actually completed, per shift, as a grouped bar chart. Different
+     question from the trend cards above (which show raw completed volume,
+     cumulative): this shows whether a department is keeping pace with what
+     comes in, or falling behind, independent of how busy it is. */
+  let RESPONSE_RATES = { processing: [], sick_injured: [], surgery: [] };
+  async function loadResponseRates() {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const { data, error } = await sb.from('tasks').select('shift, done, created_at').gte('created_at', yearStart.toISOString());
+    const rows = error ? [] : (data || []);
+    const monthsSoFar = now.getMonth() + 1;
+    const zeros = (n) => Array.from({ length: n }, () => 0);
+    const totals = { processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), surgery: zeros(monthsSoFar) };
+    const dones = { processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), surgery: zeros(monthsSoFar) };
+    rows.forEach(r => {
+      const m = new Date(r.created_at).getMonth();
+      if (m >= monthsSoFar || !totals[r.shift]) return;
+      totals[r.shift][m]++;
+      if (r.done) dones[r.shift][m]++;
+    });
+    RESPONSE_RATES = {};
+    ['processing', 'sick_injured', 'surgery'].forEach(s => {
+      RESPONSE_RATES[s] = totals[s].map((t, i) => t ? Math.round((dones[s][i] / t) * 100) : 0);
+    });
+  }
+
+  function renderResponseRateChart() {
+    const w = 640, h = 180, pad = 26;
+    const shifts = ['processing', 'sick_injured', 'surgery'];
+    const n = MONTH_LABELS.length || 1;
+    const groupW = (w - pad * 2) / n;
+    const barW = Math.min(14, groupW / 4);
+    let bars = '';
+    shifts.forEach((s, si) => {
+      (RESPONSE_RATES[s] || []).forEach((v, i) => {
+        const x = pad + i * groupW + si * (barW + 2);
+        const barH = (v / 100) * (h - pad * 2);
+        const y = h - pad - barH;
+        bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${barH.toFixed(1)}" fill="${SHIFT_COLORS[s]}" rx="2"/>`;
+      });
+    });
+    const labels = MONTH_LABELS.map((lbl, i) => `<text x="${(pad + i * groupW + groupW / 2).toFixed(1)}" y="${h - 8}" font-size="9" text-anchor="middle" fill="var(--muted)">${lbl}</text>`).join('');
+    document.getElementById('response-rate-legend').innerHTML = shifts.map(s => `<span><i class="legend-dot" style="background:${SHIFT_COLORS[s]}"></i>${SHIFT_LABELS[s]}</span>`).join('');
+    document.getElementById('response-rate-chart').innerHTML = `
+      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:180px;">
+        <line x1="${pad}" y1="${h - pad}" x2="${w - pad}" y2="${h - pad}" stroke="var(--border)" stroke-width="1"/>
+        ${bars}
+        ${labels}
+      </svg>
+    `;
+  }
+
+  /* 2026-09-19: disease surveillance monthly export — pure client-side CSV,
+     no new infrastructure. Counts each condition value flagged on requests
+     created within the chosen month. */
+  const CONDITION_LABELS = LDHLogic.CONDITION_LABELS;
+  function csvCell(v) { return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`; }
+
+  document.getElementById('surveillance-month').value = todayDateStr().slice(0, 7);
+  document.getElementById('surveillance-export').addEventListener('click', async () => {
+    const monthStr = document.getElementById('surveillance-month').value;
+    if (!monthStr) { alert('Pick a month first.'); return; }
+    const [y, m] = monthStr.split('-').map(Number);
+    const start = new Date(y, m - 1, 1);
+    const end = new Date(y, m, 1);
+    const { data, error } = await sb.from('tasks').select('title, location, condition, created_at')
+      .gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
+    if (error) { alert('Could not export: ' + error.message); return; }
+    const rows = data || [];
+
+    // Section 1: overall counts per condition (includes "None flagged").
+    const conditionCounts = { cat_flu: 0, kennel_cough: 0, diarrhoea: 0, wounds_injury: 0, other: 0, none: 0 };
+    rows.forEach(t => { conditionCounts[t.condition || 'none']++; });
+
+    // Section 2 & 3: location breakdown and full linelist — flagged cases
+    // only (excludes "none"), since a location count of unflagged routine
+    // requests isn't a surveillance signal. This is what lets her spot
+    // clustering, e.g. "kennel cough concentrated in Cat Room 2".
+    const flagged = rows.filter(t => t.condition).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const byLocation = {};
+    flagged.forEach(t => {
+      const loc = t.location || '(no location)';
+      (byLocation[loc] ??= {});
+      byLocation[loc][t.condition] = (byLocation[loc][t.condition] || 0) + 1;
+    });
+
+    let csv = `Disease surveillance — ${monthStr}\n\n`;
+    csv += 'Condition,Count\n';
+    Object.keys(conditionCounts).forEach(k => { csv += `${csvCell(CONDITION_LABELS[k])},${conditionCounts[k]}\n`; });
+    csv += '\nBy location\nLocation,Condition,Count\n';
+    Object.keys(byLocation).sort().forEach(loc => {
+      Object.keys(byLocation[loc]).forEach(cond => {
+        csv += `${csvCell(loc)},${csvCell(CONDITION_LABELS[cond])},${byLocation[loc][cond]}\n`;
+      });
+    });
+    csv += '\nFull list (flagged cases only)\nDate,Animal ID,Location,Condition\n';
+    flagged.forEach(t => {
+      const d = new Date(t.created_at).toLocaleDateString('en-AU');
+      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${csvCell(CONDITION_LABELS[t.condition])}\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `disease-surveillance-${monthStr}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+
+
+  async function initStats() {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { location.href = 'index.html'; return; }   // sign in on the dashboard first (same sign-in is shared)
+    document.getElementById('app-root').style.display = 'grid';
+    await loadTrends();
+    await loadResponseRates();
+    renderTrends();
+    renderResponseRateChart();
+  }
+  initStats();
+</script>
+<!-- ip-notice-footer -->
+<footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  &copy; 2026 Juliana Xue. All rights reserved.<br>
+  This work is the intellectual property of Juliana Xue and may not be copied,
+  modified, or distributed without her express written permission.
+</footer>
+</body>
+</html>

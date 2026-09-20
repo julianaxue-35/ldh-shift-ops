@@ -88,27 +88,11 @@ test('courseProgress and splitMemos', () => {
   assert.equal(s.active.length, 1); assert.equal(s.completed.length, 1);
 });
 
-test('buildSweep and sweepText', () => {
-  const overdue = task('red_flag', 3 * H, { title: 'RED1' });
-  const unclaimedOk = task('routine', 1 * H, { title: 'OK1' });
-  const claimed = task('routine', 60 * H, { title: 'CLAIMED', claimed_by: 'JX', claimed_at: new Date(NOW - H).toISOString() });
-  const doneT = task('routine', 5 * H, { title: 'DONE', done: true, claimed_at: new Date(NOW - H).toISOString() });
-  const req = { arrived_at: new Date(NOW - 4 * H).toISOString(), animal_count: 8, done_count: 2, species: 'cat', location: 'FIR Room' };
-  const dose = { due_date: '2026-09-19', done_at: null, animal_id: '1174362', location: 'Cat Room 1', treatment: 'Flush site', slot_label: 'AM' };
-  const sw = L.buildSweep({ tasks: [overdue, unclaimedOk, claimed, doneT], requests: [req], doses: [dose] }, NOW);
-  assert.deepEqual(sw.overdueCases.map(t => t.title), ['RED1']);
-  assert.deepEqual(sw.unclaimed.map(t => t.title).sort(), ['OK1', 'RED1']);
-  assert.deepEqual(sw.claimedOpen.map(t => t.title), ['CLAIMED']);
-  assert.equal(sw.overdueRequests.length, 1);
-  assert.equal(sw.overdueDoses.length, 1);
-  const txt = L.sweepText(sw, NOW);
-  assert.match(txt, /Overdue cases \(1\)/);
-  assert.match(txt, /RED1 — Pound 1 — Red flag, overdue 1h/);
-  assert.match(txt, /Claimed, not finished \(1\)/);
-  assert.match(txt, /CLAIMED — Pound 1 — Routine, claimed by JX 1h 0m ago/);
-  assert.ok(!txt.includes('DONE'));
-  assert.match(txt, /FIR Room — 8 cat\(s\) to vaccinate, overdue 1h/);
-  assert.match(txt, /1174362 — Cat Room 1 — Flush site \(2026-09-19 AM\)/);
+test('CONDITION_LABELS covers every condition value the flag form can save', () => {
+  assert.equal(L.CONDITION_LABELS.cat_flu, 'Cat flu (URI)');
+  assert.equal(L.CONDITION_LABELS.wounds_injury, 'Wounds / injury / trauma');
+  assert.equal(L.CONDITION_LABELS.none, 'None flagged');
+  ['cat_flu', 'kennel_cough', 'diarrhoea', 'wounds_injury', 'other'].forEach(k => assert.ok(L.CONDITION_LABELS[k], k));
 });
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {

@@ -1,6 +1,6 @@
 const { chromium } = require('playwright');
 const path = require('path');
-const PAGE_URL = 'file://' + path.resolve(__dirname, '../../index.html');
+const pageUrl = (name) => 'file://' + path.resolve(__dirname, '../../' + (name || 'index.html'));
 
 // In-memory stand-in for the Supabase client. Runs inside the page.
 const STUB = `
@@ -27,6 +27,7 @@ const STUB = `
       eq(k, v) { filters.push(r => r[k] === v); return b; },
       gte(k, v) { filters.push(r => r[k] >= v); return b; },
       lt(k, v) { filters.push(r => r[k] < v); return b; },
+      in(k, vals) { filters.push(r => vals.indexOf(r[k]) !== -1); return b; },
       order(c, o) { orderCol = c; asc = !(o && o.ascending === false); return b; },
       single() { single = true; return b; },
       then(res, rej) {
@@ -57,10 +58,11 @@ const STUB = `
 })();
 `;
 
-async function open(seed = {}) {
+async function open(seed = {}, pageName) {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1300, height: 1000 } });
   await ctx.route('**/supabase.js', r => r.abort());
+  await ctx.route('https://julianaxue-35.github.io/**', r => r.abort());   // Pick up opens the shift tool in a new tab; keep tests offline
   await ctx.addInitScript(STUB);
   await ctx.addInitScript((s) => {
     Object.keys(s).forEach(k => s[k].forEach(r => window.__db[k].push(
@@ -70,7 +72,7 @@ async function open(seed = {}) {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('dialog', d => d.accept('JX'));   // prompt() -> initials "JX"; confirm() -> OK
-  await page.goto(PAGE_URL);
+  await page.goto(pageUrl(pageName));
   await page.waitForTimeout(500);
   return { browser, page, errors, db: () => page.evaluate(() => window.__db) };
 }

@@ -3,10 +3,12 @@ const t = require('./check')('nurse-treatments');
 (async () => {
   const { browser, page, errors, db } = await open();
   try {
-    t.ok(!(await page.isVisible('#nurse-treatments')), 'hidden from Floor view');
+    t.ok(!(await page.isVisible('#nurse-treatments')) && !(await page.isVisible('#nurse-doses')), 'both treatment cards hidden from Floor view');
     await page.selectOption('#role-select', 'vet_nurse');
     await page.waitForTimeout(200);
-    t.ok(await page.isVisible('#nurse-treatments'), 'shown on the Vet desk');
+    t.ok(await page.isVisible('#nurse-treatments'), 'vets\' request card shown on the Vet desk');
+    t.ok(await page.isVisible('#nurse-doses'), 'nurses\' treatments-due card shown on the Vet desk');
+    t.ok((await page.locator('#nurse-treatments #nt-submit').count()) === 1 && (await page.locator('#nurse-doses #nt-submit').count()) === 0, 'the request form lives in the vets card, not the nurses card');
   
     await page.fill('#nt-animal', '1174362');
     await page.selectOption('#nt-location', 'Cat Room 1');
@@ -18,6 +20,7 @@ const t = require('./check')('nurse-treatments');
     let d = await db();
     t.ok(d.nurse_treatments.length === 1 && d.nurse_treatments[0].requested_by === 'JX', 'course saved with requester initials');
     t.ok(d.nurse_treatment_doses.length === 14, '2 a day for 7 days creates 14 dose slots');
+    t.ok((await page.locator('#nurse-doses #nt-today').count()) === 1 && (await page.locator('#nurse-treatments #nt-courses').count()) === 1, "today's doses are in the nurses card; courses are in the vets card");
     const today = await page.textContent('#nt-today');
     t.ok(today.includes('1174362') && today.includes('AM') && today.includes('PM') && today.includes('Cat Room 1'), "today's doses grouped by space with AM and PM");
     t.ok((await page.textContent('#nt-courses')).includes('0 of 14 done'), 'course progress shown');

@@ -224,8 +224,6 @@
     .layout { grid-template-columns: 1fr; }
     .kpi-row { grid-template-columns: 1fr; }
   }
-  .sweep-sec h3 { font-size: 0.8rem; margin: 12px 0 4px; }
-  .sweep-n { background: var(--critical); color: #fff; border-radius: 10px; padding: 1px 8px; font-size: 0.7rem; margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -258,6 +256,8 @@
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
       &nbsp;·&nbsp;
       <a href="https://julianaxue-35.github.io/ldh-shift-tools/" style="color:var(--sidebar-text-muted);">Shift Tools ↗</a>
+      &nbsp;·&nbsp;
+      <a href="stats.html" style="color:var(--sidebar-text-muted);">Stats →</a>
     </p>
     <span id="signout-link">Sign out</span>
   </aside>
@@ -317,20 +317,12 @@
       </div>
     </section>
 
-    <section class="card" id="sweep-card" style="display:none">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <h2 style="margin:0;">Shift-change sweep</h2>
-        <button class="secondary" id="sweep-copy" type="button">Copy handover</button>
-      </div>
-      <p class="subtle" style="margin-top:6px;">Everything still open, overdue or unclaimed — check this before you hand over.</p>
-      <div id="sweep-body"></div>
-    </section>
 
     <section class="card" id="nurse-requests">
       <h2>Nurse requests — vaccination on arrival</h2>
       <p class="subtle">Log animals that need vaccinating. The clock is 3 hours from arrival.</p>
       <div id="nr-list"></div>
-      <div class="nr-form">
+      <div class="nr-form" id="nr-form">
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
         <label>How many<input id="nr-count" type="number" min="1" value="1"></label>
@@ -340,13 +332,18 @@
         <button id="nr-submit" type="button">Log request</button>
       </div>
     </section>
-    <section class="card" id="nurse-treatments" style="display:none">
-      <h2>Nurse treatments</h2>
-      <p class="subtle">Vets request a treatment for an animal in the ward; nurses tick each dose off.</p>
+    <section class="card" id="nurse-doses" style="display:none">
+      <h2>Treatments due — nurses</h2>
+      <p class="subtle">Treatments the vets have asked for. Tick each dose off; your initials are recorded.</p>
       <div id="nt-overdue"></div>
       <div id="nt-today"></div>
+    </section>
+
+    <section class="card" id="nurse-treatments" style="display:none">
+      <h2>Request a treatment — vets</h2>
+      <p class="subtle">Ask the nurses to give a treatment to an animal in the ward, e.g. flush a dental extraction site twice a day for 7 days.</p>
       <div id="nt-courses"></div>
-      <h3 style="font-size:0.85rem; margin:18px 0 0;">Request a treatment</h3>
+      <h3 style="font-size:0.85rem; margin:18px 0 0;">New request</h3>
       <div class="nt-form">
         <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
         <label>Space<select id="nt-location"></select></label>
@@ -375,7 +372,7 @@
           <h2>Cases flagged</h2>
           <p class="subtle">Open cases across all shifts.</p>
           <table class="queue-table">
-            <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th></tr></thead>
+            <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th><th>Flagged</th><th>Time left</th></tr></thead>
             <tbody id="queue-tbody"></tbody>
           </table>
         </section>
@@ -423,27 +420,7 @@
       </div>
     </div>
 
-    <section class="card" id="response-rate-section">
-      <h2>Response rate by department</h2>
-      <p class="subtle">Share of flagged cases completed each month, by shift — shows where requests are backing up, not just how many came in.</p>
-      <div class="chart-legend" id="response-rate-legend"></div>
-      <div id="response-rate-chart"></div>
-    </section>
 
-    <section class="card" id="surveillance-section">
-      <h2>Disease surveillance export</h2>
-      <p class="subtle">Overall counts, a location breakdown, and a full case-by-case list for a chosen month — so you can spot clustering, e.g. kennel cough concentrated in one room.</p>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <input type="month" id="surveillance-month" style="margin:0; width:auto;">
-        <button class="secondary" id="surveillance-export" style="margin:0;">Export CSV</button>
-      </div>
-    </section>
-
-    <section class="card" id="trends-section">
-      <h2>Annual &amp; monthly progress</h2>
-      <p class="subtle">Each category tracked on its own — cumulative, so the line only ever climbs.</p>
-      <div class="trend-grid" id="trend-grid"></div>
-    </section>
   </main>
 </div>
 
@@ -482,7 +459,11 @@
     const base = SHIFT_TOOL_URLS[tasks[0].shift];
     if (!base) return null;
     const sorted = [...tasks].sort((a, b) => (a.location || '').localeCompare(b.location || ''));
-    const items = sorted.map(t => ({ id: t.title, location: t.location || '', problem: t.problem || '' }));
+    const items = sorted.map(t => ({
+      id: t.title, location: t.location || '', problem: t.problem || '',
+      redFlags: (t.red_flags || []).map(k => (LDHLogic.RED_FLAGS.find(f => f.key === k) || { label: k }).label),
+      condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
+    }));
     const params = new URLSearchParams({ items: JSON.stringify(items) });
     return `${base}?${params.toString()}`;
   }
@@ -501,6 +482,7 @@
     bar.style.display = 'block';
   }
   document.getElementById('batch-pickup-link').addEventListener('click', () => {
+    stampPickedUp(Array.from(selectedPickup));
     selectedPickup.clear();
     setTimeout(() => renderVetBoard(), 300);
   });
@@ -565,8 +547,6 @@
     NURSE_DOSES = ndRes.data || [];
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
-    await loadTrends();
-    await loadResponseRates();
     renderAll();
   }
 
@@ -591,9 +571,10 @@
     document.getElementById('cases-flagged').style.display = isStaff ? 'block' : 'none';
     document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
     document.getElementById('start-shift-card').style.display = isStaff ? 'none' : 'block';
+    document.getElementById('nr-form').style.display = isStaff ? '' : 'none';
+    document.getElementById('nurse-doses').style.display = isStaff ? 'none' : 'block';
     document.getElementById('nurse-treatments').style.display = isStaff ? 'none' : 'block';
     document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
-    document.getElementById('sweep-card').style.display = isStaff ? 'none' : 'block';
     renderAll();
   }
   document.getElementById('role-select').addEventListener('change', (e) => { ROLE = e.target.value; applyRoleVisibility(); });
@@ -746,7 +727,7 @@
     open = LDHLogic.sortQueue(open, Date.now());
     const tbody = document.getElementById('queue-tbody');
     if (!open.length) {
-      tbody.innerHTML = `<tr><td colspan="5"><p class="empty-state">Nothing matches.</p></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7"><p class="empty-state">Nothing matches.</p></td></tr>`;
       return;
     }
     tbody.innerHTML = open.map(t => `
@@ -755,15 +736,22 @@
         <td>${esc(t.location)}</td>
         <td style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
         <td>${TYPE_LABELS[t.type] || t.type}</td>
-        <td><span class="status-pill ${LDHLogic.normTier(t.urgency)}">${LDHLogic.TIER_LABELS[LDHLogic.normTier(t.urgency)]}</span> ${statusChipHtml(t)}</td>
+        <td><span class="status-pill ${LDHLogic.normTier(t.urgency)}">${LDHLogic.TIER_LABELS[LDHLogic.normTier(t.urgency)]}</span></td>
+        <td>${esc(fmtFlagged(t.created_at))}</td>
+        <td>${statusChipHtml(t)}</td>
       </tr>
     `).join('');
   }
 
   function statusChipHtml(t) {
     const st = LDHLogic.statusOf(t, Date.now());
-    if (st.level === 'seen') return `<span class="lvl lvl-seen">${t.claimed_at ? 'Claimed by ' + esc(t.claimed_by || '?') : 'Done'}</span>`;
+    if (st.level === 'seen') return `<span class="lvl lvl-seen">${t.claimed_at ? 'Picked up ' + esc(fmtTime(t.claimed_at)) : 'Done'}</span>`;
     return `<span class="lvl lvl-${st.level}">${esc(st.label)}</span>`;
+  }
+  function fmtFlagged(iso) {
+    const d = new Date(iso), now = new Date();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' + time;
   }
   let MEM_INITIALS = '';
   function myInitials() {
@@ -776,15 +764,12 @@
     }
     return v;
   }
-  async function claimTask(id) {
-    const who = myInitials(); if (!who) return;
-    const { error } = await sb.from('tasks').update({ claimed_by: who, claimed_at: new Date().toISOString() }).eq('id', id);
-    if (error) alert('Could not claim: ' + error.message);
-    loadAll();
-  }
-  async function unclaimTask(id) {
-    const { error } = await sb.from('tasks').update({ claimed_by: null, claimed_at: null }).eq('id', id);
-    if (error) alert('Could not release: ' + error.message);
+  // "Pick up" stamps a case as picked up (no initials — the shift tool records the vet). It stops ageing.
+  async function stampPickedUp(ids) {
+    const fresh = ids.filter(id => { const t = TASKS.find(x => x.id === id); return t && !t.claimed_at; });
+    if (!fresh.length) return;
+    const { error } = await sb.from('tasks').update({ claimed_at: new Date().toISOString() }).in('id', fresh);
+    if (error) alert('Could not record the pick-up: ' + error.message);
     loadAll();
   }
   async function bumpToUrgent(id) {
@@ -804,22 +789,18 @@
       <div class="attn-item">
         <label style="display:flex; align-items:center; gap:8px; flex:1; margin:0; cursor:${canPickUp ? 'pointer' : 'default'};">
           <input type="checkbox" class="pickup-check" data-id="${t.id}" ${selectedPickup.has(t.id) ? 'checked' : ''} ${canPickUp ? '' : 'disabled'}>
-          <div><div class="aname">${esc(t.title)} ${statusChipHtml(t)}</div><div class="ameta">${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}${t.problem ? ' · ' + esc(t.problem) : ''}${(t.red_flags && t.red_flags.length) ? ' · flags: ' + esc(t.red_flags.join(', ').replace(/_/g, ' ')) : ''}</div></div>
+          <div><div class="aname">${esc(t.title)} ${statusChipHtml(t)}</div><div class="ameta">Flagged ${esc(fmtFlagged(t.created_at))} · ${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}${t.problem ? ' · ' + esc(t.problem) : ''}${(t.red_flags && t.red_flags.length) ? ' · flags: ' + esc(t.red_flags.join(', ').replace(/_/g, ' ')) : ''}</div></div>
         </label>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          ${t.claimed_at
-            ? `<button class="secondary unclaim-btn" data-id="${t.id}">Release</button>`
-            : `<button class="secondary claim-btn" data-id="${t.id}">I've got this</button>`}
           ${tier === 'routine' && !t.claimed_at ? `<button class="secondary bump-btn" data-id="${t.id}">Bump to urgent</button>` : ''}
-          ${url ? `<a class="secondary pick-up" href="${url}" target="_blank" rel="noopener" style="padding:5px 10px; font-size:0.72rem; border-radius:14px; text-decoration:none; color:var(--ink); display:inline-block;">Pick up →</a>` : ''}
+          ${url ? `<a class="secondary pick-up" data-id="${esc(t.id)}" href="${url}" target="_blank" rel="noopener" style="padding:5px 10px; font-size:0.72rem; border-radius:14px; text-decoration:none; color:var(--ink); display:inline-block;">Pick up →</a>` : ''}
           <button class="secondary mark-done" data-id="${t.id}">Mark done</button>
         </div>
       </div>
     `;
     }).join('');
     el.querySelectorAll('.mark-done').forEach(btn => btn.addEventListener('click', () => markDone(btn.dataset.id)));
-    el.querySelectorAll('.claim-btn').forEach(btn => btn.addEventListener('click', () => claimTask(btn.dataset.id)));
-    el.querySelectorAll('.unclaim-btn').forEach(btn => btn.addEventListener('click', () => unclaimTask(btn.dataset.id)));
+    el.querySelectorAll('.pick-up').forEach(a => a.addEventListener('click', () => stampPickedUp([a.dataset.id])));
     el.querySelectorAll('.bump-btn').forEach(btn => btn.addEventListener('click', () => bumpToUrgent(btn.dataset.id)));
     el.querySelectorAll('.pickup-check').forEach(cb => cb.addEventListener('change', () => {
       if (cb.checked) selectedPickup.add(cb.dataset.id); else selectedPickup.delete(cb.dataset.id);
@@ -905,210 +886,6 @@
     document.getElementById('memo-text').value = '';
   });
 
-  /* ---------- annual / monthly trends — computed from real completed tasks ----------
-     "Flagged by Shelter Staff, completed" is currently the same as "every
-     completed task" (see the spec's open question on origin/staff_flagged
-     vs tool_sync — not yet resolved), so that category totals every
-     completion regardless of shift. */
-  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  let YEAR_SERIES = { surgery: [], processing: [], sick_injured: [], attendant_flagged: [] };
-  let MONTH_SERIES = { surgery: [], processing: [], sick_injured: [], attendant_flagged: [] };
-  let MONTH_LABELS = [];
-  let DAY_LABELS = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
-
-  function cumulative(arr) { let t = 0; return arr.map(v => t += v); }
-
-  async function loadTrends() {
-    const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    const { data, error } = await sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
-    const rows = error ? [] : (data || []);
-
-    const monthsSoFar = now.getMonth() + 1;
-    MONTH_LABELS = MONTH_NAMES.slice(0, monthsSoFar);
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-    thirtyDaysAgo.setHours(0, 0, 0, 0);
-
-    const zeros = (n) => Array.from({ length: n }, () => 0);
-    const monthCounts = { surgery: zeros(monthsSoFar), processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), attendant_flagged: zeros(monthsSoFar) };
-    const dayCounts = { surgery: zeros(30), processing: zeros(30), sick_injured: zeros(30), attendant_flagged: zeros(30) };
-
-    rows.forEach(r => {
-      if (!r.completed_at) return;
-      const dt = new Date(r.completed_at);
-      const shift = r.shift;
-      const m = dt.getMonth();
-      if (m < monthsSoFar) {
-        if (monthCounts[shift]) monthCounts[shift][m]++;
-        monthCounts.attendant_flagged[m]++;
-      }
-      if (dt >= thirtyDaysAgo) {
-        const dayIdx = Math.floor((dt - thirtyDaysAgo) / (24 * 60 * 60 * 1000));
-        if (dayIdx >= 0 && dayIdx < 30) {
-          if (dayCounts[shift]) dayCounts[shift][dayIdx]++;
-          dayCounts.attendant_flagged[dayIdx]++;
-        }
-      }
-    });
-
-    YEAR_SERIES = {
-      surgery: cumulative(monthCounts.surgery), processing: cumulative(monthCounts.processing),
-      sick_injured: cumulative(monthCounts.sick_injured), attendant_flagged: cumulative(monthCounts.attendant_flagged),
-    };
-    MONTH_SERIES = {
-      surgery: cumulative(dayCounts.surgery), processing: cumulative(dayCounts.processing),
-      sick_injured: cumulative(dayCounts.sick_injured), attendant_flagged: cumulative(dayCounts.attendant_flagged),
-    };
-  }
-
-  function lineChartSvg(values, color, xLabels) {
-    const w = 300, h = 90, pad = 6;
-    const maxY = Math.max(1, ...values);
-    const n = xLabels.length;
-    const xStep = n > 1 ? (w - pad * 2) / (n - 1) : 0;
-    const toY = (v) => h - pad - (v / maxY) * (h - pad * 2);
-    const d = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(pad + i * xStep).toFixed(1)},${toY(v).toFixed(1)}`).join(' ');
-    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%; height:90px;">
-      <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>
-    </svg>`;
-  }
-
-  const TREND_CATEGORIES = [
-    { key: 'surgery', title: 'Surgeries', color: 'var(--blue)' },
-    { key: 'processing', title: 'Examinations (Processing)', color: 'var(--green)' },
-    { key: 'sick_injured', title: 'Sick & Injured attended', color: 'var(--amber)' },
-    { key: 'attendant_flagged', title: 'Flagged by Shelter Staff, completed', color: 'var(--violet)' },
-  ];
-
-  function renderTrends() {
-    document.getElementById('trend-grid').innerHTML = TREND_CATEGORIES.map(c => `
-      <div class="trend-card">
-        <div class="trend-head">
-          <span class="trend-title" style="color:${c.color}">${c.title}</span>
-          <span><span class="trend-ytd" style="color:${c.color}">${(YEAR_SERIES[c.key].at(-1)) || 0}</span> <span class="trend-ytd-lbl">this year</span></span>
-        </div>
-        <h4 class="chart-subhead">Past 30 days</h4>
-        ${lineChartSvg(MONTH_SERIES[c.key], c.color, DAY_LABELS)}
-        <h4 class="chart-subhead">This year, by month</h4>
-        ${lineChartSvg(YEAR_SERIES[c.key], c.color, MONTH_LABELS)}
-      </div>
-    `).join('');
-  }
-
-  /* 2026-09-19: response rate by department — % of that month's flagged
-     cases actually completed, per shift, as a grouped bar chart. Different
-     question from the trend cards above (which show raw completed volume,
-     cumulative): this shows whether a department is keeping pace with what
-     comes in, or falling behind, independent of how busy it is. */
-  let RESPONSE_RATES = { processing: [], sick_injured: [], surgery: [] };
-  async function loadResponseRates() {
-    const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
-    const { data, error } = await sb.from('tasks').select('shift, done, created_at').gte('created_at', yearStart.toISOString());
-    const rows = error ? [] : (data || []);
-    const monthsSoFar = now.getMonth() + 1;
-    const zeros = (n) => Array.from({ length: n }, () => 0);
-    const totals = { processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), surgery: zeros(monthsSoFar) };
-    const dones = { processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), surgery: zeros(monthsSoFar) };
-    rows.forEach(r => {
-      const m = new Date(r.created_at).getMonth();
-      if (m >= monthsSoFar || !totals[r.shift]) return;
-      totals[r.shift][m]++;
-      if (r.done) dones[r.shift][m]++;
-    });
-    RESPONSE_RATES = {};
-    ['processing', 'sick_injured', 'surgery'].forEach(s => {
-      RESPONSE_RATES[s] = totals[s].map((t, i) => t ? Math.round((dones[s][i] / t) * 100) : 0);
-    });
-  }
-
-  function renderResponseRateChart() {
-    const w = 640, h = 180, pad = 26;
-    const shifts = ['processing', 'sick_injured', 'surgery'];
-    const n = MONTH_LABELS.length || 1;
-    const groupW = (w - pad * 2) / n;
-    const barW = Math.min(14, groupW / 4);
-    let bars = '';
-    shifts.forEach((s, si) => {
-      (RESPONSE_RATES[s] || []).forEach((v, i) => {
-        const x = pad + i * groupW + si * (barW + 2);
-        const barH = (v / 100) * (h - pad * 2);
-        const y = h - pad - barH;
-        bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${barH.toFixed(1)}" fill="${SHIFT_COLORS[s]}" rx="2"/>`;
-      });
-    });
-    const labels = MONTH_LABELS.map((lbl, i) => `<text x="${(pad + i * groupW + groupW / 2).toFixed(1)}" y="${h - 8}" font-size="9" text-anchor="middle" fill="var(--muted)">${lbl}</text>`).join('');
-    document.getElementById('response-rate-legend').innerHTML = shifts.map(s => `<span><i class="legend-dot" style="background:${SHIFT_COLORS[s]}"></i>${SHIFT_LABELS[s]}</span>`).join('');
-    document.getElementById('response-rate-chart').innerHTML = `
-      <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:180px;">
-        <line x1="${pad}" y1="${h - pad}" x2="${w - pad}" y2="${h - pad}" stroke="var(--border)" stroke-width="1"/>
-        ${bars}
-        ${labels}
-      </svg>
-    `;
-  }
-
-  /* 2026-09-19: disease surveillance monthly export — pure client-side CSV,
-     no new infrastructure. Counts each condition value flagged on requests
-     created within the chosen month. */
-  const CONDITION_LABELS = {
-    cat_flu: 'Cat flu (URI)', kennel_cough: 'Kennel cough', diarrhoea: 'Diarrhoea / GI upset',
-    wounds_injury: 'Wounds / injury / trauma', other: 'Other', none: 'None flagged',
-  };
-  function csvCell(v) { return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`; }
-
-  document.getElementById('surveillance-month').value = todayDateStr().slice(0, 7);
-  document.getElementById('surveillance-export').addEventListener('click', async () => {
-    const monthStr = document.getElementById('surveillance-month').value;
-    if (!monthStr) { alert('Pick a month first.'); return; }
-    const [y, m] = monthStr.split('-').map(Number);
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 1);
-    const { data, error } = await sb.from('tasks').select('title, location, condition, created_at')
-      .gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
-    if (error) { alert('Could not export: ' + error.message); return; }
-    const rows = data || [];
-
-    // Section 1: overall counts per condition (includes "None flagged").
-    const conditionCounts = { cat_flu: 0, kennel_cough: 0, diarrhoea: 0, wounds_injury: 0, other: 0, none: 0 };
-    rows.forEach(t => { conditionCounts[t.condition || 'none']++; });
-
-    // Section 2 & 3: location breakdown and full linelist — flagged cases
-    // only (excludes "none"), since a location count of unflagged routine
-    // requests isn't a surveillance signal. This is what lets her spot
-    // clustering, e.g. "kennel cough concentrated in Cat Room 2".
-    const flagged = rows.filter(t => t.condition).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const byLocation = {};
-    flagged.forEach(t => {
-      const loc = t.location || '(no location)';
-      (byLocation[loc] ??= {});
-      byLocation[loc][t.condition] = (byLocation[loc][t.condition] || 0) + 1;
-    });
-
-    let csv = `Disease surveillance — ${monthStr}\n\n`;
-    csv += 'Condition,Count\n';
-    Object.keys(conditionCounts).forEach(k => { csv += `${csvCell(CONDITION_LABELS[k])},${conditionCounts[k]}\n`; });
-    csv += '\nBy location\nLocation,Condition,Count\n';
-    Object.keys(byLocation).sort().forEach(loc => {
-      Object.keys(byLocation[loc]).forEach(cond => {
-        csv += `${csvCell(loc)},${csvCell(CONDITION_LABELS[cond])},${byLocation[loc][cond]}\n`;
-      });
-    });
-    csv += '\nFull list (flagged cases only)\nDate,Animal ID,Location,Condition\n';
-    flagged.forEach(t => {
-      const d = new Date(t.created_at).toLocaleDateString('en-AU');
-      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${csvCell(CONDITION_LABELS[t.condition])}\n`;
-    });
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `disease-surveillance-${monthStr}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  });
-
   function renderAll() {
     renderCompletion();
     renderShiftProgress();
@@ -1118,9 +895,6 @@
     renderMemos();
     renderNurseRequests();
     renderNurseTreatments();
-    renderSweep();
-    renderTrends();
-    renderResponseRateChart();
   }
 
   function fillLocationSelects() {
@@ -1157,7 +931,7 @@
           <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
           <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
-          ${canAct ? `<button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : "I've got this"}</button>
+          ${canAct ? `<button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
             <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
             <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>` : ''}
         </div></div>`;
@@ -1281,7 +1055,7 @@
       loadAll();
     } finally { _btn.disabled = false; }
   });
-  document.getElementById('nurse-treatments').addEventListener('change', async (e) => {
+  document.getElementById('nurse-doses').addEventListener('change', async (e) => {
     const cb = e.target.closest('.nt-tick'); if (!cb) return;
     let who = null;
     if (cb.checked) { who = myInitials(); if (!who) { cb.checked = false; return; } }
@@ -1297,34 +1071,11 @@
     if (error) alert('Could not stop the course: ' + error.message);
     loadAll();
   });
-  function currentSweep(now) {
-    return LDHLogic.buildSweep({ tasks: TASKS, requests: NURSE_REQUESTS, doses: activeDoses() }, now);
-  }
-  function renderSweep() {
-    const now = Date.now();
-    const sw = currentSweep(now);
-    const overdueIds = new Set(sw.overdueCases.map(t => t.id));
-    const tier = t => LDHLogic.TIER_LABELS[LDHLogic.normTier(t.urgency)];
-    const sec = (title, lines) => `<div class="sweep-sec"><h3>${title} <span class="sweep-n">${lines.length}</span></h3>${
-      lines.length ? lines.map(l => `<div class="ameta">${esc(l)}</div>`).join('') : '<div class="ameta">None</div>'}</div>`;
-    document.getElementById('sweep-body').innerHTML =
-      sec('Overdue cases', sw.overdueCases.map(t => `${t.title} — ${t.location} — ${tier(t)}, ${LDHLogic.statusOf(t, now).label}`)) +
-      sec('Not yet claimed', sw.unclaimed.filter(t => !overdueIds.has(t.id)).map(t => `${t.title} — ${t.location} — ${tier(t)}`)) +
-      sec('Claimed, not finished', sw.claimedOpen.map(t => `${t.title} — ${t.location} — ${tier(t)}, claimed by ${t.claimed_by || '?'} ${LDHLogic.fmtDuration(now - new Date(t.claimed_at).getTime())} ago`)) +
-      sec('Overdue nurse requests', sw.overdueRequests.map(r => `${r.location} — ${r.animal_count} ${r.species}(s) to vaccinate, ${LDHLogic.vaccStatus(r, now).label}`)) +
-      sec('Overdue treatment doses', sw.overdueDoses.map(d => `${d.animal_id} — ${d.location} — ${d.treatment} (${d.due_date} ${d.slot_label})`));
-  }
-  document.getElementById('sweep-copy').addEventListener('click', async () => {
-    const text = LDHLogic.sweepText(currentSweep(Date.now()), Date.now());
-    try { await navigator.clipboard.writeText(text); alert('Handover copied.'); }
-    catch (e) { window.prompt('Copy this handover text:', text); }
-  });
   function refreshTimers() {
     renderQueueTable();
     renderVetBoard();
     if (typeof renderNurseRequests === 'function') renderNurseRequests();
     if (typeof renderNurseTreatments === 'function') renderNurseTreatments();
-    if (typeof renderSweep === 'function') renderSweep();
   }
   setInterval(refreshTimers, 60000);
   fillLocationSelects();

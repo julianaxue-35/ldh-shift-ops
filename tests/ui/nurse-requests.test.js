@@ -12,6 +12,7 @@ const H = 3600 * 1000, M = 60 * 1000;
     t.ok(await page.locator('.nr-item', { hasText: 'FIR Room' }).locator('.lvl-amber').count() === 1, 'FIR request amber with 20 minutes left');
     t.ok(await page.locator('.nr-item', { hasText: 'Transport' }).locator('.lvl-red').count() === 1, 'Transport request red (overdue)');
     t.ok(await page.locator('.nr-plus').count() === 0, 'Floor cannot record vaccinations');
+    t.ok(await page.isVisible('#nr-form'), 'the request form is in the shelter staff (Floor) view');
 
     await page.selectOption('#nr-location', 'FIR Room');
     await page.selectOption('#nr-species', 'cat');
@@ -26,6 +27,8 @@ const H = 3600 * 1000, M = 60 * 1000;
 
     await page.selectOption('#role-select', 'vet_nurse');
     await page.waitForTimeout(200);
+    t.ok(!(await page.isVisible('#nr-form')), 'the request form is hidden in the vet/nurse view (staff raise these)');
+    t.ok((await page.locator('.nr-item .nr-claim').first().textContent()) === 'Pick up', 'nurses get a "Pick up" button');
     const fir = () => page.locator('.nr-item', { hasText: 'FIR Room' }).first();
     await fir().locator('.nr-plus').click();
     await page.waitForTimeout(250);
