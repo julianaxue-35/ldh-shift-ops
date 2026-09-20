@@ -24,18 +24,18 @@ It must also work as a **disease surveillance tool**.
 5. **Data before thresholds.** No high/outbreak cut-offs until a baseline exists.
 
 ## 3. Triage
-Two time-based tiers replace Urgent / Soon / Routine:
+Three time-based tiers (emergencies are radioed and are outside this board):
 
-- **Check within 2 hours** — any red flag ticked (not eating, laboured breathing, bleeding, can't
-  stand, repeated vomiting; list editable).
-- **Routine: check within 24–48 hours** — no red flags. Colour by time since flagged and still not
-  seen: under 24 h normal; 24–48 h (day 2) **amber**; 48 h onward (day 3) **red**.
+- **Red flag — check within 2 hours.** Any red flag ticked (not eating, laboured breathing, bleeding,
+  can't stand, repeated vomiting; list editable).
+- **Urgent — check within 12–24 hours.** How a case becomes "urgent": see open question 1.
+- **Routine — check within 24–48 hours.** Colour by time since flagged and still not seen: under 24 h
+  normal; 24–48 h (day 2) **amber**; 48 h onward (day 3) **red**. (Confirmed by Juliana.)
 
-Each case stores `flagged_at` and, for red-flag cases, `due_by` (2 h). Red-flag cards show a
-countdown; routine cards use the day-based colours above. Red/overdue cases sort to the top and
-appear in the shift-change sweep.
-The flag form shows "Emergency? Radio the vet." Radioed cases can be logged afterwards with one
-optional tap so surveillance counts stay complete.
+Each case stores `flagged_at` and a computed `due_by`. Red-flag and urgent cards show a countdown;
+routine cards use the day-based colours. Overdue/red cases sort to the top and appear in the
+shift-change sweep. The flag form shows "Emergency? Radio the vet." Radioed cases can be logged
+afterwards with one optional tap so surveillance counts stay complete.
 
 ## 4. Floor view
 - **Flag an animal:** animal ID, space (dropdown incl. Cat Isolation ward), pen, reported sign,
@@ -135,10 +135,10 @@ client for each view; a short trial on live Supabase with fake animals before ea
 the floor; verifier for the "DDx ignored" rule and the rate calculation against hand-worked examples.
 
 ## 11. Open questions
-1. Confirm the routine colours: normal under 24 h, amber 24–48 h, red from 48 h.
-2. Red-flag list wording; how long a case can sit unseen before it alerts (red-flag cases: 2 h).
-3. Any other nurse tasks beyond vaccination and ward treatments.
-4. Roster initials import is a separate small task (screenshot pending).
+1. What makes a case **urgent** (12–24 h) rather than routine — see Claude's question to Juliana.
+2. Red-flag list wording; how long a case can sit unseen before it alerts.
+3. Roster initials import is a separate small task; Juliana will say when she is ready.
 
-Resolved: council-seized animals need no special handling; plan lines last 24 h; active window is 3 days;
-UV positive counts as RW; nurse treatments are requested from a Vet-desk form first.
+Resolved: routine colours confirmed; red flag = 2 h; no nurse tasks beyond vaccination and ward
+treatments; council-seized animals need no special handling; plan lines last 24 h; active window is
+3 days; UV positive counts as RW; nurse treatments are requested from a Vet-desk form first.
