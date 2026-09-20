@@ -42,7 +42,7 @@ test('new tier value accepted, legacy soon still accepted, junk rejected, new co
   assert.equal(r.rows[0].claimed_by, null);
 });
 
-test('STRUCTURAL: all new policies contain sync_writer guard', async () => {
+test('STRUCTURAL: all new policies exist with sync_writer guard (14 required)', async () => {
   const d = await db([...BASE, '0008_triage_and_vet_desk.sql']);
   const policies = await d.query(`
     select tablename, cmd, qual, with_check
@@ -57,6 +57,26 @@ test('STRUCTURAL: all new policies contain sync_writer guard', async () => {
                      nurse_treatments: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
                      nurse_treatment_doses: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] };
 
+  // Assert exactly 14 policies returned (no duplicates, no extras)
+  assert.equal(policies.rows.length, 14, `Expected 14 policies, got ${policies.rows.length}`);
+
+  // Build set of returned tablename:cmd pairs
+  const returned = policies.rows.map(r => `${r.tablename}:${r.cmd}`).sort();
+
+  // Build set of expected tablename:cmd pairs from required object
+  const expectedPairs = [];
+  for (const [table, cmds] of Object.entries(required)) {
+    for (const cmd of cmds) {
+      expectedPairs.push(`${table}:${cmd}`);
+    }
+  }
+  expectedPairs.sort();
+
+  // Assert returned policies exactly match expected
+  assert.deepEqual(returned, expectedPairs,
+    `Returned policies do not match expected required set`);
+
+  // Assert all policies contain sync_writer guard
   for (const row of policies.rows) {
     const text = (row.qual || '') + (row.with_check || '');
     assert.ok(text.includes('sync_writer'),
