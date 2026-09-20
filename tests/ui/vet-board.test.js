@@ -37,6 +37,9 @@ const H = 3600 * 1000, M = 60 * 1000;
     await page.waitForTimeout(200);
     const firstRow = await page.textContent('#queue-tbody tr');
     t.ok(firstRow.includes('B-RED') && firstRow.includes('Red flag'), 'Floor table lists the most overdue first with its tier');
+    const pillColor = cls => page.evaluate(c => { const e = document.querySelector('#queue-tbody .status-pill.' + c); return e ? getComputedStyle(e).color : null; }, cls);
+    const urgC = await pillColor('urgent'), rfC = await pillColor('red_flag');
+    t.ok(urgC && rfC && urgC !== rfC, 'Urgent pill colour differs from Red flag pill (' + urgC + ' vs ' + rfC + ')');
     t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   } finally {
     await browser.close();

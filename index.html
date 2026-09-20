@@ -153,8 +153,7 @@
   table.queue-table tr:first-child td { border-top: none; }
   .row-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
   .status-pill { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
-  .status-pill.urgent { background: rgba(208,59,59,0.12); color: var(--critical); }
-  .status-pill.soon { background: rgba(156,154,144,0.18); color: var(--neutral-500); }
+  .status-pill.urgent { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .status-pill.routine { background: rgba(216,214,206,0.35); color: var(--muted); }
   .status-pill.red_flag { background: rgba(208,59,59,0.14); color: var(--critical); }
   .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
@@ -187,7 +186,6 @@
   .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
   .urgency-col h3.red-h { color: var(--critical); }
   .urgency-col h3.urgent-h { color: #c26a00; }
-  .urgency-col h3.soon-h { color: var(--neutral-500); }
   .urgency-col h3.routine-h { color: var(--muted); }
   .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
   .attn-item:last-child { border-bottom: none; }
@@ -352,7 +350,7 @@
       <div class="nt-form">
         <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
         <label>Space<select id="nt-location"></select></label>
-        <label>Treatment<input id="nt-treatment" placeholder="e.g. flush dental extraction site"></label>
+        <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
         <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
         <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
         <label>Start date<input id="nt-start" type="date"></label>
@@ -558,7 +556,7 @@
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
       sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
-      sb.from('nurse_treatment_doses').select('*'),
+      sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
     ]);
     TASKS = tasksRes.data || [];
     MEMOS = memosRes.data || [];
@@ -767,11 +765,14 @@
     if (st.level === 'seen') return `<span class="lvl lvl-seen">${t.claimed_at ? 'Claimed by ' + esc(t.claimed_by || '?') : 'Done'}</span>`;
     return `<span class="lvl lvl-${st.level}">${esc(st.label)}</span>`;
   }
+  let MEM_INITIALS = '';
   function myInitials() {
-    let v = localStorage.getItem('ldh_ops_initials') || '';
+    let v = '';
+    try { v = localStorage.getItem('ldh_ops_initials') || ''; } catch (e) {}
+    if (!v) v = MEM_INITIALS;
     if (!v) {
       v = (window.prompt('Your initials (saved on this device):') || '').trim().toUpperCase().slice(0, 4);
-      if (v) localStorage.setItem('ldh_ops_initials', v);
+      if (v) { MEM_INITIALS = v; try { localStorage.setItem('ldh_ops_initials', v); } catch (e) {} }
     }
     return v;
   }
@@ -1165,23 +1166,26 @@
   document.getElementById('nr-arrived').value = nowLocalInput();
   document.getElementById('nr-now').addEventListener('click', () => { document.getElementById('nr-arrived').value = nowLocalInput(); });
   document.getElementById('nr-submit').addEventListener('click', async () => {
-    const count = parseInt(document.getElementById('nr-count').value, 10);
-    const arrivedRaw = document.getElementById('nr-arrived').value;
-    if (!count || count < 1) { alert('Enter how many animals.'); return; }
-    if (!arrivedRaw) { alert('Enter the arrival time (or tap "Arrived now").'); return; }
-    const { error } = await sb.from('nurse_requests').insert({
-      location: document.getElementById('nr-location').value,
-      species: document.getElementById('nr-species').value,
-      animal_count: count,
-      arrived_at: new Date(arrivedRaw).toISOString(),
-      note: document.getElementById('nr-note').value.trim() || null,
-      created_by: ROLE === 'vet_nurse' ? 'Vet team' : 'Shelter Staff'
-    });
-    if (error) { alert('Could not log request: ' + error.message); return; }
-    document.getElementById('nr-count').value = '1';
-    document.getElementById('nr-note').value = '';
-    document.getElementById('nr-arrived').value = nowLocalInput();
-    loadAll();
+    const _btn = document.getElementById('nr-submit'); _btn.disabled = true;
+    try {
+      const count = parseInt(document.getElementById('nr-count').value, 10);
+      const arrivedRaw = document.getElementById('nr-arrived').value;
+      if (!count || count < 1) { alert('Enter how many animals.'); return; }
+      if (!arrivedRaw) { alert('Enter the arrival time (or tap "Arrived now").'); return; }
+      const { error } = await sb.from('nurse_requests').insert({
+        location: document.getElementById('nr-location').value,
+        species: document.getElementById('nr-species').value,
+        animal_count: count,
+        arrived_at: new Date(arrivedRaw).toISOString(),
+        note: document.getElementById('nr-note').value.trim() || null,
+        created_by: ROLE === 'vet_nurse' ? 'Vet team' : 'Shelter Staff'
+      });
+      if (error) { alert('Could not log request: ' + error.message); return; }
+      document.getElementById('nr-count').value = '1';
+      document.getElementById('nr-note').value = '';
+      document.getElementById('nr-arrived').value = nowLocalInput();
+      loadAll();
+    } finally { _btn.disabled = false; }
   });
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
@@ -1250,29 +1254,32 @@
   }
   document.getElementById('nt-start').value = LDHLogic.localISO(new Date());
   document.getElementById('nt-submit').addEventListener('click', async () => {
-    const animal = document.getElementById('nt-animal').value.trim();
-    const treatment = document.getElementById('nt-treatment').value.trim();
-    const times = parseInt(document.getElementById('nt-times').value, 10);
-    const days = parseInt(document.getElementById('nt-days').value, 10);
-    const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
-    if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
-    if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
-    const who = myInitials() || 'Vet team';
-    const { data: tr, error } = await sb.from('nurse_treatments').insert({
-      animal_id: animal, location: document.getElementById('nt-location').value, treatment,
-      times_per_day: times, days, start_date: start, requested_by: who
-    }).select().single();
-    if (error) { alert('Could not save the request: ' + error.message); return; }
-    const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
-    const { error: doseErr } = await sb.from('nurse_treatment_doses').insert(slots);
-    if (doseErr) {
-      await sb.from('nurse_treatments').delete().eq('id', tr.id);   // never leave a course without its doses
-      alert('Could not create the dose list: ' + doseErr.message);
-      return;
-    }
-    document.getElementById('nt-animal').value = '';
-    document.getElementById('nt-treatment').value = '';
-    loadAll();
+    const _btn = document.getElementById('nt-submit'); _btn.disabled = true;
+    try {
+      const animal = document.getElementById('nt-animal').value.trim();
+      const treatment = document.getElementById('nt-treatment').value.trim();
+      const times = parseInt(document.getElementById('nt-times').value, 10);
+      const days = parseInt(document.getElementById('nt-days').value, 10);
+      const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
+      if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
+      if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
+      const who = myInitials() || 'Vet team';
+      const { data: tr, error } = await sb.from('nurse_treatments').insert({
+        animal_id: animal, location: document.getElementById('nt-location').value, treatment,
+        times_per_day: times, days, start_date: start, requested_by: who
+      }).select().single();
+      if (error) { alert('Could not save the request: ' + error.message); return; }
+      const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
+      const { error: doseErr } = await sb.from('nurse_treatment_doses').insert(slots);
+      if (doseErr) {
+        await sb.from('nurse_treatments').delete().eq('id', tr.id);   // never leave a course without its doses
+        alert('Could not create the dose list: ' + doseErr.message);
+        return;
+      }
+      document.getElementById('nt-animal').value = '';
+      document.getElementById('nt-treatment').value = '';
+      loadAll();
+    } finally { _btn.disabled = false; }
   });
   document.getElementById('nurse-treatments').addEventListener('change', async (e) => {
     const cb = e.target.closest('.nt-tick'); if (!cb) return;
@@ -1303,6 +1310,7 @@
     document.getElementById('sweep-body').innerHTML =
       sec('Overdue cases', sw.overdueCases.map(t => `${t.title} — ${t.location} — ${tier(t)}, ${LDHLogic.statusOf(t, now).label}`)) +
       sec('Not yet claimed', sw.unclaimed.filter(t => !overdueIds.has(t.id)).map(t => `${t.title} — ${t.location} — ${tier(t)}`)) +
+      sec('Claimed, not finished', sw.claimedOpen.map(t => `${t.title} — ${t.location} — ${tier(t)}, claimed by ${t.claimed_by || '?'} ${LDHLogic.fmtDuration(now - new Date(t.claimed_at).getTime())} ago`)) +
       sec('Overdue nurse requests', sw.overdueRequests.map(r => `${r.location} — ${r.animal_count} ${r.species}(s) to vaccinate, ${LDHLogic.vaccStatus(r, now).label}`)) +
       sec('Overdue treatment doses', sw.overdueDoses.map(d => `${d.animal_id} — ${d.location} — ${d.treatment} (${d.due_date} ${d.slot_label})`));
   }
