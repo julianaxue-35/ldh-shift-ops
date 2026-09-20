@@ -42,29 +42,55 @@ test('new tier value accepted, legacy soon still accepted, junk rejected, new co
   assert.equal(r.rows[0].claimed_by, null);
 });
 
-test('memos: UPDATE/DELETE policies exist, staff can tick off and delete, sync_writer cannot', async () => {
+test('STRUCTURAL: all new policies contain sync_writer guard', async () => {
   const d = await db([...BASE, '0008_triage_and_vet_desk.sql']);
-  const pol = await d.query(`select cmd from pg_policies where tablename='memos'`);
-  const cmds = pol.rows.map(r => r.cmd);
-  assert.ok(cmds.includes('UPDATE') && cmds.includes('DELETE'));
+  const policies = await d.query(`
+    select tablename, cmd, qual, with_check
+    from pg_policies
+    where tablename in ('memos','nurse_requests','nurse_treatments','nurse_treatment_doses')
+      and (tablename = 'memos' and cmd in ('UPDATE','DELETE')
+        or tablename in ('nurse_requests','nurse_treatments','nurse_treatment_doses'))
+    order by tablename, cmd
+  `);
 
-  // Staff (normal authenticated) can update and delete
+  const required = { memos: ['UPDATE', 'DELETE'], nurse_requests: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+                     nurse_treatments: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+                     nurse_treatment_doses: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] };
+
+  for (const row of policies.rows) {
+    const text = (row.qual || '') + (row.with_check || '');
+    assert.ok(text.includes('sync_writer'),
+      `Policy ${row.tablename} ${row.cmd} missing sync_writer guard`);
+  }
+});
+
+test('memos: staff can update/delete, sync_writer cannot (UPDATE/DELETE discriminating)', async () => {
+  const d = await db([...BASE, '0008_triage_and_vet_desk.sql']);
   await d.exec(`grant all on all tables in schema public to authenticated;`);
+
+  // Staff with normal JWT can update and delete
+  await d.exec(`set app.jwt = '{"app_metadata":{}}'`);
   await d.exec(`insert into public.memos (author,text) values ('JX','hello')`);
   await d.exec(`set role authenticated;`);
   await d.exec(`update public.memos set done = true, done_at = now() where author='JX'`);
-  assert.equal((await d.query(`select done from public.memos where author='JX'`)).rows[0].done, true);
-  const memo_id = (await d.query(`select id from public.memos where author='JX'`)).rows[0].id;
+  const updated = await d.query(`select id, done from public.memos where author='JX'`);
+  assert.equal(updated.rows[0].done, true);
+  const memo_id = updated.rows[0].id;
   await d.exec(`delete from public.memos where id='${memo_id}'`);
-  assert.equal((await d.query(`select count(*)::int as n from public.memos where author='JX'`)).rows[0].n, 0);
+  const deleted = await d.query(`select count(*)::int as n from public.memos where author='JX'`);
+  assert.equal(deleted.rows[0].n, 0);
   await d.exec(`reset role;`);
 
-  // sync_writer cannot update memos
+  // sync_writer cannot update: UPDATE applied without WHERE still yields 0 rows (RLS blocks)
   await d.exec(`set app.jwt = '{"app_metadata":{"role":"sync_writer"}}'`);
   await d.exec(`insert into public.memos (author,text) values ('JX2','hello2')`);
   await d.exec(`set role authenticated;`);
-  const updateResult = await d.query(`update public.memos set done = true where author='JX2' returning *`);
-  assert.equal(updateResult.rows.length, 0);
+  const updateRes = await d.query(`update public.memos set done = true where author='JX2' returning *`);
+  assert.equal(updateRes.rows.length, 0, 'sync_writer UPDATE should return 0 rows');
+
+  // sync_writer cannot delete: DELETE applied to existing row still yields 0 rows (RLS blocks)
+  const deleteRes = await d.query(`delete from public.memos where author='JX2' returning *`);
+  assert.equal(deleteRes.rows.length, 0, 'sync_writer DELETE should return 0 rows');
   await d.exec(`reset role;`);
 });
 
@@ -86,19 +112,28 @@ test('nurse tables: constraints, uniqueness, cascade', async () => {
   assert.equal((await d.query(`select count(*)::int as n from public.nurse_treatment_doses`)).rows[0].n, 0);
 });
 
-test('nurse tables: sync_writer blocked by RLS policies', async () => {
+test('nurse tables: staff (normal JWT) can insert, sync_writer cannot (INSERT/SELECT/DELETE discriminating)', async () => {
   const d = await db([...BASE, '0008_triage_and_vet_desk.sql']);
   await d.exec(`grant all on all tables in schema public to authenticated;`);
+
+  // Staff with normal JWT can insert into nurse tables
+  await d.exec(`set app.jwt = '{"app_metadata":{}}'`);
+  await d.exec(`set role authenticated;`);
+  await d.exec(`insert into public.nurse_requests (location,species,animal_count) values ('FIR Room','cat',8)`);
+  await d.exec(`insert into public.nurse_treatments (animal_id,location,treatment,times_per_day,days) values ('1174362','Cat Room 1','Flush site',2,7)`);
+  const tId = (await d.query(`select id from public.nurse_treatments limit 1`)).rows[0].id;
+  await d.exec(`insert into public.nurse_treatment_doses (treatment_id,day_no,slot_no,due_date) values ('${tId}',1,1,'2026-09-20')`);
+  await d.exec(`reset role;`);
+
+  // sync_writer cannot select from nurse_requests (0 rows even if one exists)
   await d.exec(`set app.jwt = '{"app_metadata":{"role":"sync_writer"}}'`);
   await d.exec(`set role authenticated;`);
+  const selectRes = await d.query(`select * from public.nurse_requests`);
+  assert.equal(selectRes.rows.length, 0, 'sync_writer SELECT should return 0 rows');
 
-  // sync_writer cannot insert into nurse_requests
-  const err1 = await rejects(d, `insert into public.nurse_requests (location,species,animal_count) values ('FIR Room','cat',8)`);
-  assert.ok(err1 && /row level security|policy|violates/i.test(err1));
-
-  // sync_writer cannot insert into nurse_treatments
-  const err2 = await rejects(d, `insert into public.nurse_treatments (animal_id,location,treatment,times_per_day,days) values ('1174362','Cat Room 1','Flush site',2,7)`);
-  assert.ok(err2 && /row level security|policy|violates/i.test(err2));
+  // sync_writer cannot insert into nurse_treatment_doses (RLS error)
+  const insertErr = await rejects(d, `insert into public.nurse_treatment_doses (treatment_id,day_no,slot_no,due_date) values ('${tId}',2,1,'2026-09-21')`);
+  assert.ok(insertErr && /row level security|policy|violates/i.test(insertErr));
 
   await d.exec(`reset role;`);
 });
