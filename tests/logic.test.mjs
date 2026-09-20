@@ -40,13 +40,15 @@ test('claimed or done tasks stop ageing (level seen); legacy soon = urgent', () 
   assert.equal(L.statusOf(task('soon', 13 * H), NOW).tier, 'urgent');
 });
 
-test('sortQueue: red before amber before ok, then tier, then oldest first', () => {
+test('sortQueue: highest tier first, then overdue before amber before ok inside a tier, then oldest', () => {
   const a = task('routine', 1 * H, { title: 'ok-routine' });
   const b = task('red_flag', 3 * H, { title: 'red-redflag' });
   const c = task('routine', 50 * H, { title: 'red-routine' });
   const d = task('urgent', 13 * H, { title: 'amber-urgent' });
-  const order = L.sortQueue([a, d, c, b], NOW).map(t => t.title);
-  assert.deepEqual(order, ['red-redflag', 'red-routine', 'amber-urgent', 'ok-routine']);
+  const e = task('red_flag', 1 * H, { title: 'ok-redflag' });
+  const picked = task('red_flag', 5 * H, { title: 'picked-up-redflag', claimed_at: new Date(NOW).toISOString() });
+  const order = L.sortQueue([a, d, c, b, e, picked], NOW).map(t => t.title);
+  assert.deepEqual(order, ['red-redflag', 'ok-redflag', 'picked-up-redflag', 'amber-urgent', 'red-routine', 'ok-routine']);
 });
 
 test('fmtDuration', () => {
@@ -97,4 +99,21 @@ test('CONDITION_LABELS covers every condition value the flag form can save', () 
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {
   assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport']);
+});
+
+test('summariseConditions counts every condition, ignores unknown values, and groups flagged cases by space', () => {
+  const rows = [
+    { condition: 'cat_flu', location: 'Cat Room 1 / 4', created_at: '2026-09-02T01:00:00Z' },
+    { condition: 'cat_flu', location: 'Cat Room 1 / 5', created_at: '2026-09-01T01:00:00Z' },
+    { condition: 'kennel_cough', location: 'Pound 2 / 3', created_at: '2026-09-03T01:00:00Z' },
+    { condition: null, location: 'Pound 1 / 1', created_at: '2026-09-03T02:00:00Z' },
+    { condition: 'made_up', location: 'Pound 1 / 2', created_at: '2026-09-03T03:00:00Z' }
+  ];
+  const r = L.summariseConditions(rows);
+  assert.equal(r.counts.cat_flu, 2); assert.equal(r.counts.kennel_cough, 1);
+  assert.equal(r.counts.none, 2, 'no condition and unknown condition both count as none flagged');
+  assert.equal(r.total, 5);
+  assert.equal(r.flaggedTotal, 4, 'flagged = has any condition value');
+  assert.equal(r.byLocation['Cat Room 1 / 4'].cat_flu, 1);
+  assert.deepEqual(r.flagged.map(t => t.created_at)[0], '2026-09-01T01:00:00Z', 'flagged list is oldest first');
 });

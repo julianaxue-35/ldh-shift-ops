@@ -160,6 +160,8 @@
   .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
   .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .nurse-card { background: #eef8fb; border-left: 5px solid #2a9db5; }
+  .nurse-card h2 { color: #1c7387; }
   .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
   .nr-form, .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
   .nr-form label, .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
@@ -247,6 +249,11 @@
       <option value="attendant">Shelter Staff</option>
       <option value="vet_nurse">Vet / Nurse</option>
     </select>
+    <div id="initials-box" style="display:none; margin-top:14px;">
+      <label for="initials-input">Your initials</label>
+      <input id="initials-input" maxlength="4" placeholder="e.g. AB" autocomplete="off">
+      <p class="hint" style="margin-top:6px;">Used when you pick up or tick off a nurse task. Type yours in — change it if someone else is using this device.</p>
+    </div>
     <p class="hint">
       This is the live dashboard — everything here is real and shared with
       everyone signed in. Clinical detail stays in the offline shift tools;
@@ -318,7 +325,7 @@
     </section>
 
 
-    <section class="card" id="nurse-requests">
+    <section class="card nurse-card" id="nurse-requests">
       <h2>Nurse requests — vaccination on arrival</h2>
       <p class="subtle">Log animals that need vaccinating. The clock is 3 hours from arrival.</p>
       <div id="nr-list"></div>
@@ -332,7 +339,7 @@
         <button id="nr-submit" type="button">Log request</button>
       </div>
     </section>
-    <section class="card" id="nurse-doses" style="display:none">
+    <section class="card nurse-card" id="nurse-doses" style="display:none">
       <h2>Treatments due — nurses</h2>
       <p class="subtle">Treatments the vets have asked for. Tick each dose off; your initials are recorded.</p>
       <div id="nt-overdue"></div>
@@ -572,6 +579,7 @@
     document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
     document.getElementById('start-shift-card').style.display = isStaff ? 'none' : 'block';
     document.getElementById('nr-form').style.display = isStaff ? '' : 'none';
+    document.getElementById('initials-box').style.display = isStaff ? 'none' : 'block';
     document.getElementById('nurse-doses').style.display = isStaff ? 'none' : 'block';
     document.getElementById('nurse-treatments').style.display = isStaff ? 'none' : 'block';
     document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
@@ -753,17 +761,21 @@
     const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' + time;
   }
-  let MEM_INITIALS = '';
+  // Initials come from the visible box in the sidebar (Vet / Nurse view). Deliberately NOT remembered between visits:
+  // a remembered value silently mislabelled other people's work on shared devices.
+  function cleanInitials(v) { return String(v || '').trim().toUpperCase().slice(0, 4); }
   function myInitials() {
-    let v = '';
-    try { v = localStorage.getItem('ldh_ops_initials') || ''; } catch (e) {}
-    if (!v) v = MEM_INITIALS;
+    const el = document.getElementById('initials-input');
+    let v = cleanInitials(el.value);
     if (!v) {
-      v = (window.prompt('Your initials (saved on this device):') || '').trim().toUpperCase().slice(0, 4);
-      if (v) { MEM_INITIALS = v; try { localStorage.setItem('ldh_ops_initials', v); } catch (e) {} }
+      v = cleanInitials(window.prompt('Your initials:'));
+      if (v) el.value = v;
     }
     return v;
   }
+  document.getElementById('initials-input').addEventListener('input', (e) => { e.target.value = cleanInitials(e.target.value); });
+  try { localStorage.removeItem('ldh_ops_initials'); } catch (e) {}   // clear the old remembered value (it showed up as "JX" for everyone)
+
   // "Pick up" stamps a case as picked up (no initials — the shift tool records the vet). It stops ageing.
   async function stampPickedUp(ids) {
     const fresh = ids.filter(id => { const t = TASKS.find(x => x.id === id); return t && !t.claimed_at; });
@@ -937,6 +949,11 @@
         </div></div>`;
     }).join('') || '<p class="empty-state">No vaccination requests open.</p>';
   }
+  const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Transport' };
+  function applyNrDefaultLocation() {
+    document.getElementById('nr-location').value = NR_DEFAULT_LOCATION[document.getElementById('nr-species').value] || 'FIR Room';
+  }
+  document.getElementById('nr-species').addEventListener('change', applyNrDefaultLocation);
   document.getElementById('nr-arrived').value = nowLocalInput();
   document.getElementById('nr-now').addEventListener('click', () => { document.getElementById('nr-arrived').value = nowLocalInput(); });
   document.getElementById('nr-submit').addEventListener('click', async () => {
@@ -956,6 +973,7 @@
       });
       if (error) { alert('Could not log request: ' + error.message); return; }
       document.getElementById('nr-count').value = '1';
+    applyNrDefaultLocation();
       document.getElementById('nr-note').value = '';
       document.getElementById('nr-arrived').value = nowLocalInput();
       loadAll();
@@ -1079,6 +1097,7 @@
   }
   setInterval(refreshTimers, 60000);
   fillLocationSelects();
+  applyNrDefaultLocation();
   renderRedFlagForm();
 
   initAuth();

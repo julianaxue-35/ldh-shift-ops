@@ -247,12 +247,13 @@
     </section>
 
     <section class="card" id="surveillance-section">
-      <h2>Disease surveillance export</h2>
-      <p class="subtle">Overall counts, a location breakdown, and a full case-by-case list for a chosen month — so you can spot clustering, e.g. kennel cough concentrated in one room.</p>
+      <h2>Disease surveillance</h2>
+      <p class="subtle">The conditions flagged on requests for the chosen month, overall and by space — so you can spot clustering, e.g. kennel cough concentrated in one room. These are reported signs, not confirmed diagnoses.</p>
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <input type="month" id="surveillance-month" style="margin:0; width:auto;">
         <button class="secondary" id="surveillance-export" style="margin:0;">Export CSV</button>
       </div>
+      <div id="surveillance-summary" style="margin-top:16px;"></div>
     </section>
 
     <section class="card" id="trends-section">
@@ -427,32 +428,51 @@
   function csvCell(v) { return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`; }
 
   document.getElementById('surveillance-month').value = todayDateStr().slice(0, 7);
-  document.getElementById('surveillance-export').addEventListener('click', async () => {
-    const monthStr = document.getElementById('surveillance-month').value;
-    if (!monthStr) { alert('Pick a month first.'); return; }
+
+  // Fetch one month of requests and summarise them (shared by the on-screen list and the CSV export).
+  async function loadSurveillance(monthStr) {
     const [y, m] = monthStr.split('-').map(Number);
     const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 1);
     const { data, error } = await sb.from('tasks').select('title, location, condition, created_at')
       .gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
-    if (error) { alert('Could not export: ' + error.message); return; }
-    const rows = data || [];
+    if (error) throw new Error(error.message);
+    return LDHLogic.summariseConditions(data || []);
+  }
 
-    // Section 1: overall counts per condition (includes "None flagged").
-    const conditionCounts = { cat_flu: 0, kennel_cough: 0, diarrhoea: 0, wounds_injury: 0, other: 0, none: 0 };
-    rows.forEach(t => { conditionCounts[t.condition || 'none']++; });
+  const SURV_CONDITIONS = ['cat_flu', 'kennel_cough', 'diarrhoea', 'wounds_injury', 'other'];
+  async function renderSurveillance() {
+    const monthStr = document.getElementById('surveillance-month').value;
+    const box = document.getElementById('surveillance-summary');
+    if (!monthStr) { box.innerHTML = ''; return; }
+    let r;
+    try { r = await loadSurveillance(monthStr); }
+    catch (e) { box.innerHTML = `<p class="empty-state">Could not load: ${esc(e.message)}</p>`; return; }
+    const pct = n => r.flaggedTotal ? Math.round(n / r.flaggedTotal * 100) + '%' : '–';
+    const condRows = SURV_CONDITIONS.map(k => `<tr><td>${esc(CONDITION_LABELS[k])}</td><td><b>${r.counts[k]}</b></td><td>${pct(r.counts[k])}</td></tr>`).join('');
+    const locs = Object.keys(r.byLocation).sort();
+    const locRows = locs.map(loc => `<tr><td>${esc(loc)}</td>${SURV_CONDITIONS.map(k => `<td>${r.byLocation[loc][k] || ''}</td>`).join('')}</tr>`).join('');
+    box.innerHTML = `
+      <h3 style="font-size:0.85rem; margin:0 0 6px;">Reported conditions — ${esc(monthStr)}</h3>
+      <table class="queue-table" id="surveillance-conditions">
+        <thead><tr><th>Condition</th><th>Cases</th><th>Share of flagged</th></tr></thead>
+        <tbody>${condRows}</tbody>
+      </table>
+      <p class="subtle" style="margin-top:8px;">${r.flaggedTotal} of ${r.total} requests this month had a condition flagged; ${r.counts.none} did not.</p>
+      ${locs.length ? `<h3 style="font-size:0.85rem; margin:16px 0 6px;">By space</h3>
+      <table class="queue-table" id="surveillance-locations">
+        <thead><tr><th>Space</th>${SURV_CONDITIONS.map(k => `<th>${esc(CONDITION_LABELS[k])}</th>`).join('')}</tr></thead>
+        <tbody>${locRows}</tbody>
+      </table>` : '<p class="empty-state">No conditions flagged this month.</p>'}`;
+  }
+  document.getElementById('surveillance-month').addEventListener('change', renderSurveillance);
 
-    // Section 2 & 3: location breakdown and full linelist — flagged cases
-    // only (excludes "none"), since a location count of unflagged routine
-    // requests isn't a surveillance signal. This is what lets her spot
-    // clustering, e.g. "kennel cough concentrated in Cat Room 2".
-    const flagged = rows.filter(t => t.condition).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const byLocation = {};
-    flagged.forEach(t => {
-      const loc = t.location || '(no location)';
-      (byLocation[loc] ??= {});
-      byLocation[loc][t.condition] = (byLocation[loc][t.condition] || 0) + 1;
-    });
+  document.getElementById('surveillance-export').addEventListener('click', async () => {
+    const monthStr = document.getElementById('surveillance-month').value;
+    if (!monthStr) { alert('Pick a month first.'); return; }
+    let r;
+    try { r = await loadSurveillance(monthStr); } catch (e) { alert('Could not export: ' + e.message); return; }
+    const conditionCounts = r.counts, flagged = r.flagged, byLocation = r.byLocation;
 
     let csv = `Disease surveillance — ${monthStr}\n\n`;
     csv += 'Condition,Count\n';
@@ -486,6 +506,7 @@
     await loadResponseRates();
     renderTrends();
     renderResponseRateChart();
+    renderSurveillance();
   }
   initStats();
 </script>
