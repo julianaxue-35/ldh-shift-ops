@@ -2,6 +2,7 @@
 
 -- 1. Three triage tiers. Old 'urgent' (act now) becomes 'red_flag'; old 'soon' becomes 'urgent'.
 alter table public.tasks drop constraint if exists tasks_urgency_check;
+-- Run this whole file as ONE script (not statement by statement): the two UPDATEs below are order-dependent.
 update public.tasks set urgency = 'red_flag' where urgency = 'urgent';
 update public.tasks set urgency = 'urgent' where urgency = 'soon';
 -- 'soon' stays allowed ONLY so a browser tab still running the old page keeps working

@@ -6,7 +6,7 @@ const t = require('./check')('flag-form');
   t.ok((await page.textContent('#req-tier-preview')).startsWith('Routine — check within 24–48 h'), 'preview starts as Routine');
   t.ok((await page.textContent('#req-redflags-wrap')).includes("Emergency? Radio the vet"), 'emergency reminder shown');
   t.ok(await page.locator('#req-urgency').count() === 0, 'manual urgency dropdown removed');
-  t.ok(await page.locator('#req-location option').count() === 11, 'location select filled from the shared list');
+  t.ok(await page.locator('#req-location option').count() === 12, 'location select filled from the shared list');
 
   await page.fill('#req-title', 'T100');
   await page.check('input.req-flag[value="bleeding"]');

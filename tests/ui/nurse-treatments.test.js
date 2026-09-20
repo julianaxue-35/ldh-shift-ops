@@ -34,12 +34,18 @@ const t = require('./check')('nurse-treatments');
       const tr = window.__db.nurse_treatments[0];
       const y = new Date(); y.setDate(y.getDate() - 1);
       const iso = y.getFullYear() + '-' + String(y.getMonth() + 1).padStart(2, '0') + '-' + String(y.getDate()).padStart(2, '0');
+      const o = new Date(); o.setDate(o.getDate() - 40);
+      const oiso = o.getFullYear() + '-' + String(o.getMonth() + 1).padStart(2, '0') + '-' + String(o.getDate()).padStart(2, '0');
+      window.__db.nurse_treatment_doses.push({ id: 'old40', treatment_id: tr.id, day_no: 0, slot_no: 2, due_date: oiso, done_by: null, done_at: null });
+      window.__oldISO = oiso;
       window.__db.nurse_treatment_doses.push({ id: 'od1', treatment_id: tr.id, day_no: 0, slot_no: 1, due_date: iso, done_by: null, done_at: null });
       return loadAll();
     });
     await page.waitForTimeout(250);
     t.ok((await page.textContent('#nt-overdue')).includes('Overdue') && (await page.textContent('#nt-overdue')).includes('1174362'), 'overdue dose listed separately');
   
+    const oldISO = await page.evaluate(() => window.__oldISO);
+    t.ok(oldISO && !(await page.textContent('#nt-overdue')).includes(oldISO), 'dose older than the 31-day window is not fetched');
     await page.locator('.nt-stop').first().click();
     await page.waitForTimeout(250);
     d = await db();
