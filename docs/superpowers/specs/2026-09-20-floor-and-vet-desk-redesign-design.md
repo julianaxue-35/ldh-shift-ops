@@ -68,7 +68,7 @@ extraction site, twice daily for 7 days". Fields: animal ID, space, treatment, *
 **number of days**, requested-by. The board expands this into dose slots (7 days × 2 = 14 ticks).
 Nurses see **today's treatments due, grouped by space**, and tick each dose (initials + time). A dose
 not ticked by the end of its day is shown overdue and appears in the shift-change sweep. Vets can
-see progress ("9 of 14 done") and stop a course early. Request method: see open question 5.
+see progress ("9 of 14 done") and stop a course early. **Request method (decided):** a short form on the Vet desk (animal, treatment, times per day, days), with instant confirmation that it was sent. Prefilling from the shift tools is a later addition.
 
 ## 7. Disease surveillance
 **Locations** live in a `locations` table (name, group, cages), seeded from the Summer Peak workbook
@@ -84,8 +84,8 @@ Transport.
    - **Sick & Injured:** Assessment lines only.
    - **Processing:** the vet-visible problem **titles** only (exam-finding notes, custom problems),
      never the auto-generated DDx sentences (those contain words like "CIRDC complex" and would give
-     false positives). The structured **UV lamp = POSITIVE** result is captured as **"RW (UV+)"**,
-     a screening result shown as its own tag until the vet writes RW.
+     false positives). The structured **UV lamp = POSITIVE** result **counts as RW** in the
+     surveillance rate (Juliana's decision; her team treats UV positive as ringworm in practice).
    - **Any line containing "DDx" is ignored** (a skin-lesion differential must not count as
      ringworm). Diarrhoea and vomiting are not read here (they are signs). Parvo / panleukopenia can
      be added later. A finding is counted once per animal.
@@ -136,9 +136,9 @@ the floor; verifier for the "DDx ignored" rule and the rate calculation against 
 
 ## 11. Open questions
 1. Confirm the routine colours: normal under 24 h, amber 24–48 h, red from 48 h.
-2. Should **UV positive** count as ringworm in the surveillance rate, or stay a separate "RW (UV+)" tag?
-3. Red-flag list wording; how long a case can sit unseen before it alerts (red-flag cases: 2 h).
-4. Any other nurse tasks beyond vaccination and ward treatments.
-5. **How vets request a nurse treatment:** (a) a form on the Vet desk, (b) a button inside Sick &
-   Injured / Processing pre-filled with ID and location, or (c) both, starting with (a).
-6. Roster initials import is a separate small task (screenshot pending).
+2. Red-flag list wording; how long a case can sit unseen before it alerts (red-flag cases: 2 h).
+3. Any other nurse tasks beyond vaccination and ward treatments.
+4. Roster initials import is a separate small task (screenshot pending).
+
+Resolved: council-seized animals need no special handling; plan lines last 24 h; active window is 3 days;
+UV positive counts as RW; nurse treatments are requested from a Vet-desk form first.
