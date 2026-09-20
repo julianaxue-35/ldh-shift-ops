@@ -17,9 +17,11 @@ alter table public.memos add column done boolean not null default false;
 alter table public.memos add column done_at timestamptz;
 alter table public.memos add column source text;
 create policy "authenticated_update_memos" on public.memos
-  for update using (auth.role() = 'authenticated');
+  for update using (auth.role() = 'authenticated'
+    and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer');
 create policy "authenticated_delete_memos" on public.memos
-  for delete using (auth.role() = 'authenticated');
+  for delete using (auth.role() = 'authenticated'
+    and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer');
 
 -- 3. Nurse vaccination requests (groups of animals, 3 h from arrival).
 create table public.nurse_requests (
@@ -67,10 +69,10 @@ declare t text;
 begin
   foreach t in array array['nurse_requests','nurse_treatments','nurse_treatment_doses'] loop
     execute format('alter table public.%I enable row level security', t);
-    execute format('create policy "authenticated_select_%s" on public.%I for select using (auth.role() = ''authenticated'')', t, t);
-    execute format('create policy "authenticated_insert_%s" on public.%I for insert with check (auth.role() = ''authenticated'')', t, t);
-    execute format('create policy "authenticated_update_%s" on public.%I for update using (auth.role() = ''authenticated'')', t, t);
-    execute format('create policy "authenticated_delete_%s" on public.%I for delete using (auth.role() = ''authenticated'')', t, t);
+    execute format('create policy "authenticated_select_%s" on public.%I for select using (auth.role() = ''authenticated'' and coalesce(auth.jwt() -> ''app_metadata'' ->> ''role'', '''') <> ''sync_writer'')', t, t);
+    execute format('create policy "authenticated_insert_%s" on public.%I for insert with check (auth.role() = ''authenticated'' and coalesce(auth.jwt() -> ''app_metadata'' ->> ''role'', '''') <> ''sync_writer'')', t, t);
+    execute format('create policy "authenticated_update_%s" on public.%I for update using (auth.role() = ''authenticated'' and coalesce(auth.jwt() -> ''app_metadata'' ->> ''role'', '''') <> ''sync_writer'')', t, t);
+    execute format('create policy "authenticated_delete_%s" on public.%I for delete using (auth.role() = ''authenticated'' and coalesce(auth.jwt() -> ''app_metadata'' ->> ''role'', '''') <> ''sync_writer'')', t, t);
     execute format('alter publication supabase_realtime add table public.%I', t);
   end loop;
 end $$;
