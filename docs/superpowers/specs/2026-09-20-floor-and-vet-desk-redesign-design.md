@@ -93,14 +93,17 @@ Transport.
      ringworm). Diarrhoea and vomiting are not read here (they are signs). Parvo / panleukopenia can
      be added later. A finding is counted once per animal.
 
-**Rate:** per space and per sign = distinct animals reported in the last **3 days** ÷ cages,
-as a percentage (each animal counted once). Cages are capacity, not occupancy, so an under-filled
-space reads low; the screen says so.
+**Rate:** per space = **cases** in the last **3 days** ÷ cages, as a percentage. A case is one animal
+with one flagged sign: an animal is counted once for the same sign (repeat reports collapse), but an
+animal flagged with two different signs is two cases (Juliana's rule, 2026-09-21). Cages are capacity,
+not occupancy, so an under-filled space reads low; the screen says so.
 
 **Baseline, not thresholds.** The heat map is neutral (no red/"outbreak") and shows a
-"building baseline, day X of 30" banner. A nightly `pg_cron` job stores a snapshot per space and
-sign. After ~30 days Juliana and Claude review typical values, range and seasonal movement and set
-thresholds from the data; below-baseline is shown as improvement. No rate-based alerts until then.
+"building baseline, day X of 365" banner. A nightly `pg_cron` job stores a snapshot per space and
+sign. **The baseline is a full year** (Juliana, 2026-09-21: disease varies with the season); from the
+second year each period is compared with the same time last year, and Juliana and Claude set any
+thresholds from that data; below-baseline is shown as improvement. No rate-based alerts until then.
+The year-on-year comparison view is built once a year of snapshots exists.
 Caveat stated on screen: the tool measures the **reported** rate (animals someone flagged), which
 will read lower than vet-exam prevalence; do not reuse existing prevalence figures as thresholds.
 

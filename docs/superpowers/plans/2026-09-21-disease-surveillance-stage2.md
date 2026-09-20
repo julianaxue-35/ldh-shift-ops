@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A disease-surveillance board built on the signs staff already flag: a heat map of each space's rate (share of cages holding a flagged animal), a group summary, a ranked list of the most commonly reported signs, a "building baseline" banner backed by nightly snapshots, a widened sign list, and a one-click A4 report export.
+**Goal:** A disease-surveillance board built on the signs staff already flag: a heat map of each space's rate (share of cages holding a flagged animal), a group summary, a ranked list of the most commonly reported signs, a full-year "building baseline" banner backed by nightly snapshots (so year two can be compared with year one), a widened sign list, and a one-click A4 report export.
 
 **Architecture:** Same static site + Supabase + shared login. Pure counting logic goes in `lib/ldh-logic.js` (unit-tested in Node); HTML rendering for the board goes in one shared browser module `lib/surveillance-view.js` (used by both the dashboard's compact card and the stats page); styles in `lib/surveillance.css`. One migration adds the spaces table, the snapshots table, a snapshot function and the wider sign list. A nightly `pg_cron` job (Juliana already enabled pg_cron) calls the snapshot function.
 
@@ -15,10 +15,11 @@
 - Static site only: no build step, no bundler, no new runtime dependency. New JS/CSS load with plain `<script src>` / `<link>`.
 - Every value interpolated into HTML goes through `esc()` (the view module has its own `esc`).
 - **Reported signs** (exact list and storage values, in this order): `cat_flu` "Cat flu (URI)", `kennel_cough` "Kennel cough", `diarrhoea` "Diarrhoea / GI upset", `vomiting` "Vomiting", `eye_condition` "Eye condition", `skin_condition` "Skin condition", `wounds_injury` "Wounds / injury / trauma", `other` "Other". Giardia and other diagnoses are NOT signs and must not appear in the flag form.
-- **Rate** = distinct animals (by `tasks.title`) with a flagged sign created within the window ÷ the space's cages, as a percentage with one decimal. Each animal counts once per space. The default window is **last 3 days**. Options: Today, Last 3 days, Last 7 days, Last 30 days, This month.
-- A task's **space** is the text before the first `/` in `tasks.location`, trimmed (e.g. `Cat Room 1 / 4` → `Cat Room 1`). Flagged animals whose space is not in the `locations` table are counted in overall totals and the ranked list, and reported as "N flagged animals had a space that isn't in the list" — never silently dropped.
+- **A case** = one animal (`tasks.title`) with one flagged sign. **An animal is counted once for the same sign (repeat reports of that sign collapse); an animal flagged with two different signs is two cases** — Juliana's rule, the only exception to "each animal counts once".
+- **Rate** = cases created within the window in a space ÷ the space's cages, as a percentage with one decimal. The default window is **last 3 days**. Options: Today, Last 3 days, Last 7 days, Last 30 days, This month.
+- A task's **space** is the text before the first `/` in `tasks.location`, trimmed (e.g. `Cat Room 1 / 4` → `Cat Room 1`). Flagged cases whose space is not in the `locations` table are counted in overall totals and the ranked list, and reported as "N flagged animals had a space that isn't in the list" — never silently dropped.
 - **No red / "outbreak" language or colours anywhere on the board.** The heat map uses a neutral blue tint scale. No rate-based alerts until a baseline exists.
-- **Baseline banner** wording: while building: "Building your baseline — day X of 30." When done (30 or more snapshot days): "Baseline collected — 30+ days of snapshots. Thresholds can now be set from your own data."
+- **Baseline is a full year** (disease varies with the season): the banner reads "Building your baseline — day X of 365." while building, and "Baseline year complete — this year's rates can now be compared with the same time last year." once there are 365 or more snapshot days. Snapshots keep being taken after year one; the year-on-year comparison view itself is built when there is a year of data (the snapshots already store every space × sign × day it needs) and is **out of scope here**.
 - **Caveat text (verbatim meaning):** rates are the share of a space's cages holding an animal flagged with a sign in the period; cages are capacity not occupancy so a half-empty space reads low; only animals someone flagged are counted, so it reads lower than vet-exam prevalence — compare against your own baseline, not older prevalence figures.
 - **Cages (Cranbourne, 23 Aug 2026 count)** and groups, verbatim: Cat Room 1 30, Cat Room 2 24, Cat Room 3 10, FIR Room 32 (group "Cat rooms"); Adoption 1 16, Adoption 2 16 ("Cat adoption"); Cat Isolation ward 6 ("Isolation"); Pound 1 30, Pound 2 26, Pound 3 60, Pound 4 9 ("Pounds"); Transport 10 ("Transport"). Total 269. Space names match the flag form's dropdown (`LDHLogic.LOCATIONS`).
 - New tables follow the access model of migration 0008: RLS on, `select` for `authenticated` with the same `sync_writer` guard as 0003 (`and coalesce(auth.jwt() -> 'app_metadata' ->> 'role','') <> 'sync_writer'`). `locations` and `surveillance_snapshots` have NO insert/update/delete policies for API users (edited only in the SQL editor / by the job).
@@ -57,7 +58,7 @@
 - Create: `tests/surveillance-migration.test.mjs`
 
 **Interfaces:**
-- Produces (DB): `tasks.condition` accepts the 8 sign keys; `locations(name pk, grp, cages, sort)` seeded with 12 spaces; `surveillance_snapshots(snapshot_date, space, condition, animals, cages, primary key(snapshot_date,space,condition))` where `condition` is a sign key or the literal `'any'` (distinct animals with any sign); `public.take_surveillance_snapshot(p_days int default 3) returns int` (rows written; upserts for the Melbourne date of `now() - interval '1 hour'`).
+- Produces (DB): `tasks.condition` accepts the 8 sign keys; `locations(name pk, grp, cages, sort)` seeded with 12 spaces; `surveillance_snapshots(snapshot_date, space, condition, animals, cages, primary key(snapshot_date,space,condition))` where `condition` is a sign key (distinct animals with that sign) or the literal `'any'` (distinct CASES = animal+sign pairs, so an animal with two different signs adds 2); `public.take_surveillance_snapshot(p_days int default 3) returns int` (rows written; upserts for the Melbourne date of `now() - interval '1 hour'`).
 
 - [ ] **Step 1: Write the failing test**
 
@@ -104,22 +105,23 @@ test('locations are seeded with the Cranbourne spaces and 269 cages', async () =
   assert.equal(r.rows.find(x => x.name === 'FIR Room').grp, 'Cat rooms');
 });
 
-test('take_surveillance_snapshot counts distinct animals per space and sign within the window, idempotently', async () => {
+test('take_surveillance_snapshot counts distinct animals per sign and distinct cases per space within the window, idempotently', async () => {
   const d = await db();
   await d.exec(`
     insert into public.tasks (title,location,shift,condition,created_at) values
       ('A1','Cat Room 1 / 4','sick_injured','cat_flu', now()),
       ('A2','Cat Room 1 / 5','sick_injured','cat_flu', now()),
       ('A1','Cat Room 1 / 4','processing','kennel_cough', now()),
+      ('A2','Cat Room 1 / 5','processing','cat_flu', now()),
       ('A3','Pound 2 / 7','sick_injured','cat_flu', now() - interval '5 days'),
       ('A4','Unknown room / 1','sick_injured','other', now()),
       ('A5','Cat Room 2 / 1','sick_injured', null, now());`);
   const n1 = (await d.query(`select public.take_surveillance_snapshot() as n`)).rows[0].n;
   assert.equal(n1, 108, '12 spaces x (8 signs + any)');
   const row = async (space, cond) => (await d.query(`select animals, cages from public.surveillance_snapshots where space=$1 and condition=$2`, [space, cond])).rows[0];
-  assert.deepEqual(await row('Cat Room 1', 'cat_flu'), { animals: 2, cages: 30 });
+  assert.deepEqual(await row('Cat Room 1', 'cat_flu'), { animals: 2, cages: 30 }, 'A2 flagged twice for the same sign still counts once');
   assert.deepEqual(await row('Cat Room 1', 'kennel_cough'), { animals: 1, cages: 30 });
-  assert.equal((await row('Cat Room 1', 'any')).animals, 2, 'A1 has two signs but is one animal');
+  assert.equal((await row('Cat Room 1', 'any')).animals, 3, 'cases: A1+cat_flu, A2+cat_flu (reported twice = once), A1+kennel_cough');
   assert.equal((await row('Pound 2', 'any')).animals, 0, 'a 5-day-old flag is outside the 3-day window');
   assert.equal((await row('Cat Room 2', 'any')).animals, 0, 'a task with no sign is not counted');
   const total = () => d.query(`select count(*)::int as n from public.surveillance_snapshots`).then(r => r.rows[0].n);
@@ -185,7 +187,7 @@ insert into public.locations (name, grp, cages, sort) values
   ('Transport',          'Transport',    10, 12);
 
 -- 3. Nightly snapshot rows, so a baseline builds up over time.
---    condition is a sign key, or 'any' = distinct animals with any sign in that space.
+--    condition is a sign key (distinct animals with that sign), or 'any' = distinct CASES (animal + sign pairs) in that space.
 create table public.surveillance_snapshots (
   snapshot_date date not null,
   space text not null,
@@ -216,7 +218,8 @@ begin
   get diagnostics n1 = row_count;
 
   insert into public.surveillance_snapshots (snapshot_date, space, condition, animals, cages)
-  select d, l.name, 'any', count(distinct t.title)::int, l.cages
+  -- concatenate (not a row constructor): a row of two NULLs from the LEFT JOIN is itself non-null and would count as 1
+  select d, l.name, 'any', count(distinct (t.title || '|' || t.condition))::int, l.cages
   from public.locations l
   left join public.tasks t
     on trim(split_part(t.location, '/', 1)) = l.name
@@ -261,10 +264,11 @@ Do NOT run this migration on the live database yet (Task 8).
 - Modify: `tests/logic.test.mjs`
 
 **Interfaces:**
-- Produces (`LDHLogic`): `SIGN_KEYS: string[]` (8, in the spec order); `CONDITION_LABELS` (8 signs + `none`); `spaceOf(location) -> string`; `windowStart(key, nowMs) -> Date` for keys `'today'|'3d'|'7d'|'30d'|'month'` (`'today'` = local midnight; `'month'` = 1st of the local month; others = now minus N×24 h; unknown key = 3d); `buildSurvey(tasks, locations, since) -> {spaces, groups, ranked, totalAnimals, unmapped, since}`; `baselineStatus(dates, target=30) -> {day, of, done, days}`; `summariseConditions` now keys its counts from `SIGN_KEYS` + `none`.
-  - `spaces[]`: `{name, grp, cages, animals, rate (number|null, 1 decimal, percent), leading (sign key|null), by: {signKey: distinctAnimals}}`, ordered by the location rows' `sort`.
-  - `groups[]`: `{name, animals, cages, rate}` in first-seen order of `spaces`.
-  - `ranked[]`: `{key, animals, share}` (share = whole-number percent of `totalAnimals`), sorted by animals desc then `SIGN_KEYS` order; only signs with ≥1 animal.
+- Produces (`LDHLogic`): `SIGN_KEYS: string[]` (8, in the spec order); `CONDITION_LABELS` (8 signs + `none`); `spaceOf(location) -> string`; `windowStart(key, nowMs) -> Date` for keys `'today'|'3d'|'7d'|'30d'|'month'` (`'today'` = local midnight; `'month'` = 1st of the local month; others = now minus N×24 h; unknown key = 3d); `buildSurvey(tasks, locations, since) -> {spaces, groups, ranked, totalCases, unmapped, since}`; `baselineStatus(dates, target=365) -> {day, of, done, days}`; `summariseConditions` now keys its counts from `SIGN_KEYS` + `none`.
+  - `spaces[]`: `{name, grp, cages, cases, rate (number|null, 1 decimal, percent), leading (sign key|null), by: {signKey: distinctAnimals}}`, ordered by the location rows' `sort`.
+  - `groups[]`: `{name, cases, cages, rate}` in first-seen order of `spaces`.
+  - `ranked[]`: `{key, animals, share}` (`animals` = distinct animals with that sign; `share` = whole-number percent of `totalCases`), sorted by animals desc then `SIGN_KEYS` order; only signs with ≥1 animal.
+  - `totalCases` = distinct (animal, sign) pairs overall, including unmapped spaces; `unmapped` = number of distinct animals whose space is not in the list.
   - Input `tasks`: rows with `title, location, condition, created_at`; `locations`: rows with `name, grp, cages, sort`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -304,13 +308,13 @@ const LOC = [
 ];
 const trow = (title, location, condition, agoMs) => ({ title, location, condition, created_at: new Date(NOW - agoMs).toISOString() });
 
-test('buildSurvey: distinct animals, rates, leading sign, groups, ranking, unmapped', () => {
+test('buildSurvey: cases (animal + sign), rates, leading sign, groups, ranking, unmapped', () => {
   const since = new Date(NOW - 3 * 24 * H);
   const tasks = [
     trow('A1', 'Cat Room 1 / 4', 'cat_flu', 1 * H),
     trow('A2', 'Cat Room 1 / 5', 'cat_flu', 2 * H),
-    trow('A1', 'Cat Room 1 / 4', 'vomiting', 3 * H),        // same animal, second sign
-    trow('A2', 'Cat Room 1 / 5', 'cat_flu', 4 * H),         // duplicate report of the same sign
+    trow('A1', 'Cat Room 1 / 4', 'vomiting', 3 * H),        // same animal, a DIFFERENT sign = a second case
+    trow('A2', 'Cat Room 1 / 5', 'cat_flu', 4 * H),         // repeat report of the same sign = still one case
     trow('B1', 'Pound 2 / 7', 'kennel_cough', 5 * H),
     trow('C1', 'Cat Room 2 / 1', 'cat_flu', 4 * 24 * H),    // outside the window
     trow('D1', 'Cat Room 2 / 2', null, 1 * H),               // no sign flagged
@@ -318,35 +322,36 @@ test('buildSurvey: distinct animals, rates, leading sign, groups, ranking, unmap
   ];
   const r = L.buildSurvey(tasks, LOC, since);
   const s1 = r.spaces.find(s => s.name === 'Cat Room 1');
-  assert.equal(s1.animals, 2, 'A1 and A2, each counted once');
-  assert.equal(s1.rate, 6.7, '2 / 30 cages = 6.7%');
+  assert.equal(s1.cases, 3, 'A1+cat_flu, A2+cat_flu, A1+vomiting');
+  assert.equal(s1.rate, 10, '3 / 30 cages = 10.0%');
   assert.equal(s1.leading, 'cat_flu');
-  assert.deepEqual(s1.by, { cat_flu: 2, vomiting: 1 });
-  assert.equal(r.spaces.find(s => s.name === 'Cat Room 2').animals, 0, 'old flag and unflagged task are not counted');
+  assert.deepEqual(s1.by, { cat_flu: 2, vomiting: 1 }, 'distinct animals per sign');
+  assert.equal(r.spaces.find(s => s.name === 'Cat Room 2').cases, 0, 'old flag and unflagged task are not counted');
   assert.equal(r.spaces.find(s => s.name === 'Cat Room 2').leading, null);
+  assert.equal(r.spaces.find(s => s.name === 'Pound 2').rate, 3.8, '1 / 26 cages = 3.8%');
   assert.deepEqual(r.spaces.map(s => s.name), ['Cat Room 1', 'Cat Room 2', 'Pound 2'], 'ordered by sort');
   const g = r.groups.find(x => x.name === 'Cat rooms');
-  assert.deepEqual([g.animals, g.cages, g.rate], [2, 54, 3.7], 'group = 2 animals / 54 cages');
-  assert.equal(r.totalAnimals, 4, 'A1, A2, B1 and the unmapped E1');
+  assert.deepEqual([g.cases, g.cages, g.rate], [3, 54, 5.6], 'group = 3 cases / 54 cages');
+  assert.equal(r.totalCases, 5, 'A1+flu, A2+flu, A1+vomiting, B1+kennel_cough and the unmapped E1+other');
   assert.equal(r.unmapped, 1);
   assert.deepEqual(r.ranked.map(x => [x.key, x.animals]), [['cat_flu', 2], ['kennel_cough', 1], ['vomiting', 1], ['other', 1]]);
-  assert.equal(r.ranked[0].share, 50, '2 of 4 animals');
+  assert.equal(r.ranked[0].share, 40, '2 of 5 cases');
 });
 
 test('buildSurvey with no data gives zero rates, not errors', () => {
   const r = L.buildSurvey([], LOC, new Date(NOW - 3 * 24 * H));
-  assert.equal(r.totalAnimals, 0);
+  assert.equal(r.totalCases, 0);
   assert.deepEqual(r.ranked, []);
   assert.equal(r.spaces[0].rate, 0);
   assert.equal(L.buildSurvey([], [{ name: 'X', grp: 'G', cages: 0, sort: 1 }], new Date(NOW)).spaces[0].rate, null, 'zero cages -> no rate');
 });
 
-test('baselineStatus counts distinct snapshot days up to 30', () => {
-  assert.deepEqual(L.baselineStatus([]), { day: 0, of: 30, done: false, days: 0 });
-  assert.deepEqual(L.baselineStatus(['2026-09-01', '2026-09-01', '2026-09-02']), { day: 2, of: 30, done: false, days: 2 });
-  const many = Array.from({ length: 35 }, (_, i) => '2026-08-' + String(i + 1).padStart(2, '0'));
+test('baselineStatus counts distinct snapshot days up to a full year (365)', () => {
+  assert.deepEqual(L.baselineStatus([]), { day: 0, of: 365, done: false, days: 0 });
+  assert.deepEqual(L.baselineStatus(['2026-09-01', '2026-09-01', '2026-09-02']), { day: 2, of: 365, done: false, days: 2 });
+  const many = Array.from({ length: 400 }, (_, i) => new Date(Date.UTC(2026, 0, 1 + i)).toISOString().slice(0, 10));
   const b = L.baselineStatus(many);
-  assert.deepEqual([b.day, b.done, b.days], [30, true, 35]);
+  assert.deepEqual([b.day, b.done, b.days], [365, true, 400]);
 });
 
 test('summariseConditions covers the widened sign list', () => {
@@ -394,45 +399,46 @@ Add these functions above `splitMemos`:
 
   const round1 = (x) => Math.round(x * 10) / 10;
 
-  // Rates for the heat map: distinct animals (tasks.title) with a flagged sign since `since`, per space, sign and group.
+  // Rates for the heat map. A CASE = one animal (tasks.title) with one flagged sign since `since`: an animal is counted once
+  // for the same sign, but an animal with two different signs is two cases (Juliana's rule).
   function buildSurvey(tasks, locations, since) {
     const spaces = locations.slice().sort((a, b) => a.sort - b.sort)
-      .map(l => ({ name: l.name, grp: l.grp, cages: l.cages, any: new Set(), by: {} }));
+      .map(l => ({ name: l.name, grp: l.grp, cages: l.cages, cases: new Set(), by: {} }));
     const idx = {}; spaces.forEach(s => { idx[s.name] = s; });
-    const signAnimals = {}, allAnimals = new Set(), unmapped = new Set();
+    const signAnimals = {}, allCases = new Set(), unmapped = new Set();
     tasks.forEach(t => {
       if (!t.condition || new Date(t.created_at) < since) return;
-      const animal = t.title;
+      const animal = t.title, caseKey = animal + '|' + t.condition;   // a case = one animal with one sign
       (signAnimals[t.condition] = signAnimals[t.condition] || new Set()).add(animal);
-      allAnimals.add(animal);
+      allCases.add(caseKey);
       const sp = idx[spaceOf(t.location)];
       if (!sp) { unmapped.add(animal); return; }
-      sp.any.add(animal);
+      sp.cases.add(caseKey);
       (sp.by[t.condition] = sp.by[t.condition] || new Set()).add(animal);
     });
     const outSpaces = spaces.map(s => {
       let leading = null, max = 0;
       SIGN_KEYS.concat(Object.keys(s.by)).forEach(k => { if (s.by[k] && s.by[k].size > max) { max = s.by[k].size; leading = k; } });
       const by = {}; Object.keys(s.by).forEach(k => { by[k] = s.by[k].size; });
-      return { name: s.name, grp: s.grp, cages: s.cages, animals: s.any.size,
-        rate: s.cages ? round1(s.any.size / s.cages * 100) : null, leading, by };
+      return { name: s.name, grp: s.grp, cages: s.cages, cases: s.cases.size,
+        rate: s.cages ? round1(s.cases.size / s.cages * 100) : null, leading, by };
     });
     const groups = [];
     outSpaces.forEach(s => {
       let g = groups.find(x => x.name === s.grp);
-      if (!g) { g = { name: s.grp, animals: 0, cages: 0, rate: null }; groups.push(g); }
-      g.animals += s.animals; g.cages += s.cages;
+      if (!g) { g = { name: s.grp, cases: 0, cages: 0, rate: null }; groups.push(g); }
+      g.cases += s.cases; g.cages += s.cages;
     });
-    groups.forEach(g => { g.rate = g.cages ? round1(g.animals / g.cages * 100) : null; });
-    const totalAnimals = allAnimals.size;
+    groups.forEach(g => { g.rate = g.cages ? round1(g.cases / g.cages * 100) : null; });
+    const totalCases = allCases.size;
     const ranked = Object.keys(signAnimals)
-      .map(k => ({ key: k, animals: signAnimals[k].size, share: totalAnimals ? Math.round(signAnimals[k].size / totalAnimals * 100) : 0 }))
+      .map(k => ({ key: k, animals: signAnimals[k].size, share: totalCases ? Math.round(signAnimals[k].size / totalCases * 100) : 0 }))
       .sort((a, b) => b.animals - a.animals || SIGN_KEYS.indexOf(a.key) - SIGN_KEYS.indexOf(b.key));
-    return { spaces: outSpaces, groups, ranked, totalAnimals, unmapped: unmapped.size, since };
+    return { spaces: outSpaces, groups, ranked, totalCases, unmapped: unmapped.size, since };
   }
 
   function baselineStatus(dates, target) {
-    const of = target || 30, days = new Set(dates).size;
+    const of = target || 365, days = new Set(dates).size;   // a full year: disease varies with the season
     return { day: Math.min(days, of), of, done: days >= of, days };
   }
 ```
@@ -569,14 +575,14 @@ test('heat map: one tile per space with rate, cage counts and leading sign; esca
 });
 
 test('heat map is neutral: no red, no outbreak wording', () => {
-  const h = V.heatMapHtml(survey) + V.groupsHtml(survey) + V.rankedHtml(survey) + V.baselineHtml({ day: 3, of: 30, done: false, days: 3 });
+  const h = V.heatMapHtml(survey) + V.groupsHtml(survey) + V.rankedHtml(survey) + V.baselineHtml({ day: 3, of: 365, done: false, days: 3 });
   assert.ok(!/outbreak|alert|danger|critical|high risk/i.test(h), 'no alarm wording');
   assert.ok(!/rgba?\(\s*2[0-9]{2}\s*,\s*[0-9]{1,2}\s*,\s*[0-9]{1,2}/.test(h), 'no red tints');
 });
 
 test('groups and ranked tables', () => {
   const g = V.groupsHtml(survey);
-  assert.match(g, /Cat rooms[\s\S]*2[\s\S]*30[\s\S]*6\.7%/);
+  assert.match(g, /Cat rooms[\s\S]*2[\s\S]*30[\s\S]*6\.7%/, '2 cases in 30 cages');
   const r = V.rankedHtml(survey);
   assert.match(r, /Cat flu \(URI\)[\s\S]*2[\s\S]*67%/, '2 of the 3 flagged animals');
   assert.match(V.rankedHtml(L.buildSurvey([], LOC, new Date())), /No signs flagged in this period\./);
@@ -588,10 +594,11 @@ test('unmapped spaces are reported, never dropped silently', () => {
 });
 
 test('baseline banner wording and the caveat', () => {
-  assert.match(V.baselineHtml({ day: 3, of: 30, done: false, days: 3 }), /Building your baseline — day 3 of 30\./);
-  assert.match(V.baselineHtml({ day: 30, of: 30, done: true, days: 41 }), /Baseline collected — 30\+ days of snapshots\./);
+  assert.match(V.baselineHtml({ day: 3, of: 365, done: false, days: 3 }), /Building your baseline — day 3 of 365\./);
+  assert.match(V.baselineHtml({ day: 365, of: 365, done: true, days: 410 }), /Baseline year complete — this year's rates can now be compared with the same time last year\./);
   const c = V.caveatHtml();
   assert.match(c, /capacity/i); assert.match(c, /flagged/i); assert.match(c, /your own baseline/i);
+  assert.match(c, /twice if two different signs/i, 'the counting rule is stated on screen');
 });
 ```
 
@@ -623,18 +630,18 @@ Create `lib/surveillance-view.js`:
       `<div class="heat-tile" data-space="${esc(s.name)}" style="background:${shade(s.rate)}">
         <div class="heat-name">${esc(s.name)}</div>
         <div class="heat-rate">${pct(s.rate)}</div>
-        <div class="heat-sub">${s.animals} of ${s.cages} cages${s.leading ? ' · ' + esc(L.CONDITION_LABELS[s.leading] || s.leading) : ''}</div>
+        <div class="heat-sub">${s.cases} of ${s.cages} cages${s.leading ? ' · ' + esc(L.CONDITION_LABELS[s.leading] || s.leading) : ''}</div>
       </div>`).join('') + '</div>';
   }
 
   function groupsHtml(survey) {
-    return `<table class="queue-table heat-groups"><thead><tr><th>Group</th><th>Animals</th><th>Cages</th><th>Rate</th></tr></thead><tbody>${
-      survey.groups.map(g => `<tr><td>${esc(g.name)}</td><td><b>${g.animals}</b></td><td>${g.cages}</td><td>${pct(g.rate)}</td></tr>`).join('')}</tbody></table>`;
+    return `<table class="queue-table heat-groups"><thead><tr><th>Group</th><th>Cases</th><th>Cages</th><th>Rate</th></tr></thead><tbody>${
+      survey.groups.map(g => `<tr><td>${esc(g.name)}</td><td><b>${g.cases}</b></td><td>${g.cages}</td><td>${pct(g.rate)}</td></tr>`).join('')}</tbody></table>`;
   }
 
   function rankedHtml(survey) {
     if (!survey.ranked.length) return '<p class="empty-state">No signs flagged in this period.</p>';
-    return `<table class="queue-table heat-ranked"><thead><tr><th>Sign</th><th>Animals</th><th>Share of flagged</th></tr></thead><tbody>${
+    return `<table class="queue-table heat-ranked"><thead><tr><th>Sign</th><th>Animals</th><th>Share of cases</th></tr></thead><tbody>${
       survey.ranked.map(r => `<tr><td>${esc(L.CONDITION_LABELS[r.key] || r.key)}</td><td><b>${r.animals}</b></td><td>${r.share}%</td></tr>`).join('')}</tbody></table>`;
   }
 
@@ -645,12 +652,12 @@ Create `lib/surveillance-view.js`:
 
   function baselineHtml(status) {
     return status.done
-      ? '<div class="baseline-banner done">Baseline collected — 30+ days of snapshots. Thresholds can now be set from your own data.</div>'
-      : `<div class="baseline-banner">Building your baseline — day ${status.day} of ${status.of}. Rates are shown as they are; there is no "high" line until there is a month of your own data.</div>`;
+      ? '<div class="baseline-banner done">Baseline year complete — this year\'s rates can now be compared with the same time last year.</div>'
+      : `<div class="baseline-banner">Building your baseline — day ${status.day} of ${status.of}. It runs for a full year because disease varies with the season; from next year each period is compared with the same time last year. Until then rates are shown as they are, with no "high" line.</div>`;
   }
 
   function caveatHtml() {
-    return '<p class="subtle heat-caveat">Rate = the share of a space\'s cages holding an animal flagged with a sign in this period. Cages are capacity, not occupancy, so a half-empty space reads low. Only animals someone flagged are counted, so this reads lower than vet-exam prevalence — compare it against your own baseline, not older prevalence figures.</p>';
+    return '<p class="subtle heat-caveat">Rate = flagged cases as a share of a space\'s cages in this period. A case is one animal with one flagged sign: an animal counts once for the same sign, but twice if two different signs were flagged. Cages are capacity, not occupancy, so a half-empty space reads low. Only animals someone flagged are counted, so this reads lower than vet-exam prevalence — compare it against your own baseline, not older prevalence figures.</p>';
   }
 
   return { heatMapHtml, groupsHtml, rankedHtml, unmappedHtml, baselineHtml, caveatHtml };
@@ -704,23 +711,24 @@ const spaces = [['Cat Room 1', 'Cat rooms', 30], ['Cat Room 2', 'Cat rooms', 24]
   ['Pound 1', 'Pounds', 30], ['Pound 2', 'Pounds', 26], ['Pound 3', 'Pounds', 60], ['Pound 4', 'Pounds', 9], ['Transport', 'Transport', 10]];
 module.exports = { LOCATION_ROWS: spaces.map(([name, grp, cages], i) => ({ id: 'loc' + i, name, grp, cages, sort: i + 1 })) };
 ```
-In `tests/ui/harness.js` add `locations: [], surveillance_snapshots: []` to the stub's `db` object and `locations: () => ({}), surveillance_snapshots: () => ({})` to its `defaults`.
+In `tests/ui/harness.js` add `locations: [], surveillance_snapshots: []` to the stub's `db` object and `locations: () => ({}), surveillance_snapshots: () => ({})` to its `defaults`, and add `limit(n) { limitN = n; return b; }` to the stub's query builder (declare `let limitN = null;` beside `orderCol`, and slice the final `select` result to `limitN` when it is set).
 
 Replace the surveillance assertions in `tests/ui/stats-page.test.js` (the block that waits for `#surveillance-conditions`, and its seeds) with a new test section. Seeds: `const { LOCATION_ROWS } = require('./fixtures');` and add to `seed`: `locations: LOCATION_ROWS`, `surveillance_snapshots: [{ snapshot_date: '2026-09-19', space: 'Cat Room 1', condition: 'any', animals: 1, cages: 30 }, { snapshot_date: '2026-09-20', space: 'Cat Room 1', condition: 'any', animals: 2, cages: 30 }]`, and flagged tasks: two `cat_flu` in `Cat Room 1 / 4` and `Cat Room 1 / 5`, one `vomiting` in `Pound 2 / 3`, one `cat_flu` in `Pound 2 / 9` created 20 days ago. Then assert:
 ```js
     await stats.page.waitForSelector('#heat-map .heat-tile');
     t.ok(await stats.page.locator('#heat-map .heat-tile').count() === 12, 'a tile for each of the 12 spaces');
     const tile = name => stats.page.locator('#heat-map .heat-tile', { hasText: name }).first().textContent();
-    t.ok(/6\.7%/.test(await tile('Cat Room 1')) && /2 of 30 cages/.test(await tile('Cat Room 1')), 'Cat Room 1: 2 animals / 30 cages = 6.7%');
+    t.ok(/6\.7%/.test(await tile('Cat Room 1')) && /2 of 30 cages/.test(await tile('Cat Room 1')), 'Cat Room 1: 2 cases / 30 cages = 6.7%');
     t.ok(/1 of 26 cages/.test(await tile('Pound 2')), 'Pound 2 counts only the recent flag (the 20-day-old one is outside 3 days)');
     t.ok((await stats.page.textContent('#heat-groups')).includes('Cat rooms') && (await stats.page.textContent('#heat-groups')).includes('Pounds'), 'group summary');
     const ranked = await stats.page.textContent('#heat-ranked');
     t.ok(ranked.indexOf('Cat flu (URI)') < ranked.indexOf('Vomiting'), 'most commonly reported first (flu 2, vomiting 1)');
-    t.ok((await stats.page.textContent('#baseline-banner')).includes('Building your baseline — day 2 of 30'), 'baseline banner counts the 2 snapshot days');
+    t.ok((await stats.page.textContent('#baseline-banner')).includes('Building your baseline — day 2 of 365'), 'baseline banner counts the 2 snapshot days out of a full year');
     await stats.page.selectOption('#surv-window', '30d');
     await stats.page.waitForTimeout(150);
     t.ok(/2 of 26 cages/.test(await tile('Pound 2')), 'switching to 30 days includes the older flag');
     t.ok((await stats.page.textContent('#heat-notes')).toLowerCase().includes('capacity'), 'the capacity / reported-rate caveat is shown');
+    t.ok((await stats.page.textContent('#heat-notes')).toLowerCase().includes('two different signs'), 'the counting rule is stated');
     t.ok(!/outbreak|high risk|alert/i.test(await stats.page.textContent('#surveillance-section')), 'no alarm wording on the board');
 ```
 (Keep the trend-card and dashboard-side assertions in that file unchanged.)
@@ -773,14 +781,21 @@ Expected: FAIL (`#heat-map` does not exist).
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const since = new Date(Math.min(monthStart.getTime(), now.getTime() - 30 * 24 * 3600 * 1000));
-    const [loc, tk, snap] = await Promise.all([
+    const [loc, tk] = await Promise.all([
       sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('tasks').select('title, location, condition, created_at').gte('created_at', since.toISOString()),
-      sb.from('surveillance_snapshots').select('snapshot_date').eq('condition', 'any')
+      sb.from('tasks').select('title, location, condition, created_at').gte('created_at', since.toISOString())
     ]);
     SURVEY_LOCATIONS = loc.data || [];
     SURVEY_TASKS = (tk.data || []).filter(t => t.condition);
-    SNAPSHOT_DATES = (snap.data || []).map(r => r.snapshot_date);
+    // Baseline day count: read ONE space's 'any' rows (one per night, so at most ~400 for a year) — reading every space
+    // would hit the API's 1000-row cap after about 80 days.
+    SNAPSHOT_DATES = [];
+    if (SURVEY_LOCATIONS.length) {
+      const snap = await sb.from('surveillance_snapshots').select('snapshot_date')
+        .eq('condition', 'any').eq('space', SURVEY_LOCATIONS[0].name)
+        .order('snapshot_date', { ascending: true }).limit(400);
+      SNAPSHOT_DATES = (snap.data || []).map(r => r.snapshot_date);
+    }
   }
 
   function renderSurvey() {
@@ -1031,7 +1046,7 @@ Ask Juliana to hard-refresh the dashboard and the stats page (Cmd+Shift+R).
 
 1. Flag `TEST-S1` in Cat Room 1 with pen 4, sign **Vomiting**; flag `TEST-S2` in FIR Room with **Eye condition**; flag `TEST-S3` in Pound 2 with **Skin condition**.
 2. Dashboard: the **Disease watch** card shows a tile for every space; Cat Room 1 reads 3.3% (1 of 30 cages).
-3. Stats → Disease surveillance: same tiles, group summary, ranked list (each sign 1), the baseline banner "day 1 of 30", the caveat text. Switch the window to Today / 7 / 30 days.
+3. Stats → Disease surveillance: same tiles, group summary, ranked list (each sign 1), the baseline banner "day 1 of 365", the caveat text. Switch the window to Today / 7 / 30 days.
 4. **Export report (PDF)** → the print preview shows only the surveillance board on A4 with a title line.
 5. **Download case list (CSV)** still downloads.
 
@@ -1044,10 +1059,10 @@ Cleanup SQL: `delete from public.tasks where title like 'TEST%';` (the snapshot 
 ## Self-review (spec coverage)
 
 - §7 Locations table seeded with the Cranbourne cages and groups: Task 1. Two-layer split: layer 1 (signs, exact 8) Tasks 1–3; layer 2 (vet-diagnosed) is stage 3, out of scope, stated in the header.
-- §7 Rate (distinct animals, last 3 days, ÷ cages, %): Task 2 (`buildSurvey`), unit-tested with duplicates, second signs, old flags, unflagged tasks and unmapped spaces.
-- §7 Baseline, not thresholds — neutral map, banner "day X of 30", nightly snapshots, no alerts, caveat on screen: Tasks 1 (snapshots), 4 (banner, caveat, neutral tint test), 5 (banner wired to real snapshot days).
+- §7 Rate (cases = animal + sign, last 3 days, ÷ cages, %): Task 2 (`buildSurvey`), unit-tested with repeat reports of one sign (collapse), a second different sign (a second case), old flags, unflagged tasks and unmapped spaces; the same rule is in the snapshot SQL (Task 1) and stated on screen (Task 4).
+- §7 Baseline, not thresholds — neutral map, **full-year** banner "day X of 365" (Juliana: disease varies by season, year two compares with year one), nightly snapshots, no alerts, caveat on screen: Tasks 1 (snapshots), 4 (banner, caveat, neutral tint test), 5 (banner wired to real snapshot days, one-space query to stay under the API row cap). The year-on-year comparison view is deliberately not built yet — there is no data to compare until a year has passed; the snapshots keep every space × sign × day.
 - §7 Views — heat map with rate/count/leading sign, group summary, ranked signs, period switch (today / 7 d / 30 d / a month; plus the agreed 3 d default): Tasks 4–5. Dashboard shows the map to both roles: Task 6.
 - §7 Export — one-click A4 report + CSV kept as backup: Tasks 5, 7.
 - §8 data changes for stage 2 (`locations`, `surveillance_snapshots`, `pg_cron` job): Tasks 1, 8. (`flagged_at`/`due_by` remain derived, unchanged from stage 1.)
 - Deviation to note: the spec sketches "per space AND per sign" rates; the tiles show the per-space rate for any sign plus the leading sign, and the per-sign detail lives in the ranked list and the `surveillance_snapshots` rows (which store every space × sign) — so a per-sign heat map can be added later without a schema change.
-- Types checked across tasks: `buildSurvey` result fields (`spaces[].rate/animals/cages/leading/by`, `groups[]`, `ranked[].key/animals/share`, `totalAnimals`, `unmapped`) match what `SurveillanceView` reads and what the browser tests assert; `LOCATION_ROWS`/`locations` rows use `name, grp, cages, sort` everywhere (migration, fixtures, `buildSurvey`).
+- Types checked across tasks: `buildSurvey` result fields (`spaces[].rate/cases/cages/leading/by`, `groups[].cases`, `ranked[].key/animals/share`, `totalCases`, `unmapped`) match what `SurveillanceView` reads and what the browser tests assert; `LOCATION_ROWS`/`locations` rows use `name, grp, cages, sort` everywhere (migration, fixtures, `buildSurvey`).
