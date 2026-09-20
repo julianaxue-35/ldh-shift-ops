@@ -17,8 +17,8 @@ It must also work as a **disease surveillance tool**.
 ## 2. Principles
 1. **Passive over manual.** Derive values from text people already type; avoid new input fields.
 2. **Privacy.** Only operational metadata goes to the cloud. No clinical narrative, no microchip
-   numbers, plan line is a short excerpt only. Council-seized animals: plan line hidden on the Floor
-   (default, to be confirmed).
+   numbers, plan line is a short excerpt only. Council-seized animals need no special handling (staff
+   only ever see an animal ID). **A plan line expires 24 hours after it is sent.**
 3. **Emergencies are radioed.** The board is not the emergency channel; it must say so.
 4. **Never block a vet.** Anything optional (diagnosis tag, rounds flag) must not gate closing a case.
 5. **Data before thresholds.** No high/outbreak cut-offs until a baseline exists.
@@ -26,12 +26,14 @@ It must also work as a **disease surveillance tool**.
 ## 3. Triage
 Two time-based tiers replace Urgent / Soon / Routine:
 
-- **Check within 12 hours** — any red flag ticked (not eating, laboured breathing, bleeding, can't
+- **Check within 2 hours** — any red flag ticked (not eating, laboured breathing, bleeding, can't
   stand, repeated vomiting; list editable).
-- **Can wait 24–48 hours** — no red flags.
+- **Routine: check within 24–48 hours** — no red flags. Colour by time since flagged and still not
+  seen: under 24 h normal; 24–48 h (day 2) **amber**; 48 h onward (day 3) **red**.
 
-Each case stores `due_by` (12 h, or 48 h, from flagging). Cards show a countdown; amber when short,
-red when overdue. Overdue cases sort to the top and appear in the shift-change sweep.
+Each case stores `flagged_at` and, for red-flag cases, `due_by` (2 h). Red-flag cards show a
+countdown; routine cards use the day-based colours above. Red/overdue cases sort to the top and
+appear in the shift-change sweep.
 The flag form shows "Emergency? Radio the vet." Radioed cases can be logged afterwards with one
 optional tap so surveillance counts stay complete.
 
@@ -60,6 +62,14 @@ vaccine". Fields: space, species, count, note, **arrived_at** ("Arrived now" but
 (amber/red), claim button. Overdue requests appear in the sweep. Other nurse tasks can reuse the board
 with no default clock.
 
+## 6b. Nurse treatment reminders (new)
+A vet asks a nurse to provide a treatment to an animal in the ward — e.g. "flush the dental
+extraction site, twice daily for 7 days". Fields: animal ID, space, treatment, **times per day**,
+**number of days**, requested-by. The board expands this into dose slots (7 days × 2 = 14 ticks).
+Nurses see **today's treatments due, grouped by space**, and tick each dose (initials + time). A dose
+not ticked by the end of its day is shown overdue and appears in the shift-change sweep. Vets can
+see progress ("9 of 14 done") and stop a course early. Request method: see open question 5.
+
 ## 7. Disease surveillance
 **Locations** live in a `locations` table (name, group, cages), seeded from the Summer Peak workbook
 (CB, 23 Aug 2026): Cat Room 1/2/3/FIR = 30/24/10/32; Cat Adoptions 1/2 = 16/16; Cat Isolation ward = 6;
@@ -70,12 +80,17 @@ Transport.
 1. **Reported signs** (chosen at flagging): cat flu signs (URI), kennel cough, diarrhoea / GI upset,
    vomiting, eye condition, skin condition, wounds / injury, other. (Giardia etc. are diagnoses, not
    signs, so they are not offered here.)
-2. **Vet-diagnosed conditions**, read from Sick & Injured **Assessment lines only**: Giardia,
-   FURI / FURTI, RW (ringworm), CIRDC / KC. **Any line containing "DDx" is ignored** (a skin-lesion
-   differential must not count as ringworm). Diarrhoea and vomiting are not read here. Parvo /
-   panleukopenia can be added to the list later.
+2. **Vet-diagnosed conditions**: Giardia, FURI / FURTI, RW (ringworm), CIRDC / KC. Sources:
+   - **Sick & Injured:** Assessment lines only.
+   - **Processing:** the vet-visible problem **titles** only (exam-finding notes, custom problems),
+     never the auto-generated DDx sentences (those contain words like "CIRDC complex" and would give
+     false positives). The structured **UV lamp = POSITIVE** result is captured as **"RW (UV+)"**,
+     a screening result shown as its own tag until the vet writes RW.
+   - **Any line containing "DDx" is ignored** (a skin-lesion differential must not count as
+     ringworm). Diarrhoea and vomiting are not read here (they are signs). Parvo / panleukopenia can
+     be added later. A finding is counted once per animal.
 
-**Rate:** per space and per sign = distinct animals reported in the last N days (default 7) ÷ cages,
+**Rate:** per space and per sign = distinct animals reported in the last **3 days** ÷ cages,
 as a percentage (each animal counted once). Cages are capacity, not occupancy, so an under-filled
 space reads low; the screen says so.
 
@@ -96,17 +111,20 @@ backup.
 ## 8. Data changes (Supabase)
 - `tasks`: add `sign`, `red_flags`, `due_by`, `first_seen_at`, `claimed_by`, `claimed_at`,
   `rounds_flag`, `rounds_reason`, `rounds_done`, `plan_line`, `diagnosed` (text[]).
-- New `locations`, `nurse_requests`, `surveillance_snapshots`.
+- `tasks` also gets `plan_line_at` (plan lines are hidden 24 h after it).
+- New `locations`, `nurse_requests`, `nurse_treatments` + `nurse_treatment_doses`,
+  `surveillance_snapshots`.
 - `memos`: add `done`, `done_at`, `source` (e.g. rounds); add UPDATE/DELETE policies (currently
   select/insert only).
 - Nightly `pg_cron` snapshot job (Melbourne time; cron runs in UTC).
 - Roster: existing `roster` (with `foster_consult`) supplies initials for claims.
 - `sick-injured.html` sync additionally sends `diagnosed` and `plan_line` (assessment text, DDx
-  lines excluded) and first-seen time. Processing and Surgery tools unchanged.
+  lines excluded) and first-seen time. **`processing.html` also sends `diagnosed`** (problem titles +
+  UV lamp result, per section 7). Surgery tool unchanged.
 
 ## 9. Build stages (each releasable on its own)
 1. Time-based triage, red flags, Vet desk queue, claim, unseen alerts, shift-change sweep, **memo
-   tick-off**, and the **nurse requests board**.
+   tick-off**, the **nurse requests board** (vaccination) and **nurse treatment reminders**.
 2. Surveillance: `locations`, heat map, ranked signs, snapshots/baseline, Export report.
 3. Auto plan line on the Floor + vet-diagnosed sync from Sick & Injured.
 4. Rounds list with auto-memo, handover summary, isolation board.
@@ -117,8 +135,10 @@ client for each view; a short trial on live Supabase with fake animals before ea
 the floor; verifier for the "DDx ignored" rule and the rate calculation against hand-worked examples.
 
 ## 11. Open questions
-- Council-seized animals: confirm plan line is hidden on the Floor.
-- "Reported in the last 7 days" window — confirm after baseline data exists.
-- Red-flag list wording, and unseen-too-long thresholds.
-- Which other nurse tasks (if any) should reuse the requests board.
-- Roster initials import is a separate small task (screenshot pending).
+1. Confirm the routine colours: normal under 24 h, amber 24–48 h, red from 48 h.
+2. Should **UV positive** count as ringworm in the surveillance rate, or stay a separate "RW (UV+)" tag?
+3. Red-flag list wording; how long a case can sit unseen before it alerts (red-flag cases: 2 h).
+4. Any other nurse tasks beyond vaccination and ward treatments.
+5. **How vets request a nurse treatment:** (a) a form on the Vet desk, (b) a button inside Sick &
+   Injured / Processing pre-filled with ID and location, or (c) both, starting with (a).
+6. Roster initials import is a separate small task (screenshot pending).
