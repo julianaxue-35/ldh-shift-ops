@@ -162,6 +162,8 @@
   .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
   .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .nr-form, .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nr-form label, .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
   .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
 
   .completed-row {
@@ -312,6 +314,21 @@
       </div>
     </section>
 
+    <section class="card" id="nurse-requests">
+      <h2>Nurse requests — vaccination on arrival</h2>
+      <p class="subtle">Log animals that need vaccinating. The clock is 3 hours from arrival.</p>
+      <div id="nr-list"></div>
+      <div class="nr-form">
+        <label>Space<select id="nr-location"></select></label>
+        <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
+        <label>How many<input id="nr-count" type="number" min="1" value="1"></label>
+        <label>Arrived<input id="nr-arrived" type="datetime-local"></label>
+        <button class="secondary" id="nr-now" type="button">Arrived now</button>
+        <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
+        <button id="nr-submit" type="button">Log request</button>
+      </div>
+    </section>
+
     <div class="kpi-row">
       <section class="card completion-card">
         <div class="completion-donut" id="completion-donut"></div>
@@ -408,6 +425,7 @@
 
   let TASKS = [];
   let MEMOS = [];
+  let NURSE_REQUESTS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [];
   let ROSTER = {};
   let ROLE = 'attendant';
   let typeFilter = 'all';
@@ -503,13 +521,19 @@
 
   /* ---------- data loading ---------- */
   async function loadAll() {
-    const [tasksRes, memosRes, rosterRes] = await Promise.all([
+    const [tasksRes, memosRes, rosterRes, nrRes, ntRes, ndRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('memos').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
+      sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
+      sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
+      sb.from('nurse_treatment_doses').select('*'),
     ]);
     TASKS = tasksRes.data || [];
     MEMOS = memosRes.data || [];
+    NURSE_REQUESTS = nrRes.data || [];
+    NURSE_TREATMENTS = ntRes.data || [];
+    NURSE_DOSES = ndRes.data || [];
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     await loadTrends();
@@ -524,6 +548,11 @@
     sb.channel('memos-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'memos' }, () => { loadAll(); })
       .subscribe();
+    ['nurse_requests', 'nurse_treatments', 'nurse_treatment_doses'].forEach(tb => {
+      sb.channel(tb + '-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: tb }, () => { loadAll(); })
+        .subscribe();
+    });
   }
 
   function applyRoleVisibility() {
@@ -1053,6 +1082,7 @@
     renderVetBoard();
     renderCompleted();
     renderMemos();
+    renderNurseRequests();
     renderTrends();
     renderResponseRateChart();
   }
@@ -1075,6 +1105,67 @@
     wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', updateTierPreview));
     updateTierPreview();
   }
+  function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function nowLocalInput() {
+    const d = new Date();
+    return LDHLogic.localISO(d) + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+  function renderNurseRequests() {
+    const now = Date.now();
+    const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
+    const canAct = ROLE === 'vet_nurse';
+    document.getElementById('nr-list').innerHTML = open.map(r => {
+      const st = LDHLogic.vaccStatus(r, now);
+      return `<div class="attn-item nr-item">
+        <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
+          <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
+          ${canAct ? `<button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : "I've got this"}</button>
+            <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
+            <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>` : ''}
+        </div></div>`;
+    }).join('') || '<p class="empty-state">No vaccination requests open.</p>';
+  }
+  document.getElementById('nr-arrived').value = nowLocalInput();
+  document.getElementById('nr-now').addEventListener('click', () => { document.getElementById('nr-arrived').value = nowLocalInput(); });
+  document.getElementById('nr-submit').addEventListener('click', async () => {
+    const count = parseInt(document.getElementById('nr-count').value, 10);
+    const arrivedRaw = document.getElementById('nr-arrived').value;
+    if (!count || count < 1) { alert('Enter how many animals.'); return; }
+    if (!arrivedRaw) { alert('Enter the arrival time (or tap "Arrived now").'); return; }
+    const { error } = await sb.from('nurse_requests').insert({
+      location: document.getElementById('nr-location').value,
+      species: document.getElementById('nr-species').value,
+      animal_count: count,
+      arrived_at: new Date(arrivedRaw).toISOString(),
+      note: document.getElementById('nr-note').value.trim() || null,
+      created_by: ROLE === 'vet_nurse' ? 'Vet team' : 'Shelter Staff'
+    });
+    if (error) { alert('Could not log request: ' + error.message); return; }
+    document.getElementById('nr-count').value = '1';
+    document.getElementById('nr-note').value = '';
+    document.getElementById('nr-arrived').value = nowLocalInput();
+    loadAll();
+  });
+  document.getElementById('nr-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const r = NURSE_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
+    let patch = null;
+    if (btn.classList.contains('nr-claim')) {
+      if (r.claimed_by) patch = { claimed_by: null };
+      else { const who = myInitials(); if (!who) return; patch = { claimed_by: who }; }
+    } else if (btn.classList.contains('nr-plus')) {
+      const n = Math.min(r.done_count + 1, r.animal_count);
+      patch = { done_count: n, completed_at: n >= r.animal_count ? new Date().toISOString() : null };
+    } else if (btn.classList.contains('nr-all')) {
+      patch = { done_count: r.animal_count, completed_at: new Date().toISOString() };
+    }
+    if (!patch) return;
+    const { error } = await sb.from('nurse_requests').update(patch).eq('id', r.id);
+    if (error) alert('Could not update: ' + error.message);
+    loadAll();
+  });
   function refreshTimers() {
     renderQueueTable();
     renderVetBoard();
