@@ -17,9 +17,9 @@ function isoDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n);
     await page.selectOption('#role-select', 'vet_nurse');
     await page.waitForTimeout(250);
     const counts = await page.$$eval('#sweep-body .sweep-n', els => els.map(e => e.textContent.trim()));
-    t.ok(counts.join() === '1,1,1,1', 'four sections each count 1: overdue case, not yet claimed, overdue request, overdue dose (got ' + counts.join() + ')');
+    t.ok(counts.join() === '1,1,1,1,1', 'five sections each count 1: overdue case, not yet claimed, claimed not finished, overdue request, overdue dose (got ' + counts.join() + ')');
     const body = await page.textContent('#sweep-body');
-    t.ok(body.includes('RED1') && body.includes('OK1') && !body.includes('CLAIMED'), 'claimed cases are not in the sweep');
+    t.ok(body.includes('RED1') && body.includes('OK1') && body.includes('CLAIMED'), 'claimed-but-unfinished cases appear in the sweep');
     t.ok(body.includes('FIR Room') && body.includes('1174362'), 'request and dose lines present');
 
     await page.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (x) => { window.__copied = x; } }, configurable: true }); });
@@ -27,6 +27,7 @@ function isoDaysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n);
     await page.waitForTimeout(150);
     const copied = await page.evaluate(() => window.__copied || '');
     t.ok(copied.startsWith('Handover —') && copied.includes('Overdue cases (1)') && copied.includes('RED1 — Pound 1 — Red flag, overdue'), 'Copy handover puts the text on the clipboard');
+    t.ok(copied.includes('Claimed, not finished (1)'), 'copied text has the claimed-not-finished section');
     t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   } finally {
     await browser.close();

@@ -91,21 +91,26 @@ test('courseProgress and splitMemos', () => {
 test('buildSweep and sweepText', () => {
   const overdue = task('red_flag', 3 * H, { title: 'RED1' });
   const unclaimedOk = task('routine', 1 * H, { title: 'OK1' });
-  const claimed = task('routine', 60 * H, { title: 'CLAIMED', claimed_at: new Date(NOW).toISOString() });
+  const claimed = task('routine', 60 * H, { title: 'CLAIMED', claimed_by: 'JX', claimed_at: new Date(NOW - H).toISOString() });
+  const doneT = task('routine', 5 * H, { title: 'DONE', done: true, claimed_at: new Date(NOW - H).toISOString() });
   const req = { arrived_at: new Date(NOW - 4 * H).toISOString(), animal_count: 8, done_count: 2, species: 'cat', location: 'FIR Room' };
   const dose = { due_date: '2026-09-19', done_at: null, animal_id: '1174362', location: 'Cat Room 1', treatment: 'Flush site', slot_label: 'AM' };
-  const sw = L.buildSweep({ tasks: [overdue, unclaimedOk, claimed], requests: [req], doses: [dose] }, NOW);
+  const sw = L.buildSweep({ tasks: [overdue, unclaimedOk, claimed, doneT], requests: [req], doses: [dose] }, NOW);
   assert.deepEqual(sw.overdueCases.map(t => t.title), ['RED1']);
   assert.deepEqual(sw.unclaimed.map(t => t.title).sort(), ['OK1', 'RED1']);
+  assert.deepEqual(sw.claimedOpen.map(t => t.title), ['CLAIMED']);
   assert.equal(sw.overdueRequests.length, 1);
   assert.equal(sw.overdueDoses.length, 1);
   const txt = L.sweepText(sw, NOW);
   assert.match(txt, /Overdue cases \(1\)/);
   assert.match(txt, /RED1 — Pound 1 — Red flag, overdue 1h/);
+  assert.match(txt, /Claimed, not finished \(1\)/);
+  assert.match(txt, /CLAIMED — Pound 1 — Routine, claimed by JX 1h 0m ago/);
+  assert.ok(!txt.includes('DONE'));
   assert.match(txt, /FIR Room — 8 cat\(s\) to vaccinate, overdue 1h/);
   assert.match(txt, /1174362 — Cat Room 1 — Flush site \(2026-09-19 AM\)/);
 });
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {
-  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport']);
+  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport']);
 });
