@@ -367,6 +367,8 @@
         <section class="card" id="memo-board">
           <h2>Memo board</h2>
           <div id="memo-list"></div>
+          <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
+          <div id="memo-completed-list"></div>
           <div id="memo-post">
             <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
             <button id="memo-submit">Post</button>
@@ -793,11 +795,44 @@
     });
   }
 
-  function renderMemos() {
-    document.getElementById('memo-list').innerHTML = MEMOS
-      .map((m) => `<div class="memo"><strong>${esc(m.author)}</strong>: ${esc(m.text)}</div>`)
-      .join('') || '<p class="empty-state">No memos yet.</p>';
+  let showCompletedMemos = false;
+  function memoRowHtml(m, isDone) {
+    return `<div class="memo ${isDone ? 'memo-done' : ''}">
+      <label style="display:flex; gap:8px; align-items:flex-start; margin:0; cursor:pointer;">
+        <input type="checkbox" class="memo-tick" data-id="${esc(m.id)}" ${isDone ? 'checked' : ''} style="width:auto; margin-top:4px;">
+        <span><strong>${esc(m.author)}</strong>: ${esc(m.text)}</span>
+      </label>
+      ${isDone ? `<button class="secondary memo-del" data-id="${esc(m.id)}" style="padding:3px 10px; font-size:0.7rem; margin-top:6px;">Delete</button>` : ''}
+    </div>`;
   }
+  function renderMemos() {
+    const { active, completed } = LDHLogic.splitMemos(MEMOS);
+    document.getElementById('memo-list').innerHTML =
+      active.map(m => memoRowHtml(m, false)).join('') || '<p class="empty-state">No open memos.</p>';
+    const toggle = document.getElementById('memo-completed-toggle');
+    toggle.textContent = (showCompletedMemos ? 'Hide' : 'Show') + ' completed (' + completed.length + ')';
+    toggle.style.display = completed.length ? 'inline-block' : 'none';
+    document.getElementById('memo-completed-list').innerHTML =
+      showCompletedMemos ? completed.map(m => memoRowHtml(m, true)).join('') : '';
+  }
+  document.getElementById('memo-board').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.memo-tick'); if (!cb) return;
+    const { error } = await sb.from('memos').update({ done: cb.checked, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
+    if (error) alert('Could not update memo: ' + error.message);
+    loadAll();
+  });
+  document.getElementById('memo-board').addEventListener('click', async (e) => {
+    const del = e.target.closest('.memo-del');
+    if (del) {
+      if (confirm('Delete this memo permanently?')) {
+        const { error } = await sb.from('memos').delete().eq('id', del.dataset.id);
+        if (error) alert('Could not delete memo: ' + error.message);
+        loadAll();
+      }
+      return;
+    }
+    if (e.target.id === 'memo-completed-toggle') { showCompletedMemos = !showCompletedMemos; renderMemos(); }
+  });
   document.getElementById('memo-submit').addEventListener('click', async () => {
     const text = document.getElementById('memo-text').value.trim();
     if (!text) return;
