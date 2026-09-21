@@ -21,6 +21,8 @@
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
+<script src="lib/surveillance-view.js"></script>
+<link rel="stylesheet" href="lib/surveillance.css">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -224,6 +226,7 @@
     .layout { grid-template-columns: 1fr; }
     .kpi-row { grid-template-columns: 1fr; }
   }
+  .print-only { display: none; }
 </style>
 </head>
 <body>
@@ -248,12 +251,29 @@
 
     <section class="card" id="surveillance-section">
       <h2>Disease surveillance</h2>
-      <p class="subtle">The conditions flagged on requests for the chosen month, overall and by space — so you can spot clustering, e.g. kennel cough concentrated in one room. These are reported signs, not confirmed diagnoses.</p>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div class="print-only" id="report-head"></div>
+      <p class="subtle">Reported signs — what staff flagged on requests, by space. These are not confirmed diagnoses.</p>
+      <div id="baseline-banner"></div>
+      <div class="no-print" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <select id="surv-window" style="margin:0; width:auto;">
+          <option value="today">Today</option>
+          <option value="3d" selected>Last 3 days</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+          <option value="month">This month</option>
+        </select>
+        <button class="secondary" id="report-export" style="margin:0;">Export report (PDF)</button>
+        <span style="flex:1"></span>
         <input type="month" id="surveillance-month" style="margin:0; width:auto;">
-        <button class="secondary" id="surveillance-export" style="margin:0;">Export CSV</button>
+        <button class="secondary" id="surveillance-export" style="margin:0;">Download case list (CSV)</button>
       </div>
-      <div id="surveillance-summary" style="margin-top:16px;"></div>
+      <h3 style="font-size:0.85rem; margin:16px 0 8px;">Heat map — share of cages with a flagged animal</h3>
+      <div id="heat-map"></div>
+      <h3 style="font-size:0.85rem; margin:16px 0 6px;">By group</h3>
+      <div id="heat-groups"></div>
+      <h3 style="font-size:0.85rem; margin:16px 0 6px;">Most commonly reported</h3>
+      <div id="heat-ranked"></div>
+      <div id="heat-notes"></div>
     </section>
 
     <section class="card" id="trends-section">
@@ -440,32 +460,46 @@
     return LDHLogic.summariseConditions(data || []);
   }
 
-  const SURV_CONDITIONS = LDHLogic.SIGN_KEYS;
-  async function renderSurveillance() {
-    const monthStr = document.getElementById('surveillance-month').value;
-    const box = document.getElementById('surveillance-summary');
-    if (!monthStr) { box.innerHTML = ''; return; }
-    let r;
-    try { r = await loadSurveillance(monthStr); }
-    catch (e) { box.innerHTML = `<p class="empty-state">Could not load: ${esc(e.message)}</p>`; return; }
-    const pct = n => r.flaggedTotal ? Math.round(n / r.flaggedTotal * 100) + '%' : '–';
-    const condRows = SURV_CONDITIONS.map(k => `<tr><td>${esc(CONDITION_LABELS[k])}</td><td><b>${r.counts[k]}</b></td><td>${pct(r.counts[k])}</td></tr>`).join('');
-    const locs = Object.keys(r.byLocation).sort();
-    const locRows = locs.map(loc => `<tr><td>${esc(loc)}</td>${SURV_CONDITIONS.map(k => `<td>${r.byLocation[loc][k] || ''}</td>`).join('')}</tr>`).join('');
-    box.innerHTML = `
-      <h3 style="font-size:0.85rem; margin:0 0 6px;">Reported conditions — ${esc(monthStr)}</h3>
-      <table class="queue-table" id="surveillance-conditions">
-        <thead><tr><th>Condition</th><th>Cases</th><th>Share of flagged</th></tr></thead>
-        <tbody>${condRows}</tbody>
-      </table>
-      <p class="subtle" style="margin-top:8px;">${r.flaggedTotal} of ${r.total} requests this month had a condition flagged; ${r.counts.none} did not.</p>
-      ${locs.length ? `<h3 style="font-size:0.85rem; margin:16px 0 6px;">By space</h3>
-      <table class="queue-table" id="surveillance-locations">
-        <thead><tr><th>Space</th>${SURV_CONDITIONS.map(k => `<th>${esc(CONDITION_LABELS[k])}</th>`).join('')}</tr></thead>
-        <tbody>${locRows}</tbody>
-      </table>` : '<p class="empty-state">No conditions flagged this month.</p>'}`;
+  // ---- surveillance board ----
+  let SURVEY_LOCATIONS = [], SURVEY_TASKS = [], SNAPSHOT_DATES = [];
+  const WINDOW_LABELS = { today: 'Today', '3d': 'Last 3 days', '7d': 'Last 7 days', '30d': 'Last 30 days', month: 'This month' };
+
+  async function loadSurveyData() {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const since = new Date(Math.min(monthStart.getTime(), now.getTime() - 30 * 24 * 3600 * 1000));
+    const [loc, tk] = await Promise.all([
+      sb.from('locations').select('*').order('sort', { ascending: true }),
+      sb.from('tasks').select('title, location, condition, created_at').gte('created_at', since.toISOString())
+    ]);
+    SURVEY_LOCATIONS = loc.data || [];
+    SURVEY_TASKS = (tk.data || []).filter(t => t.condition);
+    // Baseline day count: read ONE space's 'any' rows (one per night, so at most ~400 for a year) — reading every space
+    // would hit the API's 1000-row cap after about 80 days.
+    SNAPSHOT_DATES = [];
+    if (SURVEY_LOCATIONS.length) {
+      const snap = await sb.from('surveillance_snapshots').select('snapshot_date')
+        .eq('condition', 'any').eq('space', SURVEY_LOCATIONS[0].name)
+        .order('snapshot_date', { ascending: true }).limit(400);
+      SNAPSHOT_DATES = (snap.data || []).map(r => r.snapshot_date);
+    }
   }
-  document.getElementById('surveillance-month').addEventListener('change', renderSurveillance);
+
+  function renderSurvey() {
+    const key = document.getElementById('surv-window').value;
+    const since = LDHLogic.windowStart(key, Date.now());
+    const survey = LDHLogic.buildSurvey(SURVEY_TASKS, SURVEY_LOCATIONS, since);
+    document.getElementById('baseline-banner').innerHTML = SurveillanceView.baselineHtml(LDHLogic.baselineStatus(SNAPSHOT_DATES));
+    document.getElementById('heat-map').innerHTML = SURVEY_LOCATIONS.length
+      ? SurveillanceView.heatMapHtml(survey)
+      : '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
+    document.getElementById('heat-groups').innerHTML = SurveillanceView.groupsHtml(survey);
+    document.getElementById('heat-ranked').innerHTML = SurveillanceView.rankedHtml(survey);
+    document.getElementById('heat-notes').innerHTML = SurveillanceView.unmappedHtml(survey) + SurveillanceView.caveatHtml();
+    document.getElementById('report-head').innerHTML =
+      `<h1 style="font-size:1.2rem;margin:0 0 4px;">Disease surveillance report</h1><p style="margin:0 0 12px;">${esc(WINDOW_LABELS[key] || key)} · generated ${esc(new Date().toLocaleString('en-AU'))} · LDH Cranbourne</p>`;
+  }
+  document.getElementById('surv-window').addEventListener('change', renderSurvey);
 
   document.getElementById('surveillance-export').addEventListener('click', async () => {
     const monthStr = document.getElementById('surveillance-month').value;
@@ -506,7 +540,8 @@
     await loadResponseRates();
     renderTrends();
     renderResponseRateChart();
-    renderSurveillance();
+    await loadSurveyData();
+    renderSurvey();
   }
   initStats();
 </script>

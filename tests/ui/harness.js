@@ -6,7 +6,7 @@ const pageUrl = (name) => 'file://' + path.resolve(__dirname, '../../' + (name |
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], locations: [], surveillance_snapshots: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     tasks: () => ({ urgency: 'routine', done: false, red_flags: [], type: 'check_recheck', origin: 'add_on', created_at: now() }),
@@ -14,11 +14,13 @@ const STUB = `
     roster: () => ({}),
     nurse_requests: () => ({ kind: 'vaccination', done_count: 0, arrived_at: now(), created_at: now() }),
     nurse_treatments: () => ({ stopped: false, created_at: now() }),
-    nurse_treatment_doses: () => ({})
+    nurse_treatment_doses: () => ({}),
+    locations: () => ({}),
+    surveillance_snapshots: () => ({})
   };
   const listeners = [];
   function table(name) {
-    let op = null, payload = null, filters = [], orderCol = null, asc = true, single = false;
+    let op = null, payload = null, filters = [], orderCol = null, limitN = null, asc = true, single = false;
     const b = {
       select() { if (!op) op = 'select'; return b; },
       insert(rows) { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return b; },
@@ -29,6 +31,7 @@ const STUB = `
       lt(k, v) { filters.push(r => r[k] < v); return b; },
       in(k, vals) { filters.push(r => vals.indexOf(r[k]) !== -1); return b; },
       order(c, o) { orderCol = c; asc = !(o && o.ascending === false); return b; },
+      limit(n) { limitN = n; return b; },
       single() { single = true; return b; },
       then(res, rej) {
         try {
@@ -38,7 +41,7 @@ const STUB = `
           if (op === 'insert') { data = payload.map(p => Object.assign({ id: uuid() }, defaults[name](), p)); data.forEach(d => rows.push(d)); }
           else if (op === 'update') { data = match(); data.forEach(r => Object.assign(r, payload)); }
           else if (op === 'delete') { data = match(); data.forEach(r => rows.splice(rows.indexOf(r), 1)); }
-          else { data = match(); if (orderCol) data = data.slice().sort((x, y) => (x[orderCol] > y[orderCol] ? 1 : -1) * (asc ? 1 : -1)); }
+          else { data = match(); if (orderCol) data = data.slice().sort((x, y) => (x[orderCol] > y[orderCol] ? 1 : -1) * (asc ? 1 : -1)); if (limitN != null) data = data.slice(0, limitN); }
           if (op !== 'select') listeners.filter(l => l.table === name).forEach(l => setTimeout(l.cb, 0));
           const out = JSON.parse(JSON.stringify(data));
           res({ data: single ? out[0] : out, error: null });
