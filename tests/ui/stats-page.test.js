@@ -30,6 +30,7 @@ const D = 24 * 3600 * 1000;
     const ranked = await stats.page.textContent('#heat-ranked');
     t.ok(ranked.indexOf('Cat flu (URI)') >= 0 && ranked.indexOf('Vomiting') >= 0 && ranked.indexOf('Cat flu (URI)') < ranked.indexOf('Vomiting'), 'most commonly reported first (flu 2, vomiting 1)');
     t.ok((await stats.page.textContent('#baseline-banner')).includes('Building your baseline — day 2 of 365'), 'baseline banner counts the 2 snapshot days out of a full year');
+    t.ok(/Last snapshot: 20 .*2026/.test(await stats.page.textContent('#baseline-banner')), 'baseline banner shows the newest snapshot date');
     await stats.page.selectOption('#surv-window', '30d');
     await stats.page.waitForTimeout(150);
     t.ok(/2 cases · 26 cages/.test(await tile('Pound 2')), 'switching to 30 days includes the older flag');
@@ -63,6 +64,12 @@ const D = 24 * 3600 * 1000;
     await many.page.waitForSelector('#heat-map .heat-tile');
     t.ok((await many.page.textContent('#heat-notes')).includes('Showing the most recent 1000 flagged requests — older ones in this window are not included.'), 'the 1000-row cap is announced');
   } finally { await many.browser.close(); }
+  // 1b2. no snapshots yet
+  const nosnap = await open({ tasks: seed.tasks, locations: LOCATION_ROWS }, 'stats.html');
+  try {
+    await nosnap.page.waitForSelector('#heat-map .heat-tile');
+    t.ok((await nosnap.page.textContent('#baseline-banner')).includes('No snapshot has been taken yet.'), 'no snapshots -> banner says so');
+  } finally { await nosnap.browser.close(); }
   // 1c. migration 0009 not applied: only the not-set-up message
   const bare = await open({ tasks: seed.tasks }, 'stats.html');
   try {

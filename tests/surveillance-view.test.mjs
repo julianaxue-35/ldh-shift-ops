@@ -35,6 +35,13 @@ test('groups and ranked tables', () => {
   assert.match(V.rankedHtml(L.buildSurvey([], LOC, new Date())), /No signs flagged in this period\./);
 });
 
+test('baseline banner shows the last snapshot, or that none has been taken', () => {
+  const withDate = V.baselineHtml({ day: 2, of: 365, done: false, days: 2 }, '2026-09-20');
+  assert.match(withDate, /Last snapshot: 20 Sept?\.? 2026\./);
+  assert.match(V.baselineHtml({ day: 0, of: 365, done: false, days: 0 }), /No snapshot has been taken yet\./);
+  assert.ok(!/No snapshot/.test(withDate) && !/Last snapshot/.test(V.baselineHtml({ day: 2, of: 365, done: false, days: 2 })));
+});
+
 test('tile sub-line says cases, singular for one', () => {
   const one = L.buildSurvey([{ title: 'A1', location: 'Cat Room 1 / 4', condition: 'cat_flu', created_at: new Date(now).toISOString() }], LOC, new Date(now - 3 * 24 * 3600 * 1000));
   assert.match(V.heatMapHtml(one), /1 case · 30 cages · Cat flu/);
