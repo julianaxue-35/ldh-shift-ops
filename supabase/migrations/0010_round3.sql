@@ -1,5 +1,8 @@
 -- Round 3: vet/nurse pages, medication hand-off, role passcodes, NO-GA list.
 -- Run this whole file as ONE script. Safe to run more than once.
+-- Requires pgcrypto in schema `extensions` (the Supabase default).
+-- After applying on real Supabase, run once by hand: select public.check_passcode('nurse','nurse');  (expect true)
+-- check_passcode has no rate limit (accepted risk).
 
 -- 1. Case fields on tasks.
 alter table public.tasks add column if not exists needs_medication boolean not null default false;
@@ -35,13 +38,22 @@ create table if not exists public.role_passcodes (
   code_hash text not null
 );
 alter table public.role_passcodes enable row level security;  -- no policies: no direct access
+-- pgcrypto-guard-start
+do $$
+begin
+  if not exists (select 1 from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+                 where e.extname = 'pgcrypto' and n.nspname = 'extensions') then
+    raise exception 'pgcrypto must be installed in schema extensions';
+  end if;
+end $$;
+-- pgcrypto-guard-end
 insert into public.role_passcodes (role, code_hash) values
   ('nurse', extensions.crypt('nurse', extensions.gen_salt('bf'))),
   ('vet', extensions.crypt('vet2026', extensions.gen_salt('bf')))
 on conflict (role) do nothing;
 
 create or replace function public.check_passcode(p_role text, p_code text) returns boolean
-language sql security definer set search_path = public, extensions as $$
+language sql security definer set search_path = extensions, pg_temp as $$
   select coalesce((select code_hash = crypt(p_code, code_hash)
                    from public.role_passcodes where role = p_role), false)
 $$;

@@ -24,17 +24,27 @@ async function db(files = ALL) {
     create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
     create function auth.jwt() returns jsonb language sql as $$ select coalesce(nullif(current_setting('app.jwt', true), ''), '{}')::jsonb $$;
     create role authenticated; create role anon;
-    create publication supabase_realtime;` + SHIM);
+    create publication supabase_realtime;
+    alter default privileges in schema public grant execute on functions to anon;` + SHIM);
   for (const f of files) await d.exec(load(f));
   return d;
 }
+// The pgcrypto guard is stripped like the create-extension line (shim is not a real extension).
 const load = f => fs.readFileSync(path.join(MIG, f), 'utf8')
-  .replace(/create extension if not exists pgcrypto with schema extensions;/, '');
+  .replace(/create extension if not exists pgcrypto with schema extensions;/, '')
+  .replace(/-- pgcrypto-guard-start[\s\S]*?-- pgcrypto-guard-end/, '');
 const rejects = async (d, sql) => { try { await d.exec(sql); return null; } catch (e) { return e.message; } };
 const row = async (d, title) => (await d.query(`select * from public.tasks where title=$1`, [title])).rows[0];
 
 test('migration file requires pgcrypto in the extensions schema', () => {
   assert.match(fs.readFileSync(path.join(MIG, '0010_round3.sql'), 'utf8'), /create extension if not exists pgcrypto with schema extensions/);
+});
+
+test('migration has the pgcrypto-in-extensions guard, and check_passcode uses a locked search_path', () => {
+  const sql = fs.readFileSync(path.join(MIG, '0010_round3.sql'), 'utf8');
+  assert.match(sql, /pgcrypto must be installed in schema extensions/);
+  assert.match(sql, /set search_path = extensions, pg_temp/);
+  assert.match(sql, /from public\.role_passcodes/);
 });
 
 test('medication insert with done=true is held: done=false, vet_done_at stamped', async () => {
@@ -142,7 +152,10 @@ test('noga_requests has 4 guarded policies and is in supabase_realtime', async (
 
 test('running 0010 twice is harmless', async () => {
   const d = await db();
+  await d.exec(`update public.role_passcodes set code_hash = extensions.crypt('x', extensions.gen_salt('bf')) where role='nurse'`);
   await d.exec(load('0010_round3.sql'));
+  assert.equal((await d.query(`select public.check_passcode('nurse','x') ok`)).rows[0].ok, true);
+  assert.equal((await d.query(`select public.check_passcode('nurse','nurse') ok`)).rows[0].ok, false);
   assert.equal((await d.query(`select count(*)::int n from public.role_passcodes`)).rows[0].n, 2);
   assert.equal((await d.query(`select count(*)::int n from pg_policies where tablename='noga_requests'`)).rows[0].n, 4);
   assert.equal((await d.query(`select count(*)::int n from pg_trigger where tgname='tasks_hold_medication'`)).rows[0].n, 1);
