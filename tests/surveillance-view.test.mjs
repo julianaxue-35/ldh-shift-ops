@@ -16,9 +16,9 @@ const survey = L.buildSurvey([
 test('heat map: one tile per space with rate, cage counts and leading sign; escapes names', () => {
   const h = V.heatMapHtml(survey);
   assert.match(h, /class="heat-grid"/);
-  assert.match(h, /data-space="Cat Room 1"[\s\S]*6\.7%[\s\S]*2 of 30 cages · Cat flu \(URI\)/);
+  assert.match(h, /data-space="Cat Room 1"[\s\S]*6\.7%[\s\S]*2 cases · 30 cages · Cat flu \(URI\)/);
   assert.ok(h.includes('Pound &lt;2&gt;') && !h.includes('Pound <2>'), 'space names are escaped');
-  assert.match(h, /data-space="Pound &lt;2&gt;"[\s\S]*0%[\s\S]*0 of 26 cages/);
+  assert.match(h, /data-space="Pound &lt;2&gt;"[\s\S]*0%[\s\S]*0 cases · 26 cages/);
 });
 
 test('heat map is neutral: no red, no outbreak wording', () => {
@@ -35,6 +35,11 @@ test('groups and ranked tables', () => {
   assert.match(V.rankedHtml(L.buildSurvey([], LOC, new Date())), /No signs flagged in this period\./);
 });
 
+test('tile sub-line says cases, singular for one', () => {
+  const one = L.buildSurvey([{ title: 'A1', location: 'Cat Room 1 / 4', condition: 'cat_flu', created_at: new Date(now).toISOString() }], LOC, new Date(now - 3 * 24 * 3600 * 1000));
+  assert.match(V.heatMapHtml(one), /1 case · 30 cages · Cat flu/);
+});
+
 test('unmapped spaces are reported, never dropped silently', () => {
   assert.match(V.unmappedHtml(survey), /1 flagged animal had a space that isn.t in the list/);
   assert.equal(V.unmappedHtml(L.buildSurvey([], LOC, new Date())), '');
@@ -46,4 +51,5 @@ test('baseline banner wording and the caveat', () => {
   const c = V.caveatHtml();
   assert.match(c, /capacity/i); assert.match(c, /flagged/i); assert.match(c, /your own baseline/i);
   assert.match(c, /twice if two different signs/i, 'the counting rule is stated on screen');
+  assert.match(c, /Requests synced from the shift tools carry no sign, so only cases flagged on the dashboard appear here until the vet-diagnosed conditions are added\./);
 });

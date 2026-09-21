@@ -12,7 +12,7 @@ const H = 3600 * 1000, D = 24 * H;
     const tile = name => a.page.locator('#disease-watch-map .heat-tile', { hasText: name }).first().textContent();
     t.ok(await a.page.locator('#disease-watch-map .heat-tile').count() === 12, 'a tile for every space');
     t.ok(/6\.7%/.test(await tile('Cat Room 1')), 'Cat Room 1: 2 of 30 cages = 6.7% (last 3 days)');
-    t.ok(/0%/.test(await tile('Pound 3')) && /0 of 60 cages/.test(await tile('Pound 3')), 'a 5-day-old flag is outside the 3-day window');
+    t.ok(/0%/.test(await tile('Pound 3')) && /0 cases · 60 cages/.test(await tile('Pound 3')), 'a 5-day-old flag is outside the 3-day window');
     t.ok(!/outbreak|alert|high risk/i.test(await a.page.textContent('#disease-watch')), 'no alarm wording');
     t.ok(await a.page.locator('#disease-watch a[href="stats.html"]').count() === 1, 'links to the full board on the stats page');
     await a.page.selectOption('#role-select', 'vet_nurse');
