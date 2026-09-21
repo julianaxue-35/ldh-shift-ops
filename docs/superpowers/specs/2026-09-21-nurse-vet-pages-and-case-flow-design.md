@@ -48,6 +48,8 @@ nurses each get the memo board, with a simple passcode guarding tick-off.
   - `Medication label` text box (paste area, only for medication cases): the vet types or pastes the
     label wording (drug, dose, frequency). It travels to the nurse page exactly as typed.
   - Non-medication case: DONE simply completes it.
+  - Under the label box, quick-insert buttons for **Chlorsig**: "Chlorsig — left eye (L)", "right eye (R)",
+    "both eyes". They add that wording to the label text; the vet can still edit it.
 - Treatment requests (the "Request a treatment — vets" card and course list) move here.
 - Memo board (section 6).
 - Vets have NO NO-GA list.
@@ -56,7 +58,9 @@ nurses each get the memo board, with a simple passcode guarding tick-off.
 
 - **Medication labels to make:** one card per case with animal ID, **SM number**, **location** (shelter space
   and pen, or "Offsite — <detail>"), chart status
-  ("Chart printed by admission" / "No chart"), and the vet's label text with a **Copy** button. The nurse
+  ("Chart printed by admission" / "No chart"), and the vet's label text. One **Copy** button per card copies everything in one go, as plain text:
+  `<animal ID> | SM <number> | <location>` on the first line, then the label instruction on the next lines,
+  ready to paste into the label / dispensing system. The nurse
   makes the label, collects the meds, and ticks **Done** (initials recorded). That tick completes the case.
 - Vaccination requests (existing card, 3 h clock).
 - Treatments due (existing overdue / today dose ticks).
@@ -97,6 +101,8 @@ The label wording is clinical detail; it lives only in `tasks.med_label`, is cle
   memo tick/delete. **Viewing** is not gated (any signed-in staff can open the pages and read).
 - **Memo board** appears on both pages, one shared board (same `memos` table): post, tick off, show
   completed, delete. Posting needs no passcode; tick-off and delete do.
+- **Starting codes (her choice, 2026-09-21):** nurses `nurse`, vets `vet2026`. Stored hashed (pgcrypto `crypt`),
+  not plain text; changed later with one SQL statement.
 - Passcode setup and changes are done in the SQL editor (I provide the statement), like the stations login.
 
 ## 7. Wording carried into the offline tools
