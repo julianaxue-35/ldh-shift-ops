@@ -30,10 +30,12 @@ const STUB = `
       gte(k, v) { filters.push(r => r[k] >= v); return b; },
       lt(k, v) { filters.push(r => r[k] < v); return b; },
       in(k, vals) { filters.push(r => vals.indexOf(r[k]) !== -1); return b; },
+      not(k, op, v) { if (op === 'is' && v === null) filters.push(r => r[k] != null); return b; },
       order(c, o) { orderCol = c; asc = !(o && o.ascending === false); return b; },
       limit(n) { limitN = n; return b; },
       single() { single = true; return b; },
       then(res, rej) {
+        if (window.__fail && window.__fail[name]) { res({ data: null, error: { message: 'boom' } }); return; }
         try {
           const rows = db[name];
           const match = () => rows.filter(r => filters.every(f => f(r)));

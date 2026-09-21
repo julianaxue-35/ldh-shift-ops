@@ -28,7 +28,7 @@ const D = 24 * 3600 * 1000;
     t.ok(/1 of 26 cages/.test(await tile('Pound 2')), 'Pound 2 counts only the recent flag (the 20-day-old one is outside 3 days)');
     t.ok((await stats.page.textContent('#heat-groups')).includes('Cat rooms') && (await stats.page.textContent('#heat-groups')).includes('Pounds'), 'group summary');
     const ranked = await stats.page.textContent('#heat-ranked');
-    t.ok(ranked.indexOf('Cat flu (URI)') < ranked.indexOf('Vomiting'), 'most commonly reported first (flu 2, vomiting 1)');
+    t.ok(ranked.indexOf('Cat flu (URI)') >= 0 && ranked.indexOf('Vomiting') >= 0 && ranked.indexOf('Cat flu (URI)') < ranked.indexOf('Vomiting'), 'most commonly reported first (flu 2, vomiting 1)');
     t.ok((await stats.page.textContent('#baseline-banner')).includes('Building your baseline — day 2 of 365'), 'baseline banner counts the 2 snapshot days out of a full year');
     await stats.page.selectOption('#surv-window', '30d');
     await stats.page.waitForTimeout(150);
@@ -36,6 +36,14 @@ const D = 24 * 3600 * 1000;
     t.ok((await stats.page.textContent('#heat-notes')).toLowerCase().includes('capacity'), 'the capacity / reported-rate caveat is shown');
     t.ok((await stats.page.textContent('#heat-notes')).toLowerCase().includes('two different signs'), 'the counting rule is stated');
     t.ok(!/outbreak|high risk|alert/i.test(await stats.page.textContent('#surveillance-section')), 'no alarm wording on the board');
+    t.ok(!(await stats.page.textContent('#heat-notes')).includes('Showing the most recent 1000'), 'no row-cap note with a small seed');
+    // a failed load shows the error, never a clean all-zero board
+    await stats.page.evaluate(() => { window.__fail = { tasks: true }; });
+    await stats.page.evaluate(() => loadSurveyData().then(renderSurvey));
+    t.ok((await stats.page.textContent('#heat-map')).includes('Could not load the flagged requests: boom') && await stats.page.locator('.heat-tile').count() === 0, 'a failed tasks query shows the error and no tiles');
+    t.ok((await stats.page.innerHTML('#heat-groups')) === '' && (await stats.page.innerHTML('#heat-ranked')) === '' && (await stats.page.innerHTML('#heat-notes')) === '', 'groups, ranking and notes are cleared on error');
+    await stats.page.evaluate(() => { window.__fail = null; });
+    await stats.page.evaluate(() => loadSurveyData().then(renderSurvey));
     // export report: clicking calls print, and the print layout shows only the surveillance board
     await stats.page.evaluate(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
     await stats.page.click('#report-export');
@@ -49,6 +57,19 @@ const D = 24 * 3600 * 1000;
     await stats.page.emulateMedia({ media: 'screen' });
     t.ok(stats.errors.length === 0, 'no page errors on stats page: ' + stats.errors.join('; '));
   } finally { await stats.browser.close(); }
+  // 1b. the row cap notice
+  const many = await open({ tasks: Array.from({ length: 1000 }, (_, i) => flagged('cat_flu', 'Cat Room 1 / ' + (1 + i % 30))), locations: LOCATION_ROWS }, 'stats.html');
+  try {
+    await many.page.waitForSelector('#heat-map .heat-tile');
+    t.ok((await many.page.textContent('#heat-notes')).includes('Showing the most recent 1000 flagged requests — older ones in this window are not included.'), 'the 1000-row cap is announced');
+  } finally { await many.browser.close(); }
+  // 1c. migration 0009 not applied: only the not-set-up message
+  const bare = await open({ tasks: seed.tasks }, 'stats.html');
+  try {
+    await bare.page.waitForSelector('#heat-map .empty-state');
+    t.ok((await bare.page.textContent('#heat-map')).includes('run migration 0009'), 'no spaces list -> set-up message');
+    t.ok((await bare.page.innerHTML('#baseline-banner')) === '' && (await bare.page.innerHTML('#heat-groups')) === '' && (await bare.page.innerHTML('#heat-ranked')) === '' && (await bare.page.innerHTML('#heat-notes')) === '', 'banner, groups, ranking and notes are empty without the spaces list');
+  } finally { await bare.browser.close(); }
   // 2. the dashboard no longer carries them, and links to stats
   const dash = await open(seed);
   try {

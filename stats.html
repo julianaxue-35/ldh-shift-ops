@@ -472,7 +472,7 @@
   }
 
   // ---- surveillance board ----
-  let SURVEY_LOCATIONS = [], SURVEY_TASKS = [], SNAPSHOT_DATES = [];
+  let SURVEY_LOCATIONS = [], SURVEY_TASKS = [], SNAPSHOT_DATES = [], SURVEY_ERROR = null, SURVEY_ROWS_RETURNED = 0;
   const WINDOW_LABELS = { today: 'Today', '3d': 'Last 3 days', '7d': 'Last 7 days', '30d': 'Last 30 days', month: 'This month' };
 
   async function loadSurveyData() {
@@ -481,9 +481,12 @@
     const since = new Date(Math.min(monthStart.getTime(), now.getTime() - 30 * 24 * 3600 * 1000));
     const [loc, tk] = await Promise.all([
       sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('tasks').select('title, location, condition, created_at').gte('created_at', since.toISOString())
+      sb.from('tasks').select('title, location, condition, created_at').not('condition', 'is', null)
+        .gte('created_at', since.toISOString()).order('created_at', { ascending: false })
     ]);
+    SURVEY_ERROR = tk.error ? (tk.error.message || 'unknown error') : null;
     SURVEY_LOCATIONS = loc.data || [];
+    SURVEY_ROWS_RETURNED = (tk.data || []).length;
     SURVEY_TASKS = (tk.data || []).filter(t => t.condition);
     // Baseline day count: read ONE space's 'any' rows (one per night, so at most ~400 for a year) — reading every space
     // would hit the API's 1000-row cap after about 80 days.
@@ -498,17 +501,27 @@
 
   function renderSurvey() {
     const key = document.getElementById('surv-window').value;
+    const el = (id) => document.getElementById(id);
+    el('report-head').innerHTML =
+      `<h1 style="font-size:1.2rem;margin:0 0 4px;">Disease surveillance report</h1><p style="margin:0 0 12px;">${esc(WINDOW_LABELS[key] || key)} · generated ${esc(new Date().toLocaleString('en-AU'))} · LDH Cranbourne</p>`;
+    if (SURVEY_ERROR) {   // never show a clean all-zero board when the data did not load
+      el('heat-map').innerHTML = `<p class="empty-state">Could not load the flagged requests: ${esc(SURVEY_ERROR)}</p>`;
+      ['heat-groups', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      return;
+    }
+    if (!SURVEY_LOCATIONS.length) {
+      el('heat-map').innerHTML = '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
+      ['baseline-banner', 'heat-groups', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      return;
+    }
     const since = LDHLogic.windowStart(key, Date.now());
     const survey = LDHLogic.buildSurvey(SURVEY_TASKS, SURVEY_LOCATIONS, since);
-    document.getElementById('baseline-banner').innerHTML = SurveillanceView.baselineHtml(LDHLogic.baselineStatus(SNAPSHOT_DATES));
-    document.getElementById('heat-map').innerHTML = SURVEY_LOCATIONS.length
-      ? SurveillanceView.heatMapHtml(survey)
-      : '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
-    document.getElementById('heat-groups').innerHTML = SurveillanceView.groupsHtml(survey);
-    document.getElementById('heat-ranked').innerHTML = SurveillanceView.rankedHtml(survey);
-    document.getElementById('heat-notes').innerHTML = SurveillanceView.unmappedHtml(survey) + SurveillanceView.caveatHtml();
-    document.getElementById('report-head').innerHTML =
-      `<h1 style="font-size:1.2rem;margin:0 0 4px;">Disease surveillance report</h1><p style="margin:0 0 12px;">${esc(WINDOW_LABELS[key] || key)} · generated ${esc(new Date().toLocaleString('en-AU'))} · LDH Cranbourne</p>`;
+    el('baseline-banner').innerHTML = SurveillanceView.baselineHtml(LDHLogic.baselineStatus(SNAPSHOT_DATES));
+    el('heat-map').innerHTML = SurveillanceView.heatMapHtml(survey);
+    el('heat-groups').innerHTML = SurveillanceView.groupsHtml(survey);
+    el('heat-ranked').innerHTML = SurveillanceView.rankedHtml(survey);
+    const capNote = SURVEY_ROWS_RETURNED >= 1000 ? '<p class="subtle">Showing the most recent 1000 flagged requests — older ones in this window are not included.</p>' : '';
+    el('heat-notes').innerHTML = capNote + SurveillanceView.unmappedHtml(survey) + SurveillanceView.caveatHtml();
   }
   document.getElementById('surv-window').addEventListener('change', renderSurvey);
 
