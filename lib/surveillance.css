@@ -1,0 +1,8 @@
+.heat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.heat-tile { border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(30,34,56,0.08); }
+.heat-name { font-size: 0.78rem; font-weight: 700; }
+.heat-rate { font-size: 1.5rem; font-weight: 700; margin: 2px 0; }
+.heat-sub { font-size: 0.72rem; color: #4b5563; }
+.baseline-banner { background: rgba(74,108,247,0.08); border-radius: 10px; padding: 10px 14px; font-size: 0.82rem; margin: 10px 0 14px; }
+.baseline-banner.done { background: rgba(34,154,99,0.1); }
+.heat-caveat { margin-top: 14px; }
