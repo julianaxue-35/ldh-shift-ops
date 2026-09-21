@@ -49,13 +49,15 @@ const D = 24 * 3600 * 1000;
     await stats.page.evaluate(() => { window.__printed = 0; window.print = () => { window.__printed++; }; });
     await stats.page.click('#report-export');
     t.ok((await stats.page.evaluate(() => window.__printed)) === 1, 'Export report opens the print dialog');
+    try {
     await stats.page.emulateMedia({ media: 'print' });
     const vis = sel => stats.page.evaluate(s => { const e = document.querySelector(s); return !!e && e.getClientRects().length > 0; }, sel);
     t.ok(await vis('#surveillance-section') && await vis('#heat-map') && await vis('#heat-ranked'), 'print layout shows the heat map and ranked signs');
     t.ok(await vis('#report-head'), 'print layout has a report title with the period and date');
     t.ok(!(await vis('aside')) && !(await vis('#surv-window')) && !(await vis('#report-export')), 'print layout hides the sidebar and the controls');
     t.ok(!(await vis('#trends-section')) && !(await vis('#response-rate-section')), 'print layout leaves out the other stats sections');
-    await stats.page.emulateMedia({ media: 'screen' });
+    t.ok(!(await vis('.page-head')) && !(await vis('#surveillance-section > h2')) && await vis('#report-head'), 'print layout shows only the report title, not the page heading or the section heading');
+    } finally { await stats.page.emulateMedia({ media: 'screen' }); }
     t.ok(stats.errors.length === 0, 'no page errors on stats page: ' + stats.errors.join('; '));
   } finally { await stats.browser.close(); }
   // 1b. the row cap notice

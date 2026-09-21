@@ -236,7 +236,9 @@
     .print-only { display: block !important; }
     .card { box-shadow: none !important; border: none !important; padding: 0 !important; }
     .heat-tile, table { break-inside: avoid; }
-    .heat-tile { border: 1px solid #ccc; }
+    .heat-tile { border: 1px solid #ccc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-head, #surveillance-section > h2 { display: none !important; }
+    h3 { break-after: avoid; page-break-after: avoid; }
   }
 </style>
 </head>
