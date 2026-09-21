@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const LDHLogic = createRequire(import.meta.url)('../lib/ldh-logic.js');
 
 const MIG = path.resolve(import.meta.dirname, '../supabase/migrations');
 // 0006 and 0007 are deliberately absent: 0006 only creates surgery_shift and 0007 only touches roster — neither affects 0009. This chain therefore does not equal the live schema.
@@ -91,4 +93,35 @@ test('0009 can be applied twice, and only the owner may run the snapshot functio
   assert.match(await rejects(d, `select public.take_surveillance_snapshot()`), /permission denied/i);
   await d.exec(`reset role`);
   assert.equal((await d.query(`select public.take_surveillance_snapshot() as n`)).rows[0].n, 108, 'the owner can still run it');
+});
+
+test('the SQL snapshot and the JS buildSurvey count the same rows the same way', async () => {
+  const d = await db();
+  const now = Date.now(), iso = (msAgo) => new Date(now - msAgo).toISOString(), H = 3600 * 1000, D = 24 * H;
+  const rows = [
+    { title: 'A1', location: 'Cat Room 1 / 4', condition: 'cat_flu', created_at: iso(1 * H), shift: 'sick_injured' },
+    { title: 'A1', location: 'Cat Room 1 / 4', condition: 'cat_flu', created_at: iso(2 * H), shift: 'processing' },     // same animal + sign again, another shift
+    { title: 'A2', location: 'Cat Room 1 / 5', condition: 'cat_flu', created_at: iso(1 * H), shift: 'sick_injured' },
+    { title: 'A2', location: 'Cat Room 1 / 5', condition: 'vomiting', created_at: iso(1 * H), shift: 'processing' },   // two different signs = two cases
+    { title: 'A6', location: 'Cat Room 2 / 1', condition: 'kennel_cough', created_at: iso(3 * H), shift: 'sick_injured' },
+    { title: 'A6', location: 'Pound 1 / 2', condition: 'kennel_cough', created_at: iso(2 * H), shift: 'sick_injured' },    // animal in two spaces
+    { title: 'A7', location: 'Mystery Room / 1', condition: 'other', created_at: iso(1 * H), shift: 'sick_injured' },     // unknown space
+    { title: 'A8', location: 'Pound 3 / 1', condition: null, created_at: iso(1 * H), shift: 'sick_injured' },             // unflagged
+    { title: 'A9', location: 'Pound 2 / 7', condition: 'cat_flu', created_at: iso(5 * D), shift: 'sick_injured' }         // 5 days old
+  ];
+  for (const r of rows) {
+    await d.query(`insert into public.tasks (title,location,shift,condition,created_at) values ($1,$2,$3,$4,$5)`, [r.title, r.location, r.shift, r.condition, r.created_at]);
+  }
+  await d.query(`select public.take_surveillance_snapshot(3)`);
+  const locationRows = (await d.query(`select name, grp, cages, sort from public.locations order by sort`)).rows;
+  const survey = LDHLogic.buildSurvey(rows, locationRows, new Date(now - 3 * D));
+  const snap = (await d.query(`select space, condition, animals from public.surveillance_snapshots`)).rows;
+  const get = (space, cond) => snap.find(r => r.space === space && r.condition === cond).animals;
+  assert.equal(survey.spaces.length, 12);
+  for (const sp of survey.spaces) {
+    assert.equal(get(sp.name, 'any'), sp.cases, sp.name + ': cases');
+    for (const k of LDHLogic.SIGN_KEYS) assert.equal(get(sp.name, k), sp.by[k] || 0, sp.name + ' / ' + k);
+  }
+  assert.equal(survey.spaces.find(s => s.name === 'Cat Room 1').cases, 3, 'sanity: A1 flu once, A2 flu + vomiting');
+  assert.equal(survey.unmapped, 1, 'sanity: the unknown space is unmapped on both sides');
 });
