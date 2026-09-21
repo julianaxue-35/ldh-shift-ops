@@ -533,8 +533,9 @@
     try { r = await loadSurveillance(monthStr); } catch (e) { alert('Could not export: ' + e.message); return; }
     const conditionCounts = r.counts, flagged = r.flagged, byLocation = r.byLocation;
 
-    let csv = `Disease surveillance — ${monthStr}\n\n`;
-    csv += 'Condition,Count\n';
+    let csv = `Disease surveillance — ${monthStr}\n`;
+    csv += 'Counts are request rows in the calendar month (the on-screen board counts cases in the chosen window).\n\n';
+    csv += 'Condition,Reports (rows)\n';
     Object.keys(conditionCounts).forEach(k => { csv += `${csvCell(CONDITION_LABELS[k])},${conditionCounts[k]}\n`; });
     csv += '\nBy location\nLocation,Condition,Count\n';
     Object.keys(byLocation).sort().forEach(loc => {

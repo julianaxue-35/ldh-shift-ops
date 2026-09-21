@@ -113,6 +113,7 @@ test('summariseConditions counts every condition, ignores unknown values, and gr
   assert.equal(r.counts.cat_flu, 2); assert.equal(r.counts.kennel_cough, 1);
   assert.equal(r.counts.none, 2, 'no condition and unknown condition both count as none flagged');
   assert.equal(r.total, 5);
+  assert.deepEqual(Object.keys(r.counts), [...L.SIGN_KEYS, 'none'], 'sign keys first, none flagged last');
   assert.equal(r.flaggedTotal, 4, 'flagged = has any condition value');
   assert.equal(r.byLocation['Cat Room 1 / 4'].cat_flu, 1);
   assert.deepEqual(r.flagged.map(t => t.created_at)[0], '2026-09-01T01:00:00Z', 'flagged list is oldest first');
