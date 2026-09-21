@@ -440,7 +440,7 @@
     return LDHLogic.summariseConditions(data || []);
   }
 
-  const SURV_CONDITIONS = ['cat_flu', 'kennel_cough', 'diarrhoea', 'wounds_injury', 'other'];
+  const SURV_CONDITIONS = LDHLogic.SIGN_KEYS;
   async function renderSurveillance() {
     const monthStr = document.getElementById('surveillance-month').value;
     const box = document.getElementById('surveillance-summary');

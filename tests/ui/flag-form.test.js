@@ -7,6 +7,9 @@ const t = require('./check')('flag-form');
   t.ok((await page.textContent('#req-redflags-wrap')).includes("Emergency? Radio the vet"), 'emergency reminder shown');
   t.ok(await page.locator('#req-urgency').count() === 0, 'manual urgency dropdown removed');
   t.ok(await page.locator('#req-location option').count() === 12, 'location select filled from the shared list');
+  const signOpts = await page.$$eval('#req-condition option', os => os.map(o => o.value));
+  t.ok(signOpts.join() === ',cat_flu,kennel_cough,diarrhoea,vomiting,eye_condition,skin_condition,wounds_injury,other', 'flag form offers the eight reported signs (got ' + signOpts.join() + ')');
+  t.ok(!(await page.textContent('#req-condition')).toLowerCase().includes('giardia'), 'no diagnoses in the sign list');
 
   await page.fill('#req-title', 'T100');
   await page.check('input.req-flag[value="bleeding"]');
