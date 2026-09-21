@@ -21,6 +21,8 @@
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
+<script src="lib/surveillance-view.js"></script>
+<link rel="stylesheet" href="lib/surveillance.css">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -376,6 +378,14 @@
       <div id="shift-progress-row" style="display:contents;"></div>
     </div>
 
+    <section class="card" id="disease-watch" style="display:none">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
+        <h2 style="margin:0;">Disease watch — last 3 days</h2>
+        <a href="stats.html" style="font-size:0.8rem; color:var(--ink);">Full surveillance board →</a>
+      </div>
+      <p class="subtle" style="margin:6px 0 12px;">Share of each space's cages holding an animal flagged with a sign. No threshold line yet — a baseline is being collected first.</p>
+      <div id="disease-watch-map"></div>
+    </section>
     <div class="dashboard-body">
       <div class="main-col">
         <section class="card" id="cases-flagged">
@@ -442,6 +452,7 @@
   let TASKS = [];
   let MEMOS = [];
   let NURSE_REQUESTS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [];
+  let LOCATION_ROWS = [];
   let ROSTER = {};
   let ROLE = 'attendant';
   let typeFilter = 'all';
@@ -542,19 +553,21 @@
 
   /* ---------- data loading ---------- */
   async function loadAll() {
-    const [tasksRes, memosRes, rosterRes, nrRes, ntRes, ndRes] = await Promise.all([
+    const [tasksRes, memosRes, rosterRes, nrRes, ntRes, ndRes, lcRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('memos').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
       sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
+      sb.from('locations').select('*').order('sort', { ascending: true }),
     ]);
     TASKS = tasksRes.data || [];
     MEMOS = memosRes.data || [];
     NURSE_REQUESTS = nrRes.data || [];
     NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || [];
+    LOCATION_ROWS = lcRes.data || [];
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
@@ -910,6 +923,7 @@
     renderMemos();
     renderNurseRequests();
     renderNurseTreatments();
+    renderDiseaseWatch();
   }
 
   function fillLocationSelects() {
@@ -1092,7 +1106,15 @@
     if (error) alert('Could not stop the course: ' + error.message);
     loadAll();
   });
+  function renderDiseaseWatch() {
+    const card = document.getElementById('disease-watch');
+    if (!LOCATION_ROWS.length) { card.style.display = 'none'; return; }
+    const survey = LDHLogic.buildSurvey(TASKS, LOCATION_ROWS, LDHLogic.windowStart('3d', Date.now()));
+    document.getElementById('disease-watch-map').innerHTML = SurveillanceView.heatMapHtml(survey) + SurveillanceView.unmappedHtml(survey);
+    card.style.display = 'block';
+  }
   function refreshTimers() {
+    renderDiseaseWatch();
     renderQueueTable();
     renderVetBoard();
     if (typeof renderNurseRequests === 'function') renderNurseRequests();
