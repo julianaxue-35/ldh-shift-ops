@@ -227,6 +227,17 @@
     .kpi-row { grid-template-columns: 1fr; }
   }
   .print-only { display: none; }
+  @media print {
+    @page { size: A4; margin: 12mm; }
+    body { background: #fff; }
+    aside, .no-print, #trends-section, #response-rate-section { display: none !important; }
+    .layout { display: block !important; }
+    main { padding: 0 !important; }
+    .print-only { display: block !important; }
+    .card { box-shadow: none !important; border: none !important; padding: 0 !important; }
+    .heat-tile, table { break-inside: avoid; }
+    .heat-tile { border: 1px solid #ccc; }
+  }
 </style>
 </head>
 <body>
@@ -501,6 +512,7 @@
   }
   document.getElementById('surv-window').addEventListener('change', renderSurvey);
 
+  document.getElementById('report-export').addEventListener('click', () => window.print());
   document.getElementById('surveillance-export').addEventListener('click', async () => {
     const monthStr = document.getElementById('surveillance-month').value;
     if (!monthStr) { alert('Pick a month first.'); return; }
