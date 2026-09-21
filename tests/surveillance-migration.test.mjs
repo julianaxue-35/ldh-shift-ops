@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const MIG = path.resolve(import.meta.dirname, '../supabase/migrations');
+// 0006 and 0007 are deliberately absent: 0006 only creates surgery_shift and 0007 only touches roster — neither affects 0009. This chain therefore does not equal the live schema.
 const CHAIN = ['0001_init_schema.sql', '0002_rls_policies.sql', '0003_sync_account_scope.sql', '0004_task_problem_field.sql',
   '0005_task_condition_field.sql', '0008_triage_and_vet_desk.sql', '0009_surveillance.sql'];
 
@@ -79,4 +80,15 @@ test('locations and snapshots are read-only for API users and guarded against sy
   await d.exec(`set app.jwt = '{"app_metadata":{"role":"sync_writer"}}'`);
   assert.equal((await d.query(`select count(*)::int as n from public.locations`)).rows[0].n, 0, 'sync_writer sees nothing');
   await d.exec(`reset role`);
+});
+
+test('0009 can be applied twice, and only the owner may run the snapshot function', async () => {
+  const d = await db();
+  await d.exec(fs.readFileSync(path.join(MIG, '0009_surveillance.sql'), 'utf8'));   // second application: no error
+  assert.equal((await d.query(`select count(*)::int as n from public.locations`)).rows[0].n, 12, 'seed is not duplicated');
+  assert.equal((await d.query(`select count(*)::int as n from pg_policies where tablename in ('locations','surveillance_snapshots')`)).rows[0].n, 2, 'policies are not duplicated');
+  await d.exec(`grant all on all tables in schema public to authenticated; set role authenticated;`);
+  assert.match(await rejects(d, `select public.take_surveillance_snapshot()`), /permission denied/i);
+  await d.exec(`reset role`);
+  assert.equal((await d.query(`select public.take_surveillance_snapshot() as n`)).rows[0].n, 108, 'the owner can still run it');
 });

@@ -1,5 +1,5 @@
 -- Stage 2 of the Floor / Vet desk redesign: disease surveillance (2026-09-21).
--- Run this whole file as ONE script.
+-- Run this whole file as ONE script. Safe to run more than once.
 
 -- 1. Wider list of REPORTED SIGNS (diagnoses such as Giardia are deliberately not signs).
 alter table public.tasks drop constraint if exists tasks_condition_check;
@@ -7,7 +7,7 @@ alter table public.tasks add constraint tasks_condition_check check (condition i
   ('cat_flu','kennel_cough','diarrhoea','vomiting','eye_condition','skin_condition','wounds_injury','other'));
 
 -- 2. Spaces and their cage counts (Cranbourne, 23 Aug 2026 count). Names match the flag form's dropdown.
-create table public.locations (
+create table if not exists public.locations (
   name text primary key,
   grp text not null,
   cages int not null check (cages >= 0),
@@ -25,11 +25,12 @@ insert into public.locations (name, grp, cages, sort) values
   ('Pound 2',            'Pounds',       26,  9),
   ('Pound 3',            'Pounds',       60, 10),
   ('Pound 4',            'Pounds',        9, 11),
-  ('Transport',          'Transport',    10, 12);
+  ('Transport',          'Transport',    10, 12)
+on conflict (name) do nothing;
 
 -- 3. Nightly snapshot rows, so a baseline builds up over time.
 --    condition is a sign key (distinct animals with that sign), or 'any' = distinct CASES (animal + sign pairs) in that space.
-create table public.surveillance_snapshots (
+create table if not exists public.surveillance_snapshots (
   snapshot_date date not null,
   space text not null,
   condition text not null,
@@ -41,7 +42,7 @@ create table public.surveillance_snapshots (
 -- 4. Snapshot function: distinct animals (tasks.title) per space and sign within the last p_days days.
 --    Dated by the Melbourne evening the job ran in (job runs at 13:00 UTC = 23:00 AEST / 00:00 AEDT).
 create or replace function public.take_surveillance_snapshot(p_days int default 3)
-returns int language plpgsql as $$
+returns int language plpgsql set search_path = public as $$
 declare
   d date := ((now() - interval '1 hour') at time zone 'Australia/Melbourne')::date;
   n1 int; n2 int;
@@ -72,12 +73,21 @@ begin
   return n1 + n2;
 end;
 $$;
+-- The nightly job runs as the database owner; the API roles must not be able to write snapshots.
+revoke execute on function public.take_surveillance_snapshot(int) from public, anon, authenticated;
 
 -- 5. Access: read-only for signed-in staff (same sync_writer guard as migration 0003). Nothing writable via the API;
 --    edit cage counts in the SQL editor, snapshots are written by the job.
 alter table public.locations enable row level security;
 alter table public.surveillance_snapshots enable row level security;
+drop policy if exists "staff_select_locations" on public.locations;
 create policy "staff_select_locations" on public.locations for select using (
   auth.role() = 'authenticated' and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer');
+drop policy if exists "staff_select_surveillance_snapshots" on public.surveillance_snapshots;
 create policy "staff_select_surveillance_snapshots" on public.surveillance_snapshots for select using (
   auth.role() = 'authenticated' and coalesce(auth.jwt() -> 'app_metadata' ->> 'role', '') <> 'sync_writer');
+
+-- Nightly snapshot job. Requires the pg_cron extension (Database > Extensions > pg_cron). Uncomment once it is enabled:
+-- select cron.schedule('surveillance-snapshot', '0 13 * * *', 'select public.take_surveillance_snapshot()');
+-- (13:00 UTC = 23:00 AEST / 00:00 AEDT, so each snapshot is dated by the Melbourne evening it ran in.)
+-- Take the FIRST snapshot by running this once in the SQL editor:  select public.take_surveillance_snapshot();
