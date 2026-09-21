@@ -74,6 +74,7 @@
 
 **Interfaces — Produces (browser global `OpsCore`):**
 - `OpsCore.init({ page })` → creates the Supabase client (same URL/anon key constants as `index.html`), shows the existing login card if there is no session, resolves with `{ sb, session }`. Same shared staff login; session persists across the three pages (same origin).
+  **One-box login (Juliana, 2026-09-21):** the login card shows ONLY a password field (label "Staff password"). The email is a constant in `OpsCore` (`staff@ldh-shift-ops.local`, not a secret) and is used for `signInWithPassword`. A small "Use a different account" text link reveals the email field for admin use. Wrong password shows the existing error style. No QR code. `index.html` uses this same core (Task 4 removes its own login markup/JS in favour of it), so all three pages share one login and one remembered session.
 - `OpsCore.esc(s)`.
 - `OpsCore.requirePasscode(role, reason)` → Promise<boolean>: if `sessionStorage['ldh_pass_'+role]==='1'` resolves true; else shows a small modal (input type password, "Enter the vet/nurse passcode to <reason>"), calls `sb.rpc('check_passcode',{p_role:role,p_code})`, on true stores the flag (try/catch) and resolves true, on false shows "Wrong passcode" and stays open; Cancel resolves false. No passcode is logged or stored.
 - `OpsCore.subscribe(tables, onChange)` → realtime `postgres_changes` on each table, debounced reload callback (mirror the existing pattern in `index.html`).
@@ -88,7 +89,7 @@
 
 **Files:** Modify `index.html`; Tests: update `tests/ui/flag-form.test.js`, `vet-board.test.js` (rename/repurpose to case-list), `memos.test.js` (memo board leaves this page), `disease-watch.test.js` (position).
 
-Requirements (spec §2):
+Requirements (spec §2; login now comes from `OpsCore.init`, one-box, see Task 3):
 - Flag form: replace the checklist with `EMERGENCY_SIGNS`; heading "Emergency signs — tick any that apply"; the radio line exactly as in Global Constraints; tier preview uses new labels; new **Needs medication** checkbox; when ticked show required **SM number** input (`sm_number`); block submit with a clear message if empty. Location select gains **Offsite**; choosing it reveals optional detail input (`location_detail`); the pen field is hidden for Offsite. Insert sets `needs_medication`, `sm_number`, `location_detail`, `red_flags` (new keys), tier via `tierFromFlags`.
 - Replace "Cases flagged" (Floor table + vet board) and "Recently completed" with ONE **Cases** section using `caseList`: table columns Animal, Location, Shift/Type, Tier, Stage, Flagged, Time left, Plan (note). Open rows first; a "Completed (last 24 h)" group at the bottom. Medication rows show a "Medication" tag and stage text "Vet check done — waiting on medication" when applicable. Search box keeps filtering. No vet action buttons on this page.
 - Remove from this page: nurse requests LIST card (keep the **vaccination request form** and put it in its own small card "Request nurse vaccination"), treatments due, treatment request card, memo board, role select, initials box, "Start a shift" card (moves to vets page), Recently completed.
