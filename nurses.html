@@ -400,16 +400,12 @@
      NO-GA required list
      ============================================================ */
   const NOGA_TASK_LABELS = { fiv_test: 'FIV test', microchip: 'Microchip', other: 'Other' };
-  function nogaLocationText(r) {
-    const off = LDHLogic.OFFSITE_NAMES.includes(r.location);
-    return off ? (r.location_detail ? r.location + ' — ' + r.location_detail : r.location) : r.location;
-  }
   function renderNoga() {
     const now = Date.now();
     const visible = NOGA_REQUESTS.filter(r => !r.done || (r.done_at && now - new Date(r.done_at).getTime() < 24 * 60 * 60 * 1000));
     document.getElementById('noga-list').innerHTML = visible.map(r => `
       <div class="attn-item noga-item">
-        <div><div class="aname">${esc(r.animal_id)} — ${esc(nogaLocationText(r))}</div>
+        <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
           <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
         ${r.done ? '' : `<button class="secondary noga-done" data-id="${esc(r.id)}">Done</button>`}
       </div>`).join('') || '<p class="empty-state">No NO-GA requests open.</p>';
