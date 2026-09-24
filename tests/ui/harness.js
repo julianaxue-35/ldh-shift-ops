@@ -49,6 +49,7 @@ const STUB = `
       lt(k, v) { filters.push(r => r[k] < v); return b; },
       in(k, vals) { filters.push(r => vals.indexOf(r[k]) !== -1); return b; },
       not(k, op, v) { if (op === 'is' && v === null) filters.push(r => r[k] != null); return b; },
+      is(k, v) { filters.push(r => (v === null ? r[k] == null : r[k] === v)); return b; },
       order(c, o) { orderCol = c; asc = !(o && o.ascending === false); return b; },
       limit(n) { limitN = n; return b; },
       single() { single = true; return b; },

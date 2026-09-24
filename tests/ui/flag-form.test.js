@@ -4,7 +4,7 @@ const t = require('./check')('flag-form');
   const { browser, page, errors, db } = await open();
   t.ok(await page.locator('#req-redflags input.req-flag').count() === 5, 'five emergency-sign checkboxes');
   t.ok((await page.textContent('#req-tier-preview')).startsWith('Request checks — check within 24–48 h'), 'preview starts as Request checks');
-  t.ok((await page.textContent('#req-redflags-wrap')).includes('High priority emergency? Radio the vet'), 'emergency reminder shown');
+  t.ok((await page.textContent('#req-redflags-wrap')).includes("High priority emergency? Radio the vet, don't wait for this board."), 'emergency reminder shown (full sentence, locked in)');
   t.ok(await page.locator('#req-urgency').count() === 0, 'manual urgency dropdown removed');
   t.ok(await page.locator('#req-location option').count() === 13, 'location select filled from the shared list (incl. Offsite)');
   const signOpts = await page.$$eval('#req-condition option', os => os.map(o => o.value));

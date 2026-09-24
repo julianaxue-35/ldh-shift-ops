@@ -247,11 +247,20 @@
   // Only Sick & Injured has the receiving code for the hand-off so far.
   const SHIFT_TOOL_URLS = { sick_injured: 'https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html' };
   function handOffItems(tasks) {
-    return tasks.map(t => ({
-      id: t.title, location: t.location || '', problem: t.problem || '',
-      redFlags: (t.red_flags || []).map(k => LDHLogic.signLabel(k)),
-      condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
-    }));
+    return tasks.map(t => {
+      // Sick & Injured's sync-completion Edge Function upserts on
+      // (title, location, shift) as its conflict key, so the bare
+      // `location` string must stay unchanged (e.g. "Offsite") or a
+      // remote-only case would fork into a duplicate/orphan row. Any
+      // foster/suburb detail rides along in `problem` instead.
+      let problem = t.problem || '';
+      if (t.location_detail) problem = problem + (problem ? ' — ' : '') + 'Offsite: ' + t.location_detail;
+      return {
+        id: t.title, location: t.location || '', problem,
+        redFlags: (t.red_flags || []).map(k => LDHLogic.signLabel(k)),
+        condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
+      };
+    });
   }
   function pickUpUrl(t) {
     const base = SHIFT_TOOL_URLS[t.shift];
@@ -390,10 +399,23 @@
     if (!ok) return;
     const tasks = TASKS.filter(t => selectedPickup.has(t.id) && !t.claimed_at);
     if (!tasks.length) return;
-    const url = batchPickUpUrl(tasks);
-    const { error } = await sb.from('tasks').update({ claimed_at: new Date().toISOString(), claimed_by: null }).in('id', tasks.map(t => t.id));
+    // .is('claimed_at', null) makes the update only succeed against rows
+    // still unclaimed — guards against two vets picking up overlapping
+    // cases at once (TOCTOU). .select() reports which ones actually won.
+    const { data, error } = await sb.from('tasks')
+      .update({ claimed_at: new Date().toISOString(), claimed_by: null })
+      .in('id', tasks.map(t => t.id)).is('claimed_at', null).select();
     if (error) { alert('Could not record the pick-up: ' + error.message); return; }
-    if (url) window.open(url, '_blank');
+    const claimedIds = new Set((data || []).map(r => r.id));
+    const claimed = tasks.filter(t => claimedIds.has(t.id));
+    const skipped = tasks.filter(t => !claimedIds.has(t.id));
+    if (skipped.length) {
+      alert(skipped.map(t => t.title).join(', ') + (skipped.length > 1 ? ' were' : ' was') + ' already picked up by someone else — skipped.');
+    }
+    if (claimed.length) {
+      const url = batchPickUpUrl(claimed);
+      if (url) window.open(url, '_blank');
+    }
     selectedPickup.clear();
     loadAll();
   });
@@ -457,9 +479,18 @@
       if (!ok) return;
       const t = TASKS.find(x => x.id === pickBtn.dataset.id);
       if (!t || t.claimed_at) return;
-      const url = pickUpUrl(t);
-      const { error } = await sb.from('tasks').update({ claimed_at: new Date().toISOString(), claimed_by: null }).eq('id', t.id);
+      // .is('claimed_at', null) + .select(): only claim it if it's still
+      // unclaimed, and tell us whether we actually won the race.
+      const { data, error } = await sb.from('tasks')
+        .update({ claimed_at: new Date().toISOString(), claimed_by: null })
+        .eq('id', t.id).is('claimed_at', null).select();
       if (error) { alert('Could not record the pick-up: ' + error.message); return; }
+      if (!data || !data.length) {
+        alert(t.title + ' was already picked up by someone else — skipped.');
+        loadAll();
+        return;
+      }
+      const url = pickUpUrl(t);
       if (url) window.open(url, '_blank');
       loadAll();
       return;
@@ -490,7 +521,14 @@
       const ok = await OpsCore.requirePasscode('vet', 'undo a completion');
       if (!ok) return;
       if (!confirm('Undo completion? This puts the case back in the open queue.')) return;
-      const { error } = await sb.from('tasks').update({ done: false, completed_by_role: null, completed_at: null, note: null }).eq('id', undoBtn.dataset.id);
+      const t = TASKS.find(x => x.id === undoBtn.dataset.id);
+      const patch = { done: false, completed_by_role: null, completed_at: null, note: null };
+      // A medication case's "done" is really the nurse's med step — undoing
+      // it must clear that step (med_done_at/med_done_by) but leave
+      // vet_done_at alone, so the case lands back on the nurse page as
+      // "waiting on medication" instead of back in the vet queue.
+      if (t && t.needs_medication) { patch.med_done_at = null; patch.med_done_by = null; }
+      const { error } = await sb.from('tasks').update(patch).eq('id', undoBtn.dataset.id);
       if (error) alert('Could not undo: ' + error.message);
       loadAll();
       return;

@@ -56,7 +56,7 @@ const H = 3600 * 1000, M = 60 * 1000;
 
     // No vet action buttons on this page — pick-up / bump / DONE move to
     // vets.html (Task 5's test file covers the hand-off and those actions).
-    t.ok(await page.locator('.pick-up, .bump-btn, .mark-done').count() === 0, 'no pick-up/bump/mark-done buttons on the shelter staff page');
+    t.ok(await page.locator('.pick-up-btn, .done-btn, .bump-btn').count() === 0, 'no pick-up/bump/mark-done buttons on the shelter staff page');
 
     // Search box filters the combined list.
     await page.fill('#search-box', 'B-RED');

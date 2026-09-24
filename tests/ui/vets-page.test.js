@@ -254,5 +254,185 @@ const H = 3600 * 1000;
     await c.browser.close();
   }
 
+  /* ============================================================
+     Part 4: pick-up TOCTOU — single pick-up loses the race to
+     another vet claiming the same case first.
+     ============================================================ */
+  const seedD = {
+    tasks: [
+      { title: 'RACE-1', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'routine', created_at: ago(1 * H) },
+    ]
+  };
+  const d = await open(seedD, 'vets.html');
+  try {
+    await d.page.evaluate(() => {
+      window.__openedUrls = []; window.open = (u) => window.__openedUrls.push(u);
+      window.__alerts = []; window.alert = (m) => window.__alerts.push(m);
+    });
+    // Simulate another vet claiming RACE-1 the instant before this vet
+    // submits the pick-up (bypassing this tab's stale in-memory cache).
+    const seededTasks = (await d.db()).tasks;
+    const raceId = seededTasks.find(x => x.title === 'RACE-1').id;
+    await d.page.evaluate((id) => { window.__db.tasks.find(t => t.id === id).claimed_at = new Date().toISOString(); }, raceId);
+
+    await d.page.locator('.attn-item', { hasText: 'RACE-1' }).locator('.pick-up-btn').click();
+    await d.page.waitForSelector('.oc-modal-overlay');
+    await d.page.fill('.oc-modal-input', 'vet2026');
+    await d.page.click('.oc-modal-submit');
+    await d.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
+    await d.page.waitForTimeout(250);
+
+    const alertsD = await d.page.evaluate(() => window.__alerts);
+    t.ok(alertsD.some(m => m.includes('RACE-1') && m.includes('already picked up by someone else')),
+      'single pick-up on an already-claimed-elsewhere case shows the "already picked up" message: ' + JSON.stringify(alertsD));
+    t.ok((await d.page.evaluate(() => window.__openedUrls.length)) === 0, 'no hand-off tab opens when the single pick-up lost the race');
+
+    t.ok(d.errors.length === 0, 'no page errors: ' + d.errors.join('; '));
+  } finally {
+    await d.browser.close();
+  }
+
+  /* ============================================================
+     Part 5: pick-up TOCTOU — batch pick-up where one of two
+     selected cases gets claimed elsewhere mid-flow; the other one
+     still succeeds and the loser is reported.
+     ============================================================ */
+  const seedE = {
+    tasks: [
+      { title: 'RACE-A', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'routine', created_at: ago(1 * H) },
+      { title: 'RACE-B', location: 'Pound 2', shift: 'sick_injured', type: 'shelter', urgency: 'routine', created_at: ago(2 * H) },
+    ]
+  };
+  const eTab = await open(seedE, 'vets.html');
+  try {
+    await eTab.page.evaluate(() => {
+      window.__openedUrls = []; window.open = (u) => window.__openedUrls.push(u);
+      window.__alerts = []; window.alert = (m) => window.__alerts.push(m);
+    });
+
+    await eTab.page.locator('.attn-item', { hasText: 'RACE-A' }).locator('.pickup-check').check();
+    await eTab.page.locator('.attn-item', { hasText: 'RACE-B' }).locator('.pickup-check').check();
+
+    // Simulate RACE-B getting claimed by someone else mid-flow.
+    const seededE = (await eTab.db()).tasks;
+    const raceBId = seededE.find(x => x.title === 'RACE-B').id;
+    await eTab.page.evaluate((id) => { window.__db.tasks.find(t => t.id === id).claimed_at = new Date().toISOString(); }, raceBId);
+
+    await eTab.page.click('#batch-pickup-btn');
+    await eTab.page.waitForSelector('.oc-modal-overlay');
+    await eTab.page.fill('.oc-modal-input', 'vet2026');
+    await eTab.page.click('.oc-modal-submit');
+    await eTab.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
+    await eTab.page.waitForTimeout(250);
+
+    const tasksAfterE = (await eTab.db()).tasks;
+    t.ok(tasksAfterE.find(x => x.title === 'RACE-A').claimed_at != null, 'batch pick-up still claims the case that was actually free');
+
+    const alertsE = await eTab.page.evaluate(() => window.__alerts);
+    t.ok(alertsE.some(m => m.includes('RACE-B') && m.includes('already picked up by someone else')),
+      'batch pick-up reports the case claimed elsewhere: ' + JSON.stringify(alertsE));
+
+    const openedUrlsE = await eTab.page.evaluate(() => window.__openedUrls);
+    t.ok(openedUrlsE.length === 1, 'a hand-off tab still opens for the case that succeeded');
+    const itemsE = JSON.parse(new URL(openedUrlsE[0]).searchParams.get('items'));
+    t.ok(itemsE.length === 1 && itemsE[0].id === 'RACE-A', 'the hand-off only includes the case that actually got claimed');
+
+    t.ok(eTab.errors.length === 0, 'no page errors: ' + eTab.errors.join('; '));
+  } finally {
+    await eTab.browser.close();
+  }
+
+  /* ============================================================
+     Part 6: undo on a completed medication case must clear the
+     nurse's medication step (med_done_at/med_done_by) but leave
+     vet_done_at intact, so the case returns to "waiting on
+     medication" (nurse page) rather than back to the vet queue.
+     ============================================================ */
+  const seedF = {
+    tasks: [
+      { title: 'UNDO-MED', location: 'Pound 1', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+        needs_medication: true, sm_number: 'SM4242', claimed_at: ago(2 * H), vet_done_at: ago(90 * 60 * 1000),
+        med_chart_done: true, med_label: 'Metacam 0.5 mL SID x 5 days',
+        med_done_by: 'AB', med_done_at: ago(30 * 60 * 1000),
+        done: true, completed_by_role: 'vet_nurse', completed_at: ago(30 * 60 * 1000), created_at: ago(3 * H) },
+    ]
+  };
+  const f = await open(seedF, 'vets.html');
+  try {
+    t.ok((await f.page.textContent('#completed-list')).includes('UNDO-MED'), 'the completed medication case starts in the Completed list');
+
+    await f.page.locator('.completed-row', { hasText: 'UNDO-MED' }).locator('.undo-done').click();
+    await f.page.waitForSelector('.oc-modal-overlay');
+    await f.page.fill('.oc-modal-input', 'vet2026');
+    await f.page.click('.oc-modal-submit');
+    await f.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
+    await f.page.waitForTimeout(250);
+
+    const tasksAfterF = (await f.db()).tasks;
+    const undone = tasksAfterF.find(x => x.title === 'UNDO-MED');
+    t.ok(undone.done === false, 'undo puts the medication case back to not-done');
+    t.ok(undone.med_done_at === null && undone.med_done_by === null, 'undo clears med_done_at and med_done_by');
+    t.ok(undone.vet_done_at != null, 'undo leaves vet_done_at untouched (survives)');
+
+    const stage = await f.page.evaluate((task) => LDHLogic.stageOf(task, Date.now()), undone);
+    t.ok(stage === 'waiting_medication', 'undone medication case is back to waiting_medication (not flagged): got ' + stage);
+
+    t.ok(!(await f.page.textContent('#completed-list')).includes('UNDO-MED'), 'the case leaves the Completed list');
+    const openRow = f.page.locator('.attn-item', { hasText: 'UNDO-MED' });
+    t.ok((await openRow.textContent()).includes('waiting on medication'), 'the case reappears on the open board showing waiting-on-medication');
+    t.ok(await openRow.locator('.done-btn').count() === 0, 'no DONE button on it — not re-completable by a bare click');
+    t.ok(await openRow.locator('.pick-up-btn').count() === 0, 'no pick-up button either — it never goes back to the vet queue');
+
+    t.ok(f.errors.length === 0, 'no page errors: ' + f.errors.join('; '));
+  } finally {
+    await f.browser.close();
+  }
+
+  /* ============================================================
+     Part 7: Offsite detail must ride along in the hand-off's
+     `problem` field — the bare `location` string has to stay
+     unchanged ("Offsite") since Sick & Injured's sync-completion
+     Edge Function upserts on (title, location, shift).
+     ============================================================ */
+  const seedG = {
+    tasks: [
+      { title: 'OFFSITE-PICKUP', location: 'Offsite', location_detail: 'Foster carer — J. Smith',
+        shift: 'sick_injured', type: 'foster', urgency: 'routine', problem: 'mild limp', created_at: ago(1 * H) },
+      { title: 'OFFSITE-NOPROBLEM', location: 'Offsite', location_detail: 'Rescue group ABC',
+        shift: 'sick_injured', type: 'rescue', urgency: 'routine', created_at: ago(2 * H) },
+    ]
+  };
+  const g = await open(seedG, 'vets.html');
+  try {
+    await g.page.evaluate(() => { window.__openedUrls = []; window.open = (u) => window.__openedUrls.push(u); });
+
+    await g.page.locator('.attn-item', { hasText: 'OFFSITE-PICKUP' }).locator('.pick-up-btn').click();
+    await g.page.waitForSelector('.oc-modal-overlay');
+    await g.page.fill('.oc-modal-input', 'vet2026');
+    await g.page.click('.oc-modal-submit');
+    await g.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
+    await g.page.waitForTimeout(250);
+
+    let openedUrlsG = await g.page.evaluate(() => window.__openedUrls);
+    t.ok(openedUrlsG.length === 1, 'Offsite pick-up opens exactly one hand-off tab');
+    let itemsG = JSON.parse(new URL(openedUrlsG[0]).searchParams.get('items'));
+    t.ok(itemsG[0].location === 'Offsite', 'the bare location field stays "Offsite" (matches the Sick & Injured upsert key)');
+    t.ok(itemsG[0].problem.includes('Foster carer — J. Smith'), 'the foster/suburb detail rides along in the problem field: ' + itemsG[0].problem);
+    t.ok(itemsG[0].problem.includes('mild limp'), 'the original problem text is preserved alongside the Offsite detail');
+
+    // A second Offsite case with no free-text problem: the detail should
+    // still appear, with no stray leading separator.
+    await g.page.locator('.attn-item', { hasText: 'OFFSITE-NOPROBLEM' }).locator('.pick-up-btn').click();
+    await g.page.waitForTimeout(250);
+    openedUrlsG = await g.page.evaluate(() => window.__openedUrls);
+    t.ok(openedUrlsG.length === 2, 'second Offsite pick-up opens its own hand-off tab');
+    const itemsG2 = JSON.parse(new URL(openedUrlsG[1]).searchParams.get('items'));
+    t.ok(itemsG2[0].problem === 'Offsite: Rescue group ABC', 'with no existing problem text, the detail stands alone with no stray separator: ' + itemsG2[0].problem);
+
+    t.ok(g.errors.length === 0, 'no page errors: ' + g.errors.join('; '));
+  } finally {
+    await g.browser.close();
+  }
+
   t.done();
 })();
