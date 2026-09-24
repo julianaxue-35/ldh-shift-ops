@@ -182,8 +182,6 @@
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
       &nbsp;·&nbsp;
       <a href="https://julianaxue-35.github.io/ldh-shift-tools/" style="color:var(--sidebar-text-muted);">Shift Tools ↗</a>
-      &nbsp;·&nbsp;
-      <a href="stats.html" style="color:var(--sidebar-text-muted);">Stats →</a>
     </p>
     <span id="signout-link">Sign out</span>
   </aside>
@@ -298,7 +296,6 @@
   const esc = OpsCore.esc;
 
   let TASKS = [];
-  let NURSE_REQUESTS = [];
   let LOCATION_ROWS = [];
   let ROSTER = {};
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
@@ -315,14 +312,12 @@
 
   /* ---------- data loading ---------- */
   async function loadAll() {
-    const [tasksRes, rosterRes, nrRes, lcRes] = await Promise.all([
+    const [tasksRes, rosterRes, lcRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
-      sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
       sb.from('locations').select('*').order('sort', { ascending: true }),
     ]);
     TASKS = tasksRes.data || [];
-    NURSE_REQUESTS = nrRes.data || [];
     LOCATION_ROWS = lcRes.data || [];
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
@@ -601,7 +596,7 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['tasks', 'nurse_requests'], loadAll);
+    OpsCore.subscribe(['tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {
       await sb.auth.signOut();
       location.reload();
