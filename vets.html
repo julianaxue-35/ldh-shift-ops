@@ -175,6 +175,10 @@
         <button class="filter-chip" data-type="medication">Medication</button>
         <button class="filter-chip" data-type="check_recheck">Check-recheck</button>
       </div>
+      <div id="batch-pickup-bar" style="display:none; margin-bottom:14px;">
+        <button type="button" id="batch-pickup-btn">Pick up <span id="batch-pickup-count">0</span> selected, sorted by location →</button>
+        <button type="button" class="secondary" id="batch-pickup-clear" style="margin-left:8px; padding:10px 14px; font-size:0.82rem;">Clear selection</button>
+      </div>
       <div class="urgency-board">
         <div class="urgency-col"><h3 class="red-h" id="col-red-h"></h3><div id="board-redflag"></div></div>
         <div class="urgency-col"><h3 class="urgent-h" id="col-urgent-h"></h3><div id="board-urgent"></div></div>
@@ -234,19 +238,36 @@
   let CASES = { open: [], completed: [] };
   let typeFilter = 'all';
   let showCompletedMemos = false;
+  // Batch pick-up selection (case ids), tracked across all three tier
+  // columns in one shared Set — see updateBatchBar() and the "Pick up N
+  // selected" bar, restored from the pre-Task-4 vet board (2026-09-24).
+  let selectedPickup = new Set();
   const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
 
   // Only Sick & Injured has the receiving code for the hand-off so far.
   const SHIFT_TOOL_URLS = { sick_injured: 'https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html' };
-  function pickUpUrl(t) {
-    const base = SHIFT_TOOL_URLS[t.shift];
-    if (!base) return null;
-    const items = [{
+  function handOffItems(tasks) {
+    return tasks.map(t => ({
       id: t.title, location: t.location || '', problem: t.problem || '',
       redFlags: (t.red_flags || []).map(k => LDHLogic.signLabel(k)),
       condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
-    }];
-    const params = new URLSearchParams({ items: JSON.stringify(items) });
+    }));
+  }
+  function pickUpUrl(t) {
+    const base = SHIFT_TOOL_URLS[t.shift];
+    if (!base) return null;
+    const params = new URLSearchParams({ items: JSON.stringify(handOffItems([t])) });
+    return `${base}?${params.toString()}`;
+  }
+  // Batch hand-off: one URL carrying every selected case, sorted by
+  // location so a vet can walk the shelter once (the offline tool already
+  // groups its own list by location regardless of add order).
+  function batchPickUpUrl(tasks) {
+    if (!tasks.length) return null;
+    const base = SHIFT_TOOL_URLS[tasks[0].shift];
+    if (!base) return null;
+    const sorted = [...tasks].sort((a, b) => (a.location || '').localeCompare(b.location || ''));
+    const params = new URLSearchParams({ items: JSON.stringify(handOffItems(sorted)) });
     return `${base}?${params.toString()}`;
   }
 
@@ -313,9 +334,12 @@
     else if (stage === 'picked_up') metaBits.push('Picked up ' + esc(fmtTime(t.claimed_at)));
     return `
       <div class="attn-item" data-id="${esc(t.id)}">
-        <div>
-          <div class="aname">${esc(t.title)}${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''} ${statusChipHtml(t)}</div>
-          <div class="ameta">${metaBits.join(' · ')}</div>
+        <div style="display:flex; align-items:flex-start; gap:8px; flex:1;">
+          ${canPickUp ? `<input type="checkbox" class="pickup-check" data-id="${esc(t.id)}" ${selectedPickup.has(t.id) ? 'checked' : ''} style="width:18px; height:18px; margin:3px 0 0; flex:none;">` : ''}
+          <div>
+            <div class="aname">${esc(t.title)}${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''} ${statusChipHtml(t)}</div>
+            <div class="ameta">${metaBits.join(' · ')}</div>
+          </div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           ${canBump ? `<button type="button" class="secondary bump-btn" data-id="${esc(t.id)}">Bump to Urgent</button>` : ''}
@@ -333,11 +357,48 @@
     renderBoardCol('board-redflag', open.filter(t => LDHLogic.normTier(t.urgency) === 'red_flag'));
     renderBoardCol('board-urgent', open.filter(t => LDHLogic.normTier(t.urgency) === 'urgent'));
     renderBoardCol('board-routine', open.filter(t => LDHLogic.normTier(t.urgency) === 'routine'));
+    updateBatchBar();
   }
   document.getElementById('type-filter-bar').addEventListener('click', (e) => {
     const btn = e.target.closest('.filter-chip'); if (!btn) return;
     typeFilter = btn.dataset.type;
     document.querySelectorAll('#type-filter-bar .filter-chip').forEach((b) => b.classList.toggle('active', b === btn));
+    renderCases();
+  });
+
+  /* ---------- batch pick-up ---------- */
+  // Re-derive from TASKS (not just the Set's size) on every render — a
+  // selected case can vanish out from under a viewer (someone else marks it
+  // done or picks it up via realtime) without this tab's checkbox ever
+  // firing a change event. Stale ids are quietly dropped, matching the
+  // pre-Task-4 vet board (it didn't handle this any more explicitly either).
+  function updateBatchBar() {
+    const bar = document.getElementById('batch-pickup-bar');
+    const tasks = TASKS.filter(t => selectedPickup.has(t.id) && !t.claimed_at && !t.done);
+    selectedPickup = new Set(tasks.map(t => t.id));
+    if (!tasks.length) { bar.style.display = 'none'; return; }
+    document.getElementById('batch-pickup-count').textContent = tasks.length;
+    bar.style.display = 'block';
+  }
+  document.getElementById('vet-cases').addEventListener('change', (e) => {
+    const cb = e.target.closest('.pickup-check'); if (!cb) return;
+    if (cb.checked) selectedPickup.add(cb.dataset.id); else selectedPickup.delete(cb.dataset.id);
+    updateBatchBar();
+  });
+  document.getElementById('batch-pickup-btn').addEventListener('click', async () => {
+    const ok = await OpsCore.requirePasscode('vet', 'pick up cases');
+    if (!ok) return;
+    const tasks = TASKS.filter(t => selectedPickup.has(t.id) && !t.claimed_at);
+    if (!tasks.length) return;
+    const url = batchPickUpUrl(tasks);
+    const { error } = await sb.from('tasks').update({ claimed_at: new Date().toISOString(), claimed_by: null }).in('id', tasks.map(t => t.id));
+    if (error) { alert('Could not record the pick-up: ' + error.message); return; }
+    if (url) window.open(url, '_blank');
+    selectedPickup.clear();
+    loadAll();
+  });
+  document.getElementById('batch-pickup-clear').addEventListener('click', () => {
+    selectedPickup.clear();
     renderCases();
   });
 

@@ -181,5 +181,78 @@ const H = 3600 * 1000;
     await b.browser.close();
   }
 
+  /* ============================================================
+     Part 3: batch pick-up — select cases across tier columns, one
+     gated hand-off for all of them sorted by location, clear
+     selection.
+     ============================================================ */
+  const seedC = {
+    tasks: [
+      { title: 'BATCH-A', location: 'Pound 9', shift: 'sick_injured', type: 'shelter', urgency: 'red_flag', created_at: ago(1 * H) },
+      { title: 'BATCH-B', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', created_at: ago(2 * H) },
+      { title: 'BATCH-C', location: 'Pound 5', shift: 'sick_injured', type: 'shelter', urgency: 'routine', created_at: ago(3 * H) },
+    ]
+  };
+  const c = await open(seedC, 'vets.html');
+  try {
+    await c.page.evaluate(() => { window.__openedUrls = []; window.open = (u) => { window.__openedUrls.push(u); }; });
+
+    t.ok(await c.page.isVisible('#batch-pickup-bar') === false, 'batch bar hidden with nothing selected');
+
+    // Select BATCH-A (Emergency column) and BATCH-B (Urgent column).
+    await c.page.locator('.attn-item', { hasText: 'BATCH-A' }).locator('.pickup-check').check();
+    await c.page.locator('.attn-item', { hasText: 'BATCH-B' }).locator('.pickup-check').check();
+    t.ok(await c.page.isVisible('#batch-pickup-bar'), 'batch bar appears once >=1 case is selected');
+    t.ok((await c.page.textContent('#batch-pickup-count')) === '2', 'selected count shows 2 across different tier columns');
+    t.ok((await c.page.textContent('#batch-pickup-bar')).includes('2 selected, sorted by location'), 'bar wording: "N selected, sorted by location"');
+
+    /* ---------- batch pick-up is gated; cancelling leaves selection + cases untouched ---------- */
+    await c.page.click('#batch-pickup-btn');
+    await c.page.waitForSelector('.oc-modal-overlay');
+    t.ok((await c.page.textContent('.oc-modal-text')) === 'Enter the vet passcode to pick up cases.', 'batch pick-up uses the same gate/reason as single pick-up');
+    await c.page.click('.oc-modal-cancel');
+    await c.page.waitForTimeout(150);
+    let tasks = (await c.db()).tasks;
+    t.ok(tasks.find(x => x.title === 'BATCH-A').claimed_at == null && tasks.find(x => x.title === 'BATCH-B').claimed_at == null,
+      'cancelling the batch passcode leaves both cases unclaimed');
+    t.ok(await c.page.isVisible('#batch-pickup-bar'), 'selection survives a cancelled passcode attempt');
+
+    /* ---------- right code: one prompt for the whole batch, one combined hand-off ---------- */
+    await c.page.click('#batch-pickup-btn');
+    await c.page.waitForSelector('.oc-modal-overlay');
+    await c.page.fill('.oc-modal-input', 'vet2026');
+    await c.page.click('.oc-modal-submit');
+    await c.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
+    await c.page.waitForTimeout(300);
+
+    tasks = (await c.db()).tasks;
+    const bA = tasks.find(x => x.title === 'BATCH-A'), bB = tasks.find(x => x.title === 'BATCH-B');
+    t.ok(bA.claimed_at != null && bB.claimed_at != null, 'the right code stamps claimed_at on every selected case');
+    t.ok(bA.claimed_by === null && bB.claimed_by === null, 'claimed_by stays null for both (no initials)');
+
+    const openedUrls = await c.page.evaluate(() => window.__openedUrls);
+    t.ok(openedUrls.length === 1, 'exactly one combined hand-off tab is opened for the whole batch');
+    const batchUrl = new URL(openedUrls[0]);
+    const batchItems = JSON.parse(batchUrl.searchParams.get('items'));
+    t.ok(batchItems.length === 2, 'the hand-off carries both selected cases');
+    t.ok(batchItems[0].id === 'BATCH-B' && batchItems[1].id === 'BATCH-A', 'items are sorted by location (Pound 1 before Pound 9)');
+
+    t.ok(!(await c.page.isVisible('#batch-pickup-bar')), 'batch bar hides again once the pick-up completes (selection cleared)');
+
+    /* ---------- clear selection ---------- */
+    await c.page.locator('.attn-item', { hasText: 'BATCH-C' }).locator('.pickup-check').check();
+    t.ok(await c.page.isVisible('#batch-pickup-bar'), 'bar reappears for a fresh selection');
+    await c.page.click('#batch-pickup-clear');
+    await c.page.waitForTimeout(150);
+    t.ok(!(await c.page.isVisible('#batch-pickup-bar')), 'Clear selection empties the bar');
+    t.ok(!(await c.page.locator('.attn-item', { hasText: 'BATCH-C' }).locator('.pickup-check').isChecked()), 'Clear selection unchecks the box');
+    tasks = (await c.db()).tasks;
+    t.ok(tasks.find(x => x.title === 'BATCH-C').claimed_at == null, 'Clear selection does not pick anything up');
+
+    t.ok(c.errors.length === 0, 'no page errors: ' + c.errors.join('; '));
+  } finally {
+    await c.browser.close();
+  }
+
   t.done();
 })();
