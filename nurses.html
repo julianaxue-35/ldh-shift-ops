@@ -139,6 +139,16 @@
 
   #noga-list .attn-item { align-items: flex-start; }
 
+  .alert-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: rgba(255,159,67,0.18); border: 1px solid rgba(255,159,67,0.55); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.88rem; font-weight: 600; color: #7a4a00;
+  }
+  .alert-banner-dismiss {
+    background: transparent; border: none; box-shadow: none; padding: 0 4px; font-size: 1.1rem;
+    line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
+  }
+
   @media (max-width: 1000px) {
     .urgency-board { grid-template-columns: 1fr; }
   }
@@ -166,6 +176,10 @@
     <span id="signout-link">Sign out</span>
   </aside>
   <main>
+    <div id="new-item-banner" class="alert-banner" style="display:none;">
+      <span id="new-item-banner-text"></span>
+      <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
+    </div>
     <div class="page-head"><div><h1>Nurses</h1><p>Medication labels, vaccination, treatments due, and the NO-GA list.</p></div></div>
 
     <section class="card" id="med-labels-section">
@@ -507,11 +521,85 @@
      ============================================================ */
   function renderAll() { renderMedLabels(); renderNurseRequests(); renderNurseDoses(); renderNoga(); renderMemos(); }
 
-  // Time-based UI (the 3h vaccination clock, the overdue/today dose split,
+  // Time-based UI (the 2h vaccination clock, the overdue/today dose split,
   // and the NO-GA 24h-hide window) needs to move even with no realtime
   // event — mirrors index.html/vets.html's refreshTimers pattern.
   function refreshTimers() { renderNurseRequests(); renderNurseDoses(); renderNoga(); }
   setInterval(refreshTimers, 60000);
+
+  /* ============================================================
+     New-item alert banner (nurses only). Vets don't get this — their
+     tasks come throughout the day so there's nothing to flag; nurses'
+     vaccination requests and medication-ready cases can appear at any
+     moment and benefit from a nudge while the tab is open.
+
+     In-memory only (a fresh page load starts with an empty seen-set,
+     so nothing already open when the nurse opens the page ever alerts).
+     The seen-set is filled from the FIRST loadAll() before any
+     comparison happens, then every loadAll() after that only alerts on
+     ids it hasn't seen before — each item alerts once, ever.
+     ============================================================ */
+  let seenVaccIds = new Set(), seenMedIds = new Set(), seenInitialised = false;
+  let bannerHideTimer = null;
+
+  function openVaccRequests() { return NURSE_REQUESTS.filter(r => r.done_count < r.animal_count); }
+
+  function playAlertTone() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 800;
+      gain.gain.value = 0.15;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+      osc.onended = () => { try { ctx.close(); } catch (e) { /* ignore */ } };
+    } catch (e) { /* audio blocked/unsupported — the banner still shows */ }
+  }
+
+  function hideAlertBanner() {
+    if (bannerHideTimer) { clearTimeout(bannerHideTimer); bannerHideTimer = null; }
+    document.getElementById('new-item-banner').style.display = 'none';
+  }
+  document.getElementById('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
+
+  function showAlertBanner(newVaccCount, newMedCount) {
+    let msg;
+    if (newVaccCount > 0 && newMedCount > 0) {
+      msg = `🔔 ${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''} and ${newMedCount} new medication label${newMedCount > 1 ? 's' : ''} waiting — check below.`;
+    } else if (newVaccCount > 0) {
+      msg = `🔔 ${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''} waiting — check below.`;
+    } else {
+      msg = `🔔 ${newMedCount} new medication label${newMedCount > 1 ? 's' : ''} waiting — check below.`;
+    }
+    document.getElementById('new-item-banner-text').textContent = msg;
+    document.getElementById('new-item-banner').style.display = 'flex';
+    playAlertTone();
+    if (bannerHideTimer) clearTimeout(bannerHideTimer);
+    bannerHideTimer = setTimeout(hideAlertBanner, 10000);
+  }
+
+  // Called on every loadAll(). The first call only seeds the seen-set
+  // (nothing pre-existing should ever alert); every call after that
+  // marks ids seen the moment they're noticed, so each one alerts once.
+  function checkForNewItems() {
+    const openVacc = openVaccRequests();
+    const medTasks = medLabelTasks();
+    if (!seenInitialised) {
+      openVacc.forEach(r => seenVaccIds.add(r.id));
+      medTasks.forEach(t => seenMedIds.add(t.id));
+      seenInitialised = true;
+      return;
+    }
+    const newVacc = openVacc.filter(r => !seenVaccIds.has(r.id));
+    const newMed = medTasks.filter(t => !seenMedIds.has(t.id));
+    openVacc.forEach(r => seenVaccIds.add(r.id));
+    medTasks.forEach(t => seenMedIds.add(t.id));
+    if (newVacc.length > 0 || newMed.length > 0) showAlertBanner(newVacc.length, newMed.length);
+  }
 
   async function loadAll() {
     const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([
@@ -524,6 +612,7 @@
     ]);
     TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || []; NOGA_REQUESTS = ngRes.data || []; MEMOS = memosRes.data || [];
+    checkForNewItems();
     renderAll();
   }
 

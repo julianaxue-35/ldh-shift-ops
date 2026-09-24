@@ -75,13 +75,13 @@ test('slotLabel and doseLevel', () => {
   assert.equal(L.doseLevel({ due_date: '2026-09-19', done_at: 'x' }, '2026-09-20'), 'done');
 });
 
-test('vaccStatus: 3 h from arrival', () => {
+test('vaccStatus: 2 h from arrival', () => {
   const req = (agoMs, done = 0) => ({ arrived_at: new Date(NOW - agoMs).toISOString(), animal_count: 8, done_count: done });
   assert.equal(L.vaccStatus(req(1 * H), NOW).level, 'ok');
-  assert.equal(L.vaccStatus(req(2.67 * H), NOW).level, 'amber');
-  assert.equal(L.vaccStatus(req(3 * H + M), NOW).level, 'red');
+  assert.equal(L.vaccStatus(req(1.75 * H), NOW).level, 'amber');
+  assert.equal(L.vaccStatus(req(2 * H + M), NOW).level, 'red');
   assert.equal(L.vaccStatus(req(5 * H, 8), NOW).level, 'done');
-  assert.match(L.vaccStatus(req(4 * H), NOW).label, /^overdue 1h/);
+  assert.match(L.vaccStatus(req(3 * H), NOW).label, /^overdue 1h/);
 });
 
 test('courseProgress and splitMemos', () => {

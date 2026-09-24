@@ -232,5 +232,70 @@ async function waitPasscodeClosed(page) {
     await c.browser.close();
   }
 
+  /* ============================================================
+     Tab D: new-request alert banner + sound (nurses only). A fresh
+     load with existing open items does NOT alert; a new vaccination
+     request or new medication-waiting case arriving via realtime
+     shows the banner (once each, never again on later refreshes).
+     ============================================================ */
+  const seedD = {
+    nurse_requests: [
+      { location: 'Cat Room 1', species: 'kitten', animal_count: 3, done_count: 1, arrived_at: ago(30 * 60 * 1000) }
+    ],
+    tasks: [
+      { title: 'MED-OLD', location: 'Pound 1', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+        needs_medication: true, vet_done_at: ago(1 * H), med_label: 'Give 1 tablet daily', sm_number: 'SM1111', created_at: ago(2 * H) }
+    ]
+  };
+  const d = await open(seedD, 'nurses.html');
+  try {
+    async function insertRow(page, table, row) {
+      await page.evaluate(({ table, row }) => window.supabase.createClient().from(table).insert(row), { table, row });
+    }
+    async function bannerVisible(page) {
+      return page.evaluate(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none');
+    }
+
+    /* ---------- (a) pre-existing open items on load: no retroactive banner ---------- */
+    t.ok(!(await bannerVisible(d.page)), 'opening the page with existing open items does not show the banner');
+
+    /* ---------- (b) a NEW vaccination request arriving shows the banner, vaccination wording ---------- */
+    await insertRow(d.page, 'nurse_requests', { location: 'Cat Room 2', species: 'cat', animal_count: 2, done_count: 0 });
+    await d.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 3000 });
+    let bannerText = await d.page.textContent('#new-item-banner-text');
+    t.ok(bannerText.includes('vaccination request'), 'new vaccination request shows banner with vaccination wording: ' + bannerText);
+    t.ok(!bannerText.includes('medication label'), 'no pre-existing medication case is wrongly included: ' + bannerText);
+
+    /* ---------- (d) Dismiss button hides it ---------- */
+    await d.page.click('#new-item-banner-dismiss');
+    t.ok(!(await bannerVisible(d.page)), 'Dismiss button hides the banner');
+
+    /* ---------- (c) a NEW medication-waiting case arriving shows the banner, medication wording ---------- */
+    await insertRow(d.page, 'tasks', {
+      title: 'MED-NEW', location: 'Pound 2', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+      needs_medication: true, vet_done_at: new Date().toISOString(), sm_number: 'SM2222', med_label: 'Amoxicillin BID'
+    });
+    await d.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 3000 });
+    bannerText = await d.page.textContent('#new-item-banner-text');
+    t.ok(bannerText.includes('medication label'), 'new medication-waiting case shows banner with medication wording: ' + bannerText);
+    t.ok(!bannerText.includes('vaccination request'), 'the already-seen vaccination request does not re-trigger alongside it: ' + bannerText);
+
+    /* ---------- sound: playAlertTone() runs (AudioContext) without throwing ---------- */
+    t.ok(d.errors.length === 0, 'synthesised alert tone does not throw a page error: ' + JSON.stringify(d.errors));
+
+    /* ---------- (e) an item that already alerted does not alert again on a later refresh ---------- */
+    await d.page.click('#new-item-banner-dismiss');
+    t.ok(!(await bannerVisible(d.page)), 'banner dismissed before the next refresh check');
+    // Trigger another loadAll() via an unrelated table change (mirrors a realtime
+    // tick / the 60s poll) with no new vaccination/medication items.
+    await insertRow(d.page, 'memos', { author: 'Nurse team', text: 'unrelated memo' });
+    await d.page.waitForTimeout(500);
+    t.ok(!(await bannerVisible(d.page)), 'the vaccination request and medication case already seen do not re-trigger the banner on a later refresh');
+
+    t.ok(d.errors.length === 0, 'no page errors in tab D: ' + JSON.stringify(d.errors));
+  } finally {
+    await d.browser.close();
+  }
+
   t.done();
 })();
