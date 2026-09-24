@@ -524,10 +524,6 @@
   });
 
   /* ---------- request a treatment ---------- */
-  function activeDoses() {
-    const by = new Map(NURSE_TREATMENTS.map(t => [t.id, t]));
-    return NURSE_DOSES.filter(d => by.has(d.treatment_id) && !by.get(d.treatment_id).stopped);
-  }
   function renderNurseTreatments() {
     const courses = NURSE_TREATMENTS.filter(t => !t.stopped).map(t => {
       const p = LDHLogic.courseProgress(NURSE_DOSES.filter(d => d.treatment_id === t.id));
