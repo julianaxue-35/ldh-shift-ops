@@ -1,0 +1,609 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDH Shift Ops — Vets</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
+<script src="lib/ops-core.js"></script>
+<style>
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
+  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+  }
+  button {
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .filter-chip {
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgency-col h3.red-h { color: var(--critical); }
+  .urgency-col h3.urgent-h { color: #c26a00; }
+  .urgency-col h3.routine-h { color: var(--muted); }
+  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
+  .attn-item:last-child { border-bottom: none; }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+  .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .completed-row {
+    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
+    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
+
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
+
+  .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+
+  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  #memo-post textarea { min-height: 60px; }
+
+  .done-modal { width: 360px; }
+  .done-modal .done-modal-title { margin: 0 0 12px; font-size: 1rem; }
+  .done-modal textarea { min-height: 90px; }
+
+  @media (max-width: 1000px) {
+    .urgency-board { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <p class="hint">
+      Case queue, medication hand-off and treatment requests for the vet
+      team. Clinical detail stays in the offline shift tools.
+    </p>
+    <p class="hint" style="margin-top:14px;">
+      <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
+      &nbsp;·&nbsp;
+      <a href="https://julianaxue-35.github.io/ldh-shift-tools/" style="color:var(--sidebar-text-muted);">Shift Tools ↗</a>
+    </p>
+    <span id="signout-link">Sign out</span>
+  </aside>
+
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Vets</h1>
+        <p>Pick up, complete and hand off cases; request treatments; start a shift.</p>
+      </div>
+    </div>
+
+    <section class="card" id="vet-cases">
+      <h2>Cases</h2>
+      <p class="subtle">Split by tier and request type — pick up as available. Filter to Medication for remote-only cases.</p>
+      <div class="filter-bar" id="type-filter-bar">
+        <button class="filter-chip active" data-type="all">All</button>
+        <button class="filter-chip" data-type="shelter">Shelter</button>
+        <button class="filter-chip" data-type="foster">Foster</button>
+        <button class="filter-chip" data-type="rescue">Rescue</button>
+        <button class="filter-chip" data-type="medication">Medication</button>
+        <button class="filter-chip" data-type="check_recheck">Check-recheck</button>
+      </div>
+      <div class="urgency-board">
+        <div class="urgency-col"><h3 class="red-h" id="col-red-h"></h3><div id="board-redflag"></div></div>
+        <div class="urgency-col"><h3 class="urgent-h" id="col-urgent-h"></h3><div id="board-urgent"></div></div>
+        <div class="urgency-col"><h3 class="routine-h" id="col-routine-h"></h3><div id="board-routine"></div></div>
+      </div>
+    </section>
+
+    <section class="card" id="completed-panel">
+      <h2>Completed (last 24 h)</h2>
+      <div id="completed-list"></div>
+    </section>
+
+    <section class="card" id="nurse-treatments">
+      <h2>Request a treatment — vets</h2>
+      <p class="subtle">Ask the nurses to give a treatment to an animal in the ward, e.g. flush a dental extraction site twice a day for 7 days.</p>
+      <div id="nt-courses"></div>
+      <h3 style="font-size:0.85rem; margin:18px 0 0;">New request</h3>
+      <div class="nt-form">
+        <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="nt-location"></select></label>
+        <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
+        <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+        <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
+        <label>Start date<input id="nt-start" type="date"></label>
+        <button id="nt-submit" type="button">Request</button>
+      </div>
+    </section>
+
+    <section class="card" id="start-shift-card">
+      <h2>Start a shift</h2>
+      <p class="subtle">Opens the shift tool in a new tab. Clinical detail is entered there, not here.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/processing.html" target="_blank" rel="noopener"><b>Processing</b><span>Intake, exams, vaccination</span></a>
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html" target="_blank" rel="noopener"><b>Sick &amp; Injured</b><span>Rechecks and flagged animals</span></a>
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/surgery.html" target="_blank" rel="noopener"><b>Surgery</b><span>Desexing list, notes, sharing</span></a>
+      </div>
+    </section>
+
+    <section class="card" id="memo-board">
+      <h2>Memo board</h2>
+      <div id="memo-list"></div>
+      <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
+      <div id="memo-completed-list"></div>
+      <div id="memo-post">
+        <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
+        <button id="memo-submit">Post</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+  let sb = null;
+  const esc = OpsCore.esc;
+
+  let TASKS = [], MEMOS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [];
+  let CASES = { open: [], completed: [] };
+  let typeFilter = 'all';
+  let showCompletedMemos = false;
+  const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
+
+  // Only Sick & Injured has the receiving code for the hand-off so far.
+  const SHIFT_TOOL_URLS = { sick_injured: 'https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html' };
+  function pickUpUrl(t) {
+    const base = SHIFT_TOOL_URLS[t.shift];
+    if (!base) return null;
+    const items = [{
+      id: t.title, location: t.location || '', problem: t.problem || '',
+      redFlags: (t.red_flags || []).map(k => LDHLogic.signLabel(k)),
+      condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
+    }];
+    const params = new URLSearchParams({ items: JSON.stringify(items) });
+    return `${base}?${params.toString()}`;
+  }
+
+  function fmtFlagged(iso) {
+    const d = new Date(iso), now = new Date();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' + time;
+  }
+  function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function locationText(t) {
+    const off = LDHLogic.OFFSITE_NAMES.includes(t.location);
+    return off ? (t.location_detail ? t.location + ' — ' + t.location_detail : t.location) : t.location;
+  }
+  function statusChipHtml(t) {
+    const st = LDHLogic.statusOf(t, Date.now());
+    return `<span class="lvl lvl-${st.level}">${esc(st.label)}</span>`;
+  }
+
+  /* ---------- data loading ---------- */
+  async function loadAll() {
+    const [tasksRes, memosRes, ntRes, ndRes] = await Promise.all([
+      sb.from('tasks').select('*').order('created_at', { ascending: false }),
+      sb.from('memos').select('*').order('created_at', { ascending: false }),
+      sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
+      sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
+    ]);
+    TASKS = tasksRes.data || [];
+    MEMOS = memosRes.data || [];
+    NURSE_TREATMENTS = ntRes.data || [];
+    NURSE_DOSES = ndRes.data || [];
+    renderAll();
+  }
+
+  function renderAll() {
+    CASES = LDHLogic.caseList(TASKS, Date.now());
+    renderCases();
+    renderCompleted();
+    renderMemos();
+    renderNurseTreatments();
+  }
+
+  /* ---------- cases board ---------- */
+  function renderColumnHeaders() {
+    document.getElementById('col-red-h').textContent = `${LDHLogic.TIER_LABELS.red_flag} · ${LDHLogic.TIER_TARGETS.red_flag}`;
+    document.getElementById('col-urgent-h').textContent = `${LDHLogic.TIER_LABELS.urgent} · ${LDHLogic.TIER_TARGETS.urgent}`;
+    document.getElementById('col-routine-h').textContent = `${LDHLogic.TIER_LABELS.routine} · ${LDHLogic.TIER_TARGETS.routine}`;
+  }
+
+  function attnItemHtml(t) {
+    const tier = LDHLogic.normTier(t.urgency);
+    const stage = LDHLogic.stageOf(t, Date.now());
+    const url = pickUpUrl(t);
+    const canPickUp = !!url && !t.claimed_at;
+    const canBump = tier === 'routine' && !t.claimed_at;
+    const canDone = stage === 'flagged' || stage === 'picked_up';
+    const metaBits = [
+      'Flagged ' + esc(fmtFlagged(t.created_at)),
+      esc(locationText(t)),
+      TYPE_LABELS[t.type] || t.type
+    ];
+    if (t.problem) metaBits.push(esc(t.problem));
+    if (t.red_flags && t.red_flags.length) metaBits.push('signs: ' + t.red_flags.map(k => esc(LDHLogic.signLabel(k))).join(', '));
+    if (stage === 'waiting_medication') metaBits.push('Vet check done — waiting on medication');
+    else if (stage === 'picked_up') metaBits.push('Picked up ' + esc(fmtTime(t.claimed_at)));
+    return `
+      <div class="attn-item" data-id="${esc(t.id)}">
+        <div>
+          <div class="aname">${esc(t.title)}${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''} ${statusChipHtml(t)}</div>
+          <div class="ameta">${metaBits.join(' · ')}</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${canBump ? `<button type="button" class="secondary bump-btn" data-id="${esc(t.id)}">Bump to Urgent</button>` : ''}
+          ${canPickUp ? `<button type="button" class="secondary pick-up-btn" data-id="${esc(t.id)}">Pick up →</button>` : ''}
+          ${canDone ? `<button type="button" class="secondary done-btn" data-id="${esc(t.id)}">DONE</button>` : ''}
+        </div>
+      </div>`;
+  }
+  function renderBoardCol(containerId, tasks) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = tasks.length ? tasks.map(attnItemHtml).join('') : '<p class="empty-state">Nothing here.</p>';
+  }
+  function renderCases() {
+    const open = typeFilter === 'all' ? CASES.open : CASES.open.filter(t => t.type === typeFilter);
+    renderBoardCol('board-redflag', open.filter(t => LDHLogic.normTier(t.urgency) === 'red_flag'));
+    renderBoardCol('board-urgent', open.filter(t => LDHLogic.normTier(t.urgency) === 'urgent'));
+    renderBoardCol('board-routine', open.filter(t => LDHLogic.normTier(t.urgency) === 'routine'));
+  }
+  document.getElementById('type-filter-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter-chip'); if (!btn) return;
+    typeFilter = btn.dataset.type;
+    document.querySelectorAll('#type-filter-bar .filter-chip').forEach((b) => b.classList.toggle('active', b === btn));
+    renderCases();
+  });
+
+  function completedRowHtml(t) {
+    return `<div class="completed-row">
+      <span>${esc(t.title)} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}${t.note ? ' — ' + esc(t.note) : ''}</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <span class="time">${esc(fmtTime(t.completed_at || t.created_at))}</span>
+        <button type="button" class="secondary undo-done" data-id="${esc(t.id)}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>
+      </span>
+    </div>`;
+  }
+  function renderCompleted() {
+    document.getElementById('completed-list').innerHTML = CASES.completed.length
+      ? CASES.completed.map(completedRowHtml).join('')
+      : '<p class="empty-state">Nothing completed in the last 24 hours.</p>';
+  }
+
+  /* ---------- DONE panel ---------- */
+  function doneModalHtml(t) {
+    const isMed = !!t.needs_medication;
+    return `
+      <div class="oc-modal-overlay done-modal-overlay" data-id="${esc(t.id)}">
+        <div class="oc-modal done-modal">
+          <h3 class="done-modal-title">${isMed ? 'Complete' : 'Mark done'} — ${esc(t.title)}</h3>
+          ${isMed ? `
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 12px;">
+              <input type="checkbox" class="done-medchart" style="width:auto; margin:0;"> Med chart completed
+            </label>
+            <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Medication label</label>
+            <textarea class="done-medlabel" rows="4" placeholder="Drug, dose, frequency..."></textarea>
+            <p class="done-medlabel-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-6px 0 8px;">Enter the medication label.</p>
+            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
+              ${LDHLogic.CHLORSIG_OPTIONS.map(o => `<button type="button" class="secondary chlorsig-btn" data-label="${esc(o.label)}" style="padding:6px 10px; font-size:0.72rem;">${esc(o.label)}</button>`).join('')}
+            </div>
+          ` : `<p style="font-size:0.88rem; margin:0 0 16px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
+          <div class="oc-modal-actions">
+            <button type="button" class="oc-modal-cancel done-cancel">Cancel</button>
+            <button type="button" class="oc-modal-submit done-confirm">Confirm</button>
+          </div>
+        </div>
+      </div>`;
+  }
+  function openDoneModal(t) {
+    document.querySelectorAll('.done-modal-overlay').forEach(el => el.remove());
+    const wrap = document.createElement('div');
+    wrap.innerHTML = doneModalHtml(t);
+    document.body.appendChild(wrap.firstElementChild);
+  }
+
+  /* ---------- case actions (delegated) ---------- */
+  document.addEventListener('click', async (e) => {
+    const pickBtn = e.target.closest('.pick-up-btn');
+    if (pickBtn) {
+      const ok = await OpsCore.requirePasscode('vet', 'pick up cases');
+      if (!ok) return;
+      const t = TASKS.find(x => x.id === pickBtn.dataset.id);
+      if (!t || t.claimed_at) return;
+      const url = pickUpUrl(t);
+      const { error } = await sb.from('tasks').update({ claimed_at: new Date().toISOString(), claimed_by: null }).eq('id', t.id);
+      if (error) { alert('Could not record the pick-up: ' + error.message); return; }
+      if (url) window.open(url, '_blank');
+      loadAll();
+      return;
+    }
+
+    const bumpBtn = e.target.closest('.bump-btn');
+    if (bumpBtn) {
+      const ok = await OpsCore.requirePasscode('vet', 'bump this case to Urgent');
+      if (!ok) return;
+      const { error } = await sb.from('tasks').update({ urgency: 'urgent' }).eq('id', bumpBtn.dataset.id);
+      if (error) alert('Could not update: ' + error.message);
+      loadAll();
+      return;
+    }
+
+    const doneBtn = e.target.closest('.done-btn');
+    if (doneBtn) {
+      const ok = await OpsCore.requirePasscode('vet', 'complete this case');
+      if (!ok) return;
+      const t = TASKS.find(x => x.id === doneBtn.dataset.id);
+      if (!t) return;
+      openDoneModal(t);
+      return;
+    }
+
+    const undoBtn = e.target.closest('.undo-done');
+    if (undoBtn) {
+      const ok = await OpsCore.requirePasscode('vet', 'undo a completion');
+      if (!ok) return;
+      if (!confirm('Undo completion? This puts the case back in the open queue.')) return;
+      const { error } = await sb.from('tasks').update({ done: false, completed_by_role: null, completed_at: null, note: null }).eq('id', undoBtn.dataset.id);
+      if (error) alert('Could not undo: ' + error.message);
+      loadAll();
+      return;
+    }
+
+    const cancelBtn = e.target.closest('.done-cancel');
+    if (cancelBtn) { cancelBtn.closest('.done-modal-overlay').remove(); return; }
+
+    const chlorsigBtn = e.target.closest('.chlorsig-btn');
+    if (chlorsigBtn) {
+      const overlay = chlorsigBtn.closest('.done-modal-overlay');
+      const ta = overlay.querySelector('.done-medlabel');
+      ta.value = ta.value ? (ta.value + '\n' + chlorsigBtn.dataset.label) : chlorsigBtn.dataset.label;
+      return;
+    }
+
+    const confirmBtn = e.target.closest('.done-confirm');
+    if (confirmBtn) {
+      const overlay = confirmBtn.closest('.done-modal-overlay');
+      const id = overlay.dataset.id;
+      const t = TASKS.find(x => x.id === id);
+      if (!t) { overlay.remove(); return; }
+      if (t.needs_medication) {
+        const chart = overlay.querySelector('.done-medchart').checked;
+        const label = overlay.querySelector('.done-medlabel').value.trim();
+        if (!label) { overlay.querySelector('.done-medlabel-error').style.display = 'block'; return; }
+        const { error } = await sb.from('tasks').update({
+          done: true, med_chart_done: chart, med_label: label, vet_done_at: new Date().toISOString()
+        }).eq('id', id);
+        if (error) { alert('Could not complete: ' + error.message); return; }
+      } else {
+        const { error } = await sb.from('tasks').update({
+          done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString()
+        }).eq('id', id);
+        if (error) { alert('Could not complete: ' + error.message); return; }
+      }
+      overlay.remove();
+      loadAll();
+      return;
+    }
+  });
+
+  /* ---------- memo board ---------- */
+  function memoRowHtml(m, isDone) {
+    return `<div class="memo ${isDone ? 'memo-done' : ''}">
+      <label style="display:flex; gap:8px; align-items:flex-start; margin:0; cursor:pointer;">
+        <input type="checkbox" class="memo-tick" data-id="${esc(m.id)}" ${isDone ? 'checked' : ''} style="width:auto; margin-top:4px;">
+        <span><strong>${esc(m.author)}</strong>: ${esc(m.text)}</span>
+      </label>
+      ${isDone ? `<button type="button" class="secondary memo-del" data-id="${esc(m.id)}" style="padding:3px 10px; font-size:0.7rem; margin-top:6px;">Delete</button>` : ''}
+    </div>`;
+  }
+  function renderMemos() {
+    const { active, completed } = LDHLogic.splitMemos(MEMOS);
+    document.getElementById('memo-list').innerHTML =
+      active.map(m => memoRowHtml(m, false)).join('') || '<p class="empty-state">No open memos.</p>';
+    const toggle = document.getElementById('memo-completed-toggle');
+    toggle.textContent = (showCompletedMemos ? 'Hide' : 'Show') + ' completed (' + completed.length + ')';
+    toggle.style.display = completed.length ? 'inline-block' : 'none';
+    document.getElementById('memo-completed-list').innerHTML =
+      showCompletedMemos ? completed.map(m => memoRowHtml(m, true)).join('') : '';
+  }
+  document.getElementById('memo-board').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.memo-tick'); if (!cb) return;
+    const wantDone = cb.checked;
+    const ok = await OpsCore.requirePasscode('vet', 'tick off a memo');
+    if (!ok) { cb.checked = !wantDone; return; }
+    const { error } = await sb.from('memos').update({ done: wantDone, done_at: wantDone ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
+    if (error) alert('Could not update memo: ' + error.message);
+    loadAll();
+  });
+  document.getElementById('memo-board').addEventListener('click', async (e) => {
+    const del = e.target.closest('.memo-del');
+    if (del) {
+      const ok = await OpsCore.requirePasscode('vet', 'delete a memo');
+      if (!ok) return;
+      if (confirm('Delete this memo permanently?')) {
+        const { error } = await sb.from('memos').delete().eq('id', del.dataset.id);
+        if (error) alert('Could not delete memo: ' + error.message);
+        loadAll();
+      }
+      return;
+    }
+    if (e.target.id === 'memo-completed-toggle') { showCompletedMemos = !showCompletedMemos; renderMemos(); }
+  });
+  document.getElementById('memo-submit').addEventListener('click', async () => {
+    const text = document.getElementById('memo-text').value.trim();
+    if (!text) return;
+    const { error } = await sb.from('memos').insert({ author: 'Vet team', text });
+    if (error) { alert('Could not post: ' + error.message); return; }
+    document.getElementById('memo-text').value = '';
+  });
+
+  /* ---------- request a treatment ---------- */
+  function activeDoses() {
+    const by = new Map(NURSE_TREATMENTS.map(t => [t.id, t]));
+    return NURSE_DOSES.filter(d => by.has(d.treatment_id) && !by.get(d.treatment_id).stopped);
+  }
+  function renderNurseTreatments() {
+    const courses = NURSE_TREATMENTS.filter(t => !t.stopped).map(t => {
+      const p = LDHLogic.courseProgress(NURSE_DOSES.filter(d => d.treatment_id === t.id));
+      return { t, p };
+    }).filter(c => c.p.total === 0 || c.p.done < c.p.total);
+    document.getElementById('nt-courses').innerHTML = courses.length
+      ? `<div class="nt-h">Courses in progress</div>` + courses.map(c => `<div class="attn-item">
+          <div><div class="aname">${esc(c.t.animal_id)} — ${esc(c.t.treatment)}</div>
+            <div class="ameta">${esc(c.t.location)} · ${c.t.times_per_day}× a day for ${c.t.days} days · ${c.p.done} of ${c.p.total} done${c.t.requested_by ? ' · requested by ' + esc(c.t.requested_by) : ''}</div></div>
+          <button type="button" class="secondary nt-stop" data-id="${esc(c.t.id)}">Stop course</button></div>`).join('')
+      : '<p class="empty-state">No treatment courses in progress.</p>';
+  }
+  document.getElementById('nt-start').value = LDHLogic.localISO(new Date());
+  document.getElementById('nt-submit').addEventListener('click', async () => {
+    const _btn = document.getElementById('nt-submit'); _btn.disabled = true;
+    try {
+      const animal = document.getElementById('nt-animal').value.trim();
+      const treatment = document.getElementById('nt-treatment').value.trim();
+      const times = parseInt(document.getElementById('nt-times').value, 10);
+      const days = parseInt(document.getElementById('nt-days').value, 10);
+      const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
+      if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
+      if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
+      const { data: tr, error } = await sb.from('nurse_treatments').insert({
+        animal_id: animal, location: document.getElementById('nt-location').value, treatment,
+        times_per_day: times, days, start_date: start, requested_by: 'Vet team'
+      }).select().single();
+      if (error) { alert('Could not save the request: ' + error.message); return; }
+      const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
+      const { error: doseErr } = await sb.from('nurse_treatment_doses').insert(slots);
+      if (doseErr) {
+        await sb.from('nurse_treatments').delete().eq('id', tr.id);   // never leave a course without its doses
+        alert('Could not create the dose list: ' + doseErr.message);
+        return;
+      }
+      document.getElementById('nt-animal').value = '';
+      document.getElementById('nt-treatment').value = '';
+      loadAll();
+    } finally { _btn.disabled = false; }
+  });
+  document.getElementById('nurse-treatments').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.nt-stop'); if (!btn) return;
+    if (!confirm('Stop this course? Its remaining doses will disappear from the lists.')) return;
+    const { error } = await sb.from('nurse_treatments').update({ stopped: true }).eq('id', btn.dataset.id);
+    if (error) alert('Could not stop the course: ' + error.message);
+    loadAll();
+  });
+
+  function fillLocationSelects() {
+    const el = document.getElementById('nt-location');
+    if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+  }
+
+  function refreshTimers() { renderCases(); renderCompleted(); }
+  setInterval(refreshTimers, 60000);
+  fillLocationSelects();
+  renderColumnHeaders();
+
+  /* ---------- auth (OpsCore) ---------- */
+  (async function () {
+    const { sb: client } = await OpsCore.init({ page: 'vets' });
+    sb = client;
+    document.getElementById('app-root').style.display = 'grid';
+    await loadAll();
+    OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses'], loadAll);
+    document.getElementById('signout-link').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      location.reload();
+    });
+  })();
+</script>
+<!-- ip-notice-footer -->
+<footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  &copy; 2026 Juliana Xue. All rights reserved.<br>
+  This work is the intellectual property of Juliana Xue and may not be copied,
+  modified, or distributed without her express written permission.
+</footer>
+</body>
+</html>
