@@ -154,10 +154,6 @@
   table.queue-table td { padding: 10px; border-top: 1px solid rgba(30,34,56,0.06); }
   table.queue-table tr:first-child td { border-top: none; }
   .row-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-  .status-pill { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
-  .status-pill.urgent { background: rgba(255,159,67,0.22); color: #9a5b00; }
-  .status-pill.routine { background: rgba(216,214,206,0.35); color: var(--muted); }
-  .status-pill.red_flag { background: rgba(208,59,59,0.14); color: var(--critical); }
   .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
   .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
   .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
@@ -183,12 +179,8 @@
     font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
   }
   .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
   .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
-  .urgency-col h3.red-h { color: var(--critical); }
-  .urgency-col h3.urgent-h { color: #c26a00; }
-  .urgency-col h3.routine-h { color: var(--muted); }
   .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
   .attn-item:last-child { border-bottom: none; }
   .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
@@ -218,7 +210,7 @@
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
   @media (max-width: 1000px) {
-    .urgency-board, .trend-grid { grid-template-columns: 1fr; }
+    .trend-grid { grid-template-columns: 1fr; }
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
     .dashboard-body { grid-template-columns: 1fr; }
   }
@@ -248,7 +240,13 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <p class="hint">Stats — all Processing, Sick &amp; Injured and Surgery shifts. Live from the same data as the dashboard.</p>
-    <p class="hint" style="margin-top:14px;"><a href="index.html" style="color:var(--sidebar-text-muted);">← Back to the dashboard</a></p>
+    <p class="hint" style="margin-top:14px;">
+      <a href="index.html" style="color:var(--sidebar-text-muted);">← Shelter staff</a>
+      &nbsp;·&nbsp;
+      <a href="vets.html" style="color:var(--sidebar-text-muted);">Vets</a>
+      &nbsp;·&nbsp;
+      <a href="nurses.html" style="color:var(--sidebar-text-muted);">Nurses</a>
+    </p>
   </aside>
   <main>
     <div class="page-head">
