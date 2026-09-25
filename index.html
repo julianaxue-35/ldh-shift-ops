@@ -245,9 +245,9 @@
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
         <label>How many<input id="nr-count" type="number" min="1" value="1"></label>
-        <span id="nr-arrived-wrap"><label>Arrived<input id="nr-arrived" type="datetime-local"></label>
+        <span id="nr-arrived-wrap"><label>Arrived<input id="nr-arrived" type="datetime-local" step="1800"></label>
         <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
-        <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local"></label>
+        <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
         <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
         <button id="nr-submit" type="button">Log request</button>
       </div>
