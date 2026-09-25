@@ -84,6 +84,29 @@ test('vaccStatus: 2 h from arrival', () => {
   assert.match(L.vaccStatus(req(3 * H), NOW).label, /^overdue 1h/);
 });
 
+test('arrivalStatus: countdown to a scheduled (not-yet-arrived) request, then overdue', () => {
+  const sched = (inMs) => ({ arrived_at: null, expected_at: new Date(NOW + inMs).toISOString() });
+  assert.equal(L.arrivalStatus({ arrived_at: new Date(NOW).toISOString(), expected_at: null }, NOW), null,
+    'null once arrived_at is set — vaccStatus takes over, not arrivalStatus');
+  assert.equal(L.arrivalStatus(sched(45 * M), NOW).level, 'ok');
+  assert.equal(L.arrivalStatus(sched(10 * M), NOW).level, 'amber', 'within the 15-minute warning window');
+  assert.match(L.arrivalStatus(sched(10 * M), NOW).label, /^arriving in/);
+  const overdue = L.arrivalStatus(sched(-20 * M), NOW);
+  assert.equal(overdue.level, 'red');
+  assert.equal(overdue.overdue, true);
+  assert.match(overdue.label, /^overdue arrival by 20m/);
+});
+
+test('needsArrivalWarning: true only strictly inside the 15-minute window, never after arrival or once overdue', () => {
+  const sched = (inMs) => ({ arrived_at: null, expected_at: new Date(NOW + inMs).toISOString() });
+  assert.equal(L.needsArrivalWarning(sched(20 * M), NOW), false, 'not yet within the window');
+  assert.equal(L.needsArrivalWarning(sched(15 * M), NOW), true, 'exactly at the 15-minute boundary');
+  assert.equal(L.needsArrivalWarning(sched(1 * M), NOW), true);
+  assert.equal(L.needsArrivalWarning(sched(-5 * M), NOW), false, 'already overdue — the warning window has passed, not a repeating alert');
+  assert.equal(L.needsArrivalWarning({ arrived_at: new Date(NOW).toISOString(), expected_at: new Date(NOW + 5 * M).toISOString() }, NOW), false,
+    'already arrived — no warning needed regardless of expected_at');
+});
+
 test('courseProgress and splitMemos', () => {
   assert.deepEqual(L.courseProgress([{ done_at: 'x' }, { done_at: null }, { done_at: null }]), { done: 1, total: 3 });
   const s = L.splitMemos([{ id: 1, done: false }, { id: 2, done: true }]);

@@ -329,5 +329,55 @@ const todayISO = LDHLogic.localISO(new Date());
     await eTab.browser.close();
   }
 
+  /* ============================================================
+     Tab F: scheduled arrivals (2026-09-26) — a request logged ahead
+     of time shows a countdown/overdue state instead of the
+     vaccination-progress actions, "Mark arrived" converts it, and a
+     due-within-15-minutes request bangs the banner even on first load
+     (unlike the "new item" checks, this is time-based, not novelty-based).
+     ============================================================ */
+  const seedF = {
+    nurse_requests: [
+      { location: 'FIR Room', species: 'cat', animal_count: 4, done_count: 0, arrived_at: null, expected_at: new Date(Date.now() + 3 * 3600 * 1000).toISOString(), note: 'from Cranbourne pound' },
+      { location: 'Transport', species: 'dog', animal_count: 2, done_count: 0, arrived_at: null, expected_at: new Date(Date.now() - 20 * 60 * 1000).toISOString() },
+      { location: 'Pound 1', species: 'cat', animal_count: 1, done_count: 0, arrived_at: null, expected_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() },
+    ]
+  };
+  const fTab = await open(seedF, 'nurses.html');
+  try {
+    // Far-out scheduled request: countdown, no vaccination-progress buttons.
+    const farRow = fTab.page.locator('.nr-item', { hasText: 'FIR Room' });
+    t.ok((await farRow.textContent()).includes('arriving in'), 'a far-out scheduled request shows a countdown to arrival');
+    t.ok(await farRow.locator('.nr-claim, .nr-plus, .nr-all').count() === 0, 'no vaccination-progress buttons before it has arrived');
+    t.ok(await farRow.locator('.nr-arrive').count() === 1, 'a "Mark arrived" button is offered instead');
+
+    // Overdue scheduled request (expected 20 min ago, never marked arrived).
+    const overdueRow = fTab.page.locator('.nr-item', { hasText: 'Transport' });
+    t.ok((await overdueRow.textContent()).includes('overdue arrival'), 'an unconfirmed request past its expected time shows "overdue arrival", not an auto-started vaccinate clock');
+
+    // Due-within-15-minutes request alerts the banner even on the very
+    // first load (not suppressed like the "new item" seeding).
+    const bannerVisible = await fTab.page.evaluate(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none');
+    t.ok(bannerVisible, 'a request already due within 15 minutes alerts on first load');
+    const bannerText = await fTab.page.textContent('#new-item-banner-text');
+    t.ok(bannerText.includes('arrival') && bannerText.includes('15 minutes'), 'banner wording mentions the 15-minute arrival warning: ' + bannerText);
+
+    // Mark arrived converts it: arrived_at gets stamped, vaccination-progress
+    // buttons appear, the countdown/overdue wording is gone.
+    await fTab.page.click('#new-item-banner-dismiss');
+    await fTab.page.locator('.nr-item', { hasText: 'Pound 1' }).locator('.nr-arrive').click();
+    await fTab.page.waitForTimeout(200);
+    const dbReqs = (await fTab.db()).nurse_requests;
+    const marked = dbReqs.find(r => r.location === 'Pound 1');
+    t.ok(marked.arrived_at != null, 'Mark arrived stamps arrived_at');
+    const markedRow = fTab.page.locator('.nr-item', { hasText: 'Pound 1' });
+    t.ok(!(await markedRow.textContent()).includes('arriving in'), 'the countdown wording is gone once arrived');
+    t.ok(await markedRow.locator('.nr-claim').count() === 1, 'vaccination-progress buttons (Pick up) appear once arrived');
+
+    t.ok(fTab.errors.length === 0, 'no page errors in tab F: ' + JSON.stringify(fTab.errors));
+  } finally {
+    await fTab.browser.close();
+  }
+
   t.done();
 })();

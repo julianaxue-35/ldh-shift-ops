@@ -238,12 +238,16 @@
     <section class="card nurse-card" id="nurse-requests">
       <h2>Request nurse vaccination</h2>
       <p class="subtle">Log animals that need vaccinating on arrival. The clock is 2 hours from arrival.</p>
+      <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
+        <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
+      </label>
       <div class="nr-form" id="nr-form">
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
         <label>How many<input id="nr-count" type="number" min="1" value="1"></label>
-        <label>Arrived<input id="nr-arrived" type="datetime-local"></label>
-        <button class="secondary" id="nr-now" type="button">Arrived now</button>
+        <span id="nr-arrived-wrap"><label>Arrived<input id="nr-arrived" type="datetime-local"></label>
+        <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
+        <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local"></label>
         <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
         <button id="nr-submit" type="button">Log request</button>
       </div>
@@ -534,26 +538,46 @@
   document.getElementById('nr-species').addEventListener('change', applyNrDefaultLocation);
   document.getElementById('nr-arrived').value = nowLocalInput();
   document.getElementById('nr-now').addEventListener('click', () => { document.getElementById('nr-arrived').value = nowLocalInput(); });
+  // Scheduled arrival (2026-09-26): an alternative to "it's here now" — log
+  // an animal that hasn't arrived yet (e.g. "8 cats at 2pm") so nurses see
+  // it coming, instead of only ever logging an arrival after the fact.
+  document.getElementById('nr-scheduled-toggle').addEventListener('change', (e) => {
+    document.getElementById('nr-arrived-wrap').style.display = e.target.checked ? 'none' : '';
+    document.getElementById('nr-expected-wrap').style.display = e.target.checked ? '' : 'none';
+  });
   document.getElementById('nr-submit').addEventListener('click', async () => {
     const _btn = document.getElementById('nr-submit'); _btn.disabled = true;
     try {
       const count = parseInt(document.getElementById('nr-count').value, 10);
-      const arrivedRaw = document.getElementById('nr-arrived').value;
       if (!count || count < 1) { alert('Enter how many animals.'); return; }
-      if (!arrivedRaw) { alert('Enter the arrival time (or tap "Arrived now").'); return; }
-      const { error } = await sb.from('nurse_requests').insert({
+      const scheduled = document.getElementById('nr-scheduled-toggle').checked;
+      const payload = {
         location: document.getElementById('nr-location').value,
         species: document.getElementById('nr-species').value,
         animal_count: count,
-        arrived_at: new Date(arrivedRaw).toISOString(),
         note: document.getElementById('nr-note').value.trim() || null,
         created_by: 'Shelter Staff'
-      });
+      };
+      if (scheduled) {
+        const expectedRaw = document.getElementById('nr-expected').value;
+        if (!expectedRaw) { alert('Enter the expected arrival time.'); return; }
+        payload.arrived_at = null;
+        payload.expected_at = new Date(expectedRaw).toISOString();
+      } else {
+        const arrivedRaw = document.getElementById('nr-arrived').value;
+        if (!arrivedRaw) { alert('Enter the arrival time (or tap "Arrived now").'); return; }
+        payload.arrived_at = new Date(arrivedRaw).toISOString();
+      }
+      const { error } = await sb.from('nurse_requests').insert(payload);
       if (error) { alert('Could not log request: ' + error.message); return; }
       document.getElementById('nr-count').value = '1';
       applyNrDefaultLocation();
       document.getElementById('nr-note').value = '';
       document.getElementById('nr-arrived').value = nowLocalInput();
+      document.getElementById('nr-expected').value = '';
+      document.getElementById('nr-scheduled-toggle').checked = false;
+      document.getElementById('nr-arrived-wrap').style.display = '';
+      document.getElementById('nr-expected-wrap').style.display = 'none';
       loadAll();
     } finally { _btn.disabled = false; }
   });

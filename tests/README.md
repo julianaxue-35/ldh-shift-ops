@@ -1,6 +1,6 @@
 # Tests (dev only)
-- Node suites: `logic`, `migration`, `round3-migration`, `surveillance-migration`, `consistency`, `surveillance-view` (all in `tests/*.test.mjs`). `node --test tests/*.test.mjs` runs them all.
-- The three migration suites (`migration`, `round3-migration`, `surveillance-migration`) need PGlite (`cd tests && npm install` once).
+- Node suites: `logic`, `migration`, `round3-migration`, `scheduled-arrival-migration`, `surveillance-migration`, `consistency`, `surveillance-view` (all in `tests/*.test.mjs`). `node --test tests/*.test.mjs` runs them all.
+- The four migration suites (`migration`, `round3-migration`, `scheduled-arrival-migration`, `surveillance-migration`) need PGlite (`cd tests && npm install` once).
 - Browser (`tests/ui/*.test.js`): needs Playwright. On Juliana's Mac it is at
   `~/.npm/_npx/e41f203b7505f1fb/node_modules` (find with `find ~/.npm/_npx -maxdepth 4 -iname playwright -type d`).
   Run: `NODE_PATH=<that path> node tests/ui/run-all.js`, or

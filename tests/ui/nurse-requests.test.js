@@ -29,6 +29,38 @@ const t = require('./check')('nurse-requests');
     t.ok(reqs.length === 1 && reqs[0].animal_count === 3 && reqs[0].location === 'FIR Room' && reqs[0].created_by === 'Shelter Staff', 'new request saved from the form, raised by Shelter Staff');
     t.ok(Math.abs(Date.now() - new Date(reqs[0].arrived_at).getTime()) < 120000, 'arrival time saved as ~now');
 
+    /* ---------- Scheduled arrival (2026-09-26): log one for later, not now ---------- */
+    t.ok(!(await page.isVisible('#nr-expected-wrap')), 'expected-arrival field hidden by default');
+    t.ok(await page.isVisible('#nr-arrived-wrap'), 'arrived field shown by default');
+    await page.check('#nr-scheduled-toggle');
+    t.ok(await page.isVisible('#nr-expected-wrap'), 'checking the toggle reveals the expected-arrival field');
+    t.ok(!(await page.isVisible('#nr-arrived-wrap')), 'and hides the arrived field/button');
+
+    await page.fill('#nr-count', '5');
+    await page.selectOption('#nr-species', 'dog');
+    const future = new Date(Date.now() + 3 * 3600 * 1000);
+    const futureLocal = future.getFullYear() + '-' + String(future.getMonth() + 1).padStart(2, '0') + '-' + String(future.getDate()).padStart(2, '0')
+      + 'T' + String(future.getHours()).padStart(2, '0') + ':' + String(future.getMinutes()).padStart(2, '0');
+    await page.fill('#nr-expected', futureLocal);
+    await page.click('#nr-submit');
+    await page.waitForTimeout(250);
+    const reqs2 = (await db()).nurse_requests;
+    const scheduled = reqs2.find(r => r.animal_count === 5);
+    t.ok(scheduled && scheduled.arrived_at == null, 'a scheduled request saves with arrived_at null');
+    t.ok(scheduled && scheduled.expected_at != null, 'and expected_at set');
+
+    // Form resets to the non-scheduled mode after a successful submit.
+    t.ok(!(await page.isVisible('#nr-expected-wrap')), 'toggle resets off after submit');
+    t.ok(await page.isVisible('#nr-arrived-wrap'), 'arrived field shown again after submit');
+
+    // Submitting scheduled mode with no expected time is blocked (no insert).
+    await page.check('#nr-scheduled-toggle');
+    await page.fill('#nr-expected', '');
+    await page.click('#nr-submit');
+    await page.waitForTimeout(200);
+    t.ok((await db()).nurse_requests.length === 2, 'submit is blocked with the toggle on and no expected time entered');
+    await page.uncheck('#nr-scheduled-toggle');
+
     t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   } finally {
     await browser.close();

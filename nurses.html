@@ -370,27 +370,44 @@
   /* ============================================================
      Vaccination requests
      ============================================================ */
+  // A scheduled request (logged ahead of arrival — 2026-09-26) has no
+  // arrived_at yet: show a countdown/overdue state and just a "Mark
+  // arrived" button, not the vaccination-progress actions, which only make
+  // sense once the animal is actually here.
+  function scheduledRowHtml(r) {
+    const st = LDHLogic.arrivalStatus(r, Date.now());
+    return `<div class="attn-item nr-item">
+      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
+        <div class="ameta">expected ${fmtTime(r.expected_at)}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+        <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
+        <button class="secondary nr-arrive" data-id="${esc(r.id)}">Mark arrived</button>
+      </div></div>`;
+  }
+  function arrivedRowHtml(r) {
+    const st = LDHLogic.vaccStatus(r, Date.now());
+    return `<div class="attn-item nr-item">
+      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
+        <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+        <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
+        <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
+        <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
+        <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
+      </div></div>`;
+  }
   function renderNurseRequests() {
-    const now = Date.now();
     const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
-    document.getElementById('nr-list').innerHTML = open.map(r => {
-      const st = LDHLogic.vaccStatus(r, now);
-      return `<div class="attn-item nr-item">
-        <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
-          <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
-        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
-          <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
-          <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
-          <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
-        </div></div>`;
-    }).join('') || '<p class="empty-state">No vaccination requests open.</p>';
+    document.getElementById('nr-list').innerHTML = open.map(r => r.arrived_at ? arrivedRowHtml(r) : scheduledRowHtml(r)).join('')
+      || '<p class="empty-state">No vaccination requests open.</p>';
   }
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
     const r = NURSE_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
     let patch = null;
-    if (btn.classList.contains('nr-claim')) {
+    if (btn.classList.contains('nr-arrive')) {
+      patch = { arrived_at: new Date().toISOString() };
+    } else if (btn.classList.contains('nr-claim')) {
       if (r.claimed_by) patch = { claimed_by: null };
       else { const who = myInitials(); if (!who) return; patch = { claimed_by: who }; }
     } else if (btn.classList.contains('nr-plus')) {
@@ -558,7 +575,10 @@
   // Time-based UI (the 2h vaccination clock, the overdue/today dose split,
   // and the NO-GA 24h-hide window) needs to move even with no realtime
   // event — mirrors index.html/vets.html's refreshTimers pattern.
-  function refreshTimers() { renderNurseRequests(); renderNurseDoses(); renderNoga(); }
+  // checkForNewItems() also runs here (not just after loadAll()) because
+  // crossing the 15-minute arrival-warning threshold is purely time-based —
+  // it needs to fire even when nothing in the data has actually changed.
+  function refreshTimers() { checkForNewItems(); renderNurseRequests(); renderNurseDoses(); renderNoga(); }
   setInterval(refreshTimers, 60000);
 
   /* ============================================================
@@ -600,16 +620,23 @@
   }
   document.getElementById('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
 
-  function showAlertBanner(newVaccCount, newMedCount) {
-    let msg;
-    if (newVaccCount > 0 && newMedCount > 0) {
-      msg = `🔔 ${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''} and ${newMedCount} new medication label${newMedCount > 1 ? 's' : ''} waiting — check below.`;
-    } else if (newVaccCount > 0) {
-      msg = `🔔 ${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''} waiting — check below.`;
-    } else {
-      msg = `🔔 ${newMedCount} new medication label${newMedCount > 1 ? 's' : ''} waiting — check below.`;
-    }
-    document.getElementById('new-item-banner-text').textContent = msg;
+  // 2026-09-26: a scheduled request due within 15 minutes gets the same
+  // banner+ding, worded separately from "new" items — this one's a
+  // time-based warning, not something that just appeared. seenArrivalWarnIds
+  // stops it repeating every refresh once it's fired for a given request;
+  // unlike seenVaccIds/seenMedIds it deliberately does NOT skip its very
+  // first check — a request already due within 15 minutes when the page is
+  // opened still needs the warning, since the point is "get ready now", not
+  // "this is new to me".
+  let seenArrivalWarnIds = new Set();
+
+  function showAlertBanner(newVaccCount, newMedCount, arrivalWarnCount) {
+    const parts = [];
+    if (newVaccCount > 0) parts.push(`${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''}`);
+    if (newMedCount > 0) parts.push(`${newMedCount} new medication label${newMedCount > 1 ? 's' : ''}`);
+    if (arrivalWarnCount > 0) parts.push(`${arrivalWarnCount} arrival${arrivalWarnCount > 1 ? 's' : ''} due in 15 minutes`);
+    if (!parts.length) return;
+    document.getElementById('new-item-banner-text').textContent = '🔔 ' + parts.join(' · ') + ' — check below.';
     document.getElementById('new-item-banner').style.display = 'flex';
     playAlertTone();
     if (bannerHideTimer) clearTimeout(bannerHideTimer);
@@ -622,23 +649,27 @@
   function checkForNewItems() {
     const openVacc = openVaccRequests();
     const medTasks = medLabelTasks();
+    const now = Date.now();
+    const dueArrivals = NURSE_REQUESTS.filter(r => LDHLogic.needsArrivalWarning(r, now) && !seenArrivalWarnIds.has(r.id));
+    dueArrivals.forEach(r => seenArrivalWarnIds.add(r.id));
     if (!seenInitialised) {
       openVacc.forEach(r => seenVaccIds.add(r.id));
       medTasks.forEach(t => seenMedIds.add(t.id));
       seenInitialised = true;
+      if (dueArrivals.length > 0) showAlertBanner(0, 0, dueArrivals.length);
       return;
     }
     const newVacc = openVacc.filter(r => !seenVaccIds.has(r.id));
     const newMed = medTasks.filter(t => !seenMedIds.has(t.id));
     openVacc.forEach(r => seenVaccIds.add(r.id));
     medTasks.forEach(t => seenMedIds.add(t.id));
-    if (newVacc.length > 0 || newMed.length > 0) showAlertBanner(newVacc.length, newMed.length);
+    if (newVacc.length > 0 || newMed.length > 0 || dueArrivals.length > 0) showAlertBanner(newVacc.length, newMed.length, dueArrivals.length);
   }
 
   async function loadAll() {
     const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
-      sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
+      sb.from('nurse_requests').select('*').order('created_at', { ascending: true }),
       sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
       sb.from('noga_requests').select('*').order('created_at', { ascending: false }),
