@@ -1,6 +1,6 @@
 // LDH Shift Ops — offline-tool sync (completions + list-load).
 //
-// Two request shapes, same endpoint, same shared secret:
+// Three request shapes (delete added 2026-09-25), same endpoint, same shared secret:
 //   1. { title, location, shift }        — one item just ticked "Completed"
 //      in an offline tool. Upserts done=true, completed_at=now().
 //   2. { items: [{title,location,shift}, ...] } — a whole list just got
@@ -66,6 +66,27 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(PROJECT_URL, SERVICE_KEY);
+
+  // Shape 3 (2026-09-25): { delete: {title,location,shift} } — an animal was
+  // removed from an offline tool's list, so its case is removed here too.
+  // Deletes only the one matching row; never reads anything back.
+  if (body.delete && typeof body.delete === 'object') {
+    const dTitle = typeof body.delete.title === 'string' ? body.delete.title.trim() : '';
+    const dLocation = typeof body.delete.location === 'string' ? body.delete.location.trim() : '';
+    const dShift = body.delete.shift;
+    if (!dTitle || !dLocation || !VALID_SHIFTS.includes(dShift)) {
+      return new Response(JSON.stringify({ error: 'delete needs title, location and a valid shift' }), { status: 400, headers: CORS_HEADERS });
+    }
+    const { error } = await supabase.from('tasks').delete()
+      .eq('title', dTitle).eq('location', dLocation).eq('shift', dShift);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    }
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
+  }
 
   // Shape 2: batch list-load. Insert-only — never touches an existing row's
   // done/completed_at, so a re-imported list can't un-complete something.
