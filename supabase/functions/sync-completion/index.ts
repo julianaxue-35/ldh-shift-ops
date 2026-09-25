@@ -1,6 +1,7 @@
 // LDH Shift Ops — offline-tool sync (completions + list-load).
 //
-// Three request shapes (delete added 2026-09-25), same endpoint, same shared secret:
+// Four request shapes (delete added 2026-09-25, chart added 2026-09-26),
+// same endpoint, same shared secret:
 //   1. { title, location, shift }        — one item just ticked "Completed"
 //      in an offline tool. Upserts done=true, completed_at=now().
 //   2. { items: [{title,location,shift}, ...] } — a whole list just got
@@ -10,6 +11,12 @@
 //      this must NEVER overwrite an existing row's done/completed_at, since
 //      an item already marked complete must stay complete even if the same
 //      list gets re-imported.
+//   4. { chart: {title,location,shift,med_label,med_chart_done} } — a
+//      medication chart was registered/corrected for this animal in
+//      Processing/Sick & Injured/Surgery (medchart.js). UPDATE only, never
+//      an upsert: if the dashboard has no matching row (not a flagged
+//      medication case, or not on the dashboard at all) this is a no-op —
+//      it must never create a stray task row out of a chart record alone.
 //
 // Runs with the service role key, which bypasses RLS entirely, so this
 // function itself is the only thing that must be trusted to only ever
@@ -79,6 +86,31 @@ Deno.serve(async (req) => {
     }
     const { error } = await supabase.from('tasks').delete()
       .eq('title', dTitle).eq('location', dLocation).eq('shift', dShift);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    }
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Shape 4 (2026-09-26): { chart: {title,location,shift,med_label,med_chart_done} }.
+  // Plain UPDATE filtered by the same (title,location,shift) key as
+  // everything else — no insert branch, so a chart with no matching
+  // dashboard row (not flagged for medication, or not synced there at all)
+  // silently touches nothing rather than fabricating a task.
+  if (body.chart && typeof body.chart === 'object') {
+    const cTitle = typeof body.chart.title === 'string' ? body.chart.title.trim() : '';
+    const cLocation = typeof body.chart.location === 'string' ? body.chart.location.trim() : '';
+    const cShift = body.chart.shift;
+    const cLabel = typeof body.chart.med_label === 'string' && body.chart.med_label.trim() ? body.chart.med_label.trim().slice(0, 500) : null;
+    if (!cTitle || !cLocation || !VALID_SHIFTS.includes(cShift) || !cLabel) {
+      return new Response(JSON.stringify({ error: 'chart needs title, location, a valid shift and a med_label' }), { status: 400, headers: CORS_HEADERS });
+    }
+    const { error } = await supabase.from('tasks')
+      .update({ med_label: cLabel, med_chart_done: body.chart.med_chart_done === true })
+      .eq('title', cTitle).eq('location', cLocation).eq('shift', cShift);
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }
