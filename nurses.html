@@ -1,0 +1,636 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDH Shift Ops — Nurses</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
+<script src="lib/ops-core.js"></script>
+<style>
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
+  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+  }
+  button {
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .filter-chip {
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgency-col h3.red-h { color: var(--critical); }
+  .urgency-col h3.urgent-h { color: #c26a00; }
+  .urgency-col h3.routine-h { color: var(--muted); }
+  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
+  .attn-item:last-child { border-bottom: none; }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+  .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .completed-row {
+    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
+    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
+
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
+
+  .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+  .nt-h.overdue { color: var(--critical); }
+
+  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  .memo-done { opacity: 0.6; }
+  #memo-post textarea { min-height: 60px; }
+
+  .done-modal { width: 360px; }
+  .done-modal .done-modal-title { margin: 0 0 12px; font-size: 1rem; }
+  .done-modal textarea { min-height: 90px; }
+
+  .med-label-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .med-label-card:last-child { margin-bottom: 0; }
+  .med-label-text { white-space: pre-wrap; background: var(--neutral-100); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; margin: 8px 0; }
+  .med-label-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  #noga-list .attn-item { align-items: flex-start; }
+
+  .alert-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: rgba(255,159,67,0.18); border: 1px solid rgba(255,159,67,0.55); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.88rem; font-weight: 600; color: #7a4a00;
+  }
+  .alert-banner-dismiss {
+    background: transparent; border: none; box-shadow: none; padding: 0 4px; font-size: 1.1rem;
+    line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
+  }
+
+  @media (max-width: 1000px) {
+    .urgency-board { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <p class="hint">Medication labels, vaccination and treatment tasks, and the NO-GA list for the nurse team.</p>
+    <p class="hint" style="margin-top:14px;">
+      <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
+      &nbsp;·&nbsp;
+      <a href="https://julianaxue-35.github.io/ldh-shift-tools/" style="color:var(--sidebar-text-muted);">Shift Tools ↗</a>
+    </p>
+    <div id="initials-box" style="margin-top:14px;">
+      <label for="initials-input">Your initials</label>
+      <input id="initials-input" maxlength="4" placeholder="e.g. AB" autocomplete="off">
+      <p class="hint" style="margin-top:6px;">Used when you pick up or tick off a task. Type yours in — change it if someone else is using this device.</p>
+    </div>
+    <span id="signout-link">Sign out</span>
+  </aside>
+  <main>
+    <div id="new-item-banner" class="alert-banner" style="display:none;">
+      <span id="new-item-banner-text"></span>
+      <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
+    </div>
+    <div class="page-head"><div><h1>Nurses</h1><p>Medication labels, vaccination, treatments due, and the NO-GA list.</p></div></div>
+
+    <section class="card" id="med-labels-section">
+      <h2>Medication labels to make</h2>
+      <div id="med-labels-list"></div>
+    </section>
+
+    <section class="card" id="nurse-requests-section">
+      <h2>Vaccination requests</h2>
+      <div id="nr-list"></div>
+    </section>
+
+    <section class="card" id="nurse-doses">
+      <h2>Treatments due</h2>
+      <div id="nt-overdue"></div>
+      <div id="nt-today"></div>
+    </section>
+
+    <section class="card" id="noga-section">
+      <h2>NO-GA required list</h2>
+      <div id="noga-list"></div>
+      <div class="nt-form">
+        <label>Animal ID
+          <input type="text" id="noga-animal-id" autocomplete="off">
+        </label>
+        <label>Location
+          <select id="noga-location"></select>
+        </label>
+        <label id="noga-detail-wrap" style="display:none;">Offsite detail
+          <input type="text" id="noga-location-detail" autocomplete="off">
+        </label>
+        <label>Task
+          <select id="noga-task">
+            <option value="fiv_test">FIV test</option>
+            <option value="microchip">Microchip</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>Note
+          <input type="text" id="noga-note" autocomplete="off">
+        </label>
+        <button type="button" id="noga-submit">Add</button>
+      </div>
+    </section>
+
+    <section class="card" id="memo-board">
+      <h2>Memo board</h2>
+      <div id="memo-list"></div>
+      <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
+      <div id="memo-completed-list"></div>
+      <div id="memo-post">
+        <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
+        <button id="memo-submit">Post</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+  let sb = null;
+  const esc = OpsCore.esc;
+  let TASKS = [], NURSE_REQUESTS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [], NOGA_REQUESTS = [], MEMOS = [];
+  let showCompletedMemos = false;
+
+  // Initials come from the visible box in the sidebar. Deliberately NOT remembered between visits.
+  function cleanInitials(v) { return String(v || '').trim().toUpperCase().slice(0, 4); }
+  function myInitials() {
+    const el = document.getElementById('initials-input');
+    let v = cleanInitials(el.value);
+    if (!v) { v = cleanInitials(window.prompt('Your initials:')); if (v) el.value = v; }
+    return v;
+  }
+  document.getElementById('initials-input').addEventListener('input', (e) => { e.target.value = cleanInitials(e.target.value); });
+
+  function locationText(t) {
+    const off = LDHLogic.OFFSITE_NAMES.includes(t.location);
+    return off ? (t.location_detail ? t.location + ' — ' + t.location_detail : t.location) : t.location;
+  }
+  function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+
+  /* ============================================================
+     Medication labels to make
+     ============================================================ */
+  function medLabelTasks() {
+    return TASKS.filter(t => t.needs_medication && t.vet_done_at && !t.done);
+  }
+  function medLabelCardHtml(t) {
+    return `<div class="med-label-card" data-id="${esc(t.id)}">
+      <div class="aname">${esc(t.title)} <span class="ameta">SM ${esc(t.sm_number || '—')}</span></div>
+      <div class="ameta">${esc(locationText(t))} · ${t.med_chart_done ? 'Chart printed by admission' : 'No chart'}</div>
+      <div class="med-label-text">${esc(t.med_label || '')}</div>
+      <div class="med-label-actions">
+        <button type="button" class="secondary med-copy-btn" data-id="${esc(t.id)}">Copy</button>
+        <button type="button" class="med-done-btn" data-id="${esc(t.id)}">Done</button>
+      </div>
+    </div>`;
+  }
+  function renderMedLabels() {
+    const list = medLabelTasks();
+    document.getElementById('med-labels-list').innerHTML = list.map(medLabelCardHtml).join('') || '<p class="empty-state">No medication labels waiting.</p>';
+  }
+  function copyTextFallback(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+  document.getElementById('med-labels-list').addEventListener('click', async (e) => {
+    const copyBtn = e.target.closest('.med-copy-btn');
+    if (copyBtn) {
+      const t = TASKS.find(x => x.id === copyBtn.dataset.id);
+      if (!t) return;
+      const text = LDHLogic.medCopyText(t);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try { await navigator.clipboard.writeText(text); } catch (err) { copyTextFallback(text); }
+      } else {
+        copyTextFallback(text);
+      }
+      const original = 'Copy';
+      copyBtn.textContent = 'Copied';
+      setTimeout(() => { copyBtn.textContent = original; }, 1500);
+      return;
+    }
+    const doneBtn = e.target.closest('.med-done-btn');
+    if (doneBtn) {
+      const t = TASKS.find(x => x.id === doneBtn.dataset.id);
+      if (!t) return;
+      const ok = await OpsCore.requirePasscode('nurse', 'mark medication done');
+      if (!ok) return;
+      const initials = myInitials();
+      if (!initials) { alert('Enter your initials before marking this done.'); return; }
+      const { error } = await sb.from('tasks').update({
+        med_done_by: initials, med_done_at: new Date().toISOString(), done: true,
+        completed_by_role: 'vet_nurse', completed_at: new Date().toISOString()
+      }).eq('id', t.id);
+      if (error) alert('Could not mark done: ' + error.message);
+      loadAll();
+    }
+  });
+
+  /* ============================================================
+     Vaccination requests
+     ============================================================ */
+  function renderNurseRequests() {
+    const now = Date.now();
+    const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
+    document.getElementById('nr-list').innerHTML = open.map(r => {
+      const st = LDHLogic.vaccStatus(r, now);
+      return `<div class="attn-item nr-item">
+        <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
+          <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+          <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
+          <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
+          <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
+          <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
+        </div></div>`;
+    }).join('') || '<p class="empty-state">No vaccination requests open.</p>';
+  }
+  document.getElementById('nr-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const r = NURSE_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
+    const ok = await OpsCore.requirePasscode('nurse', 'update a vaccination request'); if (!ok) return;
+    let patch = null;
+    if (btn.classList.contains('nr-claim')) {
+      if (r.claimed_by) patch = { claimed_by: null };
+      else { const who = myInitials(); if (!who) return; patch = { claimed_by: who }; }
+    } else if (btn.classList.contains('nr-plus')) {
+      const n = Math.min(r.done_count + 1, r.animal_count);
+      patch = { done_count: n, completed_at: n >= r.animal_count ? new Date().toISOString() : null };
+    } else if (btn.classList.contains('nr-all')) {
+      patch = { done_count: r.animal_count, completed_at: new Date().toISOString() };
+    }
+    if (!patch) return;
+    const { error } = await sb.from('nurse_requests').update(patch).eq('id', r.id);
+    if (error) alert('Could not update: ' + error.message);
+    loadAll();
+  });
+
+  /* ============================================================
+     Treatments due
+     ============================================================ */
+  function activeDoses() {
+    const by = new Map(NURSE_TREATMENTS.map(t => [t.id, t]));
+    return NURSE_DOSES
+      .filter(d => by.has(d.treatment_id) && !by.get(d.treatment_id).stopped)
+      .map(d => { const t = by.get(d.treatment_id);
+        return Object.assign({}, d, { animal_id: t.animal_id, location: t.location, treatment: t.treatment, slot_label: LDHLogic.slotLabel(t.times_per_day, d.slot_no) }); });
+  }
+  function doseRowHtml(d, todayISO) {
+    const done = !!d.done_at;
+    return `<label class="attn-item" style="cursor:pointer;">
+      <span style="display:flex; gap:10px; align-items:center;">
+        <input type="checkbox" class="nt-tick" data-id="${esc(d.id)}" ${done ? 'checked' : ''} style="width:20px; height:20px; margin:0;">
+        <span><span class="aname">${esc(d.animal_id)} — ${esc(d.treatment)}</span><br>
+          <span class="ameta">${esc(d.slot_label)}${d.due_date !== todayISO ? ' · due ' + esc(d.due_date) : ''}${done ? ' · done by ' + esc(d.done_by || '?') + ' ' + fmtTime(d.done_at) : ''}</span></span>
+      </span></label>`;
+  }
+  function groupedDoseHtml(list, todayISO) {
+    const by = {}; list.forEach(d => { (by[d.location] = by[d.location] || []).push(d); });
+    return Object.keys(by).sort().map(loc => `<div><div class="nt-loc-h">${esc(loc)}</div>${by[loc].map(d => doseRowHtml(d, todayISO)).join('')}</div>`).join('');
+  }
+  function renderNurseDoses() {
+    const todayISO = LDHLogic.localISO(new Date());
+    const doses = activeDoses();
+    const overdue = doses.filter(d => LDHLogic.doseLevel(d, todayISO) === 'overdue');
+    const today = doses.filter(d => d.due_date === todayISO);
+    document.getElementById('nt-overdue').innerHTML = overdue.length ? `<div class="nt-h overdue">Overdue (${overdue.length})</div>${groupedDoseHtml(overdue, todayISO)}` : '';
+    const todayDone = today.filter(d => d.done_at).length;
+    document.getElementById('nt-today').innerHTML = today.length
+      ? `<div class="nt-h">Due today (${todayDone} of ${today.length} done)</div>${groupedDoseHtml(today, todayISO)}`
+      : '<p class="empty-state">No treatments due today.</p>';
+  }
+  document.getElementById('nurse-doses').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.nt-tick'); if (!cb) return;
+    let who = null;
+    if (cb.checked) {
+      const ok = await OpsCore.requirePasscode('nurse', 'tick off a dose'); if (!ok) { cb.checked = false; return; }
+      who = myInitials(); if (!who) { cb.checked = false; return; }
+    } else {
+      const ok = await OpsCore.requirePasscode('nurse', 'undo a dose'); if (!ok) { cb.checked = true; return; }
+    }
+    const { error } = await sb.from('nurse_treatment_doses').update({ done_by: who, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
+    if (error) alert('Could not save the tick: ' + error.message);
+    loadAll();
+  });
+
+  /* ============================================================
+     NO-GA required list
+     ============================================================ */
+  const NOGA_TASK_LABELS = { fiv_test: 'FIV test', microchip: 'Microchip', other: 'Other' };
+  function renderNoga() {
+    const now = Date.now();
+    // Same fallback-anchor style as LDHLogic.caseList's doneAt(): fall back
+    // to created_at if done_at is somehow missing, so a done row with no
+    // timestamp reads as "just now" (still visible) rather than vanishing.
+    const doneAt = r => new Date(r.done_at || r.created_at).getTime();
+    const visible = NOGA_REQUESTS.filter(r => !r.done || now - doneAt(r) <= 24 * 60 * 60 * 1000);
+    document.getElementById('noga-list').innerHTML = visible.map(r => `
+      <div class="attn-item noga-item">
+        <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
+        ${r.done ? '' : `<button class="secondary noga-done" data-id="${esc(r.id)}">Done</button>`}
+      </div>`).join('') || '<p class="empty-state">No NO-GA requests open.</p>';
+  }
+  document.getElementById('noga-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.noga-done'); if (!btn) return;
+    const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
+    const ok = await OpsCore.requirePasscode('nurse', 'mark a NO-GA task done'); if (!ok) return;
+    const initials = myInitials();
+    if (!initials) { alert('Enter your initials before marking this done.'); return; }
+    const { error } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString() }).eq('id', r.id);
+    if (error) alert('Could not update: ' + error.message);
+    loadAll();
+  });
+  document.getElementById('noga-location').addEventListener('change', (e) => {
+    document.getElementById('noga-detail-wrap').style.display = (e.target.value === 'Offsite') ? '' : 'none';
+  });
+  document.getElementById('noga-submit').addEventListener('click', async () => {
+    const animalId = document.getElementById('noga-animal-id').value.trim();
+    if (!animalId) { alert('Enter an animal ID.'); return; }
+    const location = document.getElementById('noga-location').value;
+    const detail = document.getElementById('noga-location-detail').value.trim();
+    const task = document.getElementById('noga-task').value;
+    const note = document.getElementById('noga-note').value.trim();
+    const ok = await OpsCore.requirePasscode('nurse', 'add a NO-GA request'); if (!ok) return;
+    // Initials are NOT required to add a NO-GA request (only to mark one
+    // done) — read the box directly rather than myInitials(), which would
+    // pop a window.prompt() when it's empty.
+    const addedBy = cleanInitials(document.getElementById('initials-input').value) || null;
+    const { error } = await sb.from('noga_requests').insert({
+      animal_id: animalId, location, location_detail: (location === 'Offsite' ? (detail || null) : null),
+      task, note: note || null, added_by: addedBy
+    });
+    if (error) { alert('Could not add: ' + error.message); return; }
+    document.getElementById('noga-animal-id').value = '';
+    document.getElementById('noga-location-detail').value = '';
+    document.getElementById('noga-note').value = '';
+    document.getElementById('noga-detail-wrap').style.display = 'none';
+    loadAll();
+  });
+
+  /* ============================================================
+     Memo board
+     ============================================================ */
+  function memoRowHtml(m, isDone) {
+    return `<div class="memo ${isDone ? 'memo-done' : ''}">
+      <label style="display:flex; gap:8px; align-items:flex-start; margin:0; cursor:pointer;">
+        <input type="checkbox" class="memo-tick" data-id="${esc(m.id)}" ${isDone ? 'checked' : ''} style="width:auto; margin-top:4px;">
+        <span><strong>${esc(m.author)}</strong>: ${esc(m.text)}</span>
+      </label>
+      ${isDone ? `<button type="button" class="secondary memo-del" data-id="${esc(m.id)}" style="padding:3px 10px; font-size:0.7rem; margin-top:6px;">Delete</button>` : ''}
+    </div>`;
+  }
+  function renderMemos() {
+    const { active, completed } = LDHLogic.splitMemos(MEMOS);
+    document.getElementById('memo-list').innerHTML = active.map(m => memoRowHtml(m, false)).join('') || '<p class="empty-state">No open memos.</p>';
+    const toggle = document.getElementById('memo-completed-toggle');
+    toggle.textContent = (showCompletedMemos ? 'Hide' : 'Show') + ' completed (' + completed.length + ')';
+    toggle.style.display = completed.length ? 'inline-block' : 'none';
+    document.getElementById('memo-completed-list').innerHTML = showCompletedMemos ? completed.map(m => memoRowHtml(m, true)).join('') : '';
+  }
+  document.getElementById('memo-board').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.memo-tick'); if (!cb) return;
+    const wantDone = cb.checked;
+    const ok = await OpsCore.requirePasscode('nurse', 'tick off a memo');
+    if (!ok) { cb.checked = !wantDone; return; }
+    const { error } = await sb.from('memos').update({ done: wantDone, done_at: wantDone ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
+    if (error) alert('Could not update memo: ' + error.message);
+    loadAll();
+  });
+  document.getElementById('memo-board').addEventListener('click', async (e) => {
+    const del = e.target.closest('.memo-del');
+    if (del) {
+      const ok = await OpsCore.requirePasscode('nurse', 'delete a memo');
+      if (!ok) return;
+      if (confirm('Delete this memo permanently?')) {
+        const { error } = await sb.from('memos').delete().eq('id', del.dataset.id);
+        if (error) alert('Could not delete memo: ' + error.message);
+        loadAll();
+      }
+    }
+  });
+  document.getElementById('memo-completed-toggle').addEventListener('click', () => { showCompletedMemos = !showCompletedMemos; renderMemos(); });
+  document.getElementById('memo-submit').addEventListener('click', async () => {
+    const text = document.getElementById('memo-text').value.trim();
+    if (!text) return;
+    const { error } = await sb.from('memos').insert({ author: 'Nurse team', text });
+    if (error) { alert('Could not post: ' + error.message); return; }
+    document.getElementById('memo-text').value = '';
+    loadAll();
+  });
+
+  /* ============================================================
+     Load / render / init
+     ============================================================ */
+  function renderAll() { renderMedLabels(); renderNurseRequests(); renderNurseDoses(); renderNoga(); renderMemos(); }
+
+  // Time-based UI (the 2h vaccination clock, the overdue/today dose split,
+  // and the NO-GA 24h-hide window) needs to move even with no realtime
+  // event — mirrors index.html/vets.html's refreshTimers pattern.
+  function refreshTimers() { renderNurseRequests(); renderNurseDoses(); renderNoga(); }
+  setInterval(refreshTimers, 60000);
+
+  /* ============================================================
+     New-item alert banner (nurses only). Vets don't get this — their
+     tasks come throughout the day so there's nothing to flag; nurses'
+     vaccination requests and medication-ready cases can appear at any
+     moment and benefit from a nudge while the tab is open.
+
+     In-memory only (a fresh page load starts with an empty seen-set,
+     so nothing already open when the nurse opens the page ever alerts).
+     The seen-set is filled from the FIRST loadAll() before any
+     comparison happens, then every loadAll() after that only alerts on
+     ids it hasn't seen before — each item alerts once, ever.
+     ============================================================ */
+  let seenVaccIds = new Set(), seenMedIds = new Set(), seenInitialised = false;
+  let bannerHideTimer = null;
+
+  function openVaccRequests() { return NURSE_REQUESTS.filter(r => r.done_count < r.animal_count); }
+
+  function playAlertTone() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 800;
+      gain.gain.value = 0.15;
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+      osc.onended = () => { try { ctx.close(); } catch (e) { /* ignore */ } };
+    } catch (e) { /* audio blocked/unsupported — the banner still shows */ }
+  }
+
+  function hideAlertBanner() {
+    if (bannerHideTimer) { clearTimeout(bannerHideTimer); bannerHideTimer = null; }
+    document.getElementById('new-item-banner').style.display = 'none';
+  }
+  document.getElementById('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
+
+  function showAlertBanner(newVaccCount, newMedCount) {
+    let msg;
+    if (newVaccCount > 0 && newMedCount > 0) {
+      msg = `🔔 ${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''} and ${newMedCount} new medication label${newMedCount > 1 ? 's' : ''} waiting — check below.`;
+    } else if (newVaccCount > 0) {
+      msg = `🔔 ${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''} waiting — check below.`;
+    } else {
+      msg = `🔔 ${newMedCount} new medication label${newMedCount > 1 ? 's' : ''} waiting — check below.`;
+    }
+    document.getElementById('new-item-banner-text').textContent = msg;
+    document.getElementById('new-item-banner').style.display = 'flex';
+    playAlertTone();
+    if (bannerHideTimer) clearTimeout(bannerHideTimer);
+    bannerHideTimer = setTimeout(hideAlertBanner, 10000);
+  }
+
+  // Called on every loadAll(). The first call only seeds the seen-set
+  // (nothing pre-existing should ever alert); every call after that
+  // marks ids seen the moment they're noticed, so each one alerts once.
+  function checkForNewItems() {
+    const openVacc = openVaccRequests();
+    const medTasks = medLabelTasks();
+    if (!seenInitialised) {
+      openVacc.forEach(r => seenVaccIds.add(r.id));
+      medTasks.forEach(t => seenMedIds.add(t.id));
+      seenInitialised = true;
+      return;
+    }
+    const newVacc = openVacc.filter(r => !seenVaccIds.has(r.id));
+    const newMed = medTasks.filter(t => !seenMedIds.has(t.id));
+    openVacc.forEach(r => seenVaccIds.add(r.id));
+    medTasks.forEach(t => seenMedIds.add(t.id));
+    if (newVacc.length > 0 || newMed.length > 0) showAlertBanner(newVacc.length, newMed.length);
+  }
+
+  async function loadAll() {
+    const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([
+      sb.from('tasks').select('*').order('created_at', { ascending: false }),
+      sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
+      sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
+      sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
+      sb.from('noga_requests').select('*').order('created_at', { ascending: false }),
+      sb.from('memos').select('*').order('created_at', { ascending: false }),
+    ]);
+    TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];
+    NURSE_DOSES = ndRes.data || []; NOGA_REQUESTS = ngRes.data || []; MEMOS = memosRes.data || [];
+    checkForNewItems();
+    renderAll();
+  }
+
+  (async function () {
+    document.getElementById('noga-location').innerHTML = LDHLogic.LOCATIONS.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+    const { sb: client } = await OpsCore.init({ page: 'nurses' });
+    sb = client;
+    document.getElementById('app-root').style.display = 'grid';
+    await loadAll();
+    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos'], loadAll);
+    document.getElementById('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+  })();
+</script>
+<!-- ip-notice-footer -->
+<footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  &copy; 2026 Juliana Xue. All rights reserved.<br>
+  This work is the intellectual property of Juliana Xue and may not be copied,
+  modified, or distributed without her express written permission.
+</footer>
+</body>
+</html>

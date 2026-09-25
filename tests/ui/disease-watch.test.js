@@ -16,9 +16,15 @@ const H = 3600 * 1000, D = 24 * H;
     t.ok((await a.page.textContent('#disease-watch')).includes("1 flagged animal had a space that isn't in the list"), 'an unknown space is reported in the card, not dropped');
     t.ok(!/outbreak|alert|high risk/i.test(await a.page.textContent('#disease-watch')), 'no alarm wording');
     t.ok(await a.page.locator('#disease-watch a[href="stats.html"]').count() === 1, 'links to the full board on the stats page');
-    await a.page.selectOption('#role-select', 'vet_nurse');
-    await a.page.waitForTimeout(200);
-    t.ok(await a.page.isVisible('#disease-watch'), 'card also visible to vets and nurses');
+
+    // Round 3: Disease watch moved to the bottom of <main>, after the
+    // combined Cases section (there is no vet/nurse role switch on this
+    // page any more — it IS the staff page — so there is nothing to check
+    // it against besides its own position).
+    const sectionIds = await a.page.$$eval('main > section', els => els.map(e => e.id));
+    t.ok(sectionIds[sectionIds.length - 1] === 'disease-watch', 'disease watch is the last card in <main> (' + sectionIds.join(', ') + ')');
+    t.ok(sectionIds.indexOf('cases-list') !== -1 && sectionIds.indexOf('cases-list') < sectionIds.indexOf('disease-watch'), 'disease watch comes after the Cases section');
+
     t.ok(a.errors.length === 0, 'no page errors: ' + a.errors.join('; '));
   } finally { await a.browser.close(); }
   // before migration 0009: no spaces list -> the card stays hidden instead of showing an empty board

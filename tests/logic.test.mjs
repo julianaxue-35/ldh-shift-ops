@@ -75,13 +75,13 @@ test('slotLabel and doseLevel', () => {
   assert.equal(L.doseLevel({ due_date: '2026-09-19', done_at: 'x' }, '2026-09-20'), 'done');
 });
 
-test('vaccStatus: 3 h from arrival', () => {
+test('vaccStatus: 2 h from arrival', () => {
   const req = (agoMs, done = 0) => ({ arrived_at: new Date(NOW - agoMs).toISOString(), animal_count: 8, done_count: done });
   assert.equal(L.vaccStatus(req(1 * H), NOW).level, 'ok');
-  assert.equal(L.vaccStatus(req(2.67 * H), NOW).level, 'amber');
-  assert.equal(L.vaccStatus(req(3 * H + M), NOW).level, 'red');
+  assert.equal(L.vaccStatus(req(1.75 * H), NOW).level, 'amber');
+  assert.equal(L.vaccStatus(req(2 * H + M), NOW).level, 'red');
   assert.equal(L.vaccStatus(req(5 * H, 8), NOW).level, 'done');
-  assert.match(L.vaccStatus(req(4 * H), NOW).label, /^overdue 1h/);
+  assert.match(L.vaccStatus(req(3 * H), NOW).label, /^overdue 1h/);
 });
 
 test('courseProgress and splitMemos', () => {
@@ -98,7 +98,7 @@ test('CONDITION_LABELS covers every condition value the flag form can save', () 
 });
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {
-  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport']);
+  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport', 'Offsite']);
 });
 
 test('summariseConditions counts every condition, ignores unknown values, and groups flagged cases by space', () => {
@@ -203,4 +203,77 @@ test('summariseConditions covers the widened sign list', () => {
     { condition: 'skin_condition', location: 'Pound 1 / 2', created_at: '2026-09-02T00:00:00Z' }]);
   assert.equal(r.counts.vomiting, 1); assert.equal(r.counts.skin_condition, 1); assert.equal(r.counts.eye_condition, 0);
   assert.equal(r.counts.none, 0);
+});
+
+test('EMERGENCY_SIGNS: Juliana\'s verbatim labels; RED_FLAGS is an alias; tierFromFlags still works', () => {
+  assert.deepEqual(L.EMERGENCY_SIGNS, [
+    { key: 'not_eating_48h', label: 'Not eating > 48 hours' },
+    { key: 'not_urinating_36h', label: 'Not urinating > 36 hours' },
+    { key: 'bleeding_wound', label: "Bleeding wound (large cut / can't stop the bleeding)" },
+    { key: 'not_defecated_72h', label: 'Not defecated > 72 hours' },
+    { key: 'vomited_multiple', label: 'Vomited multiple piles' }]);
+  assert.equal(L.RED_FLAGS, L.EMERGENCY_SIGNS);
+  assert.equal(L.tierFromFlags(['not_eating_48h']), 'red_flag');
+});
+
+test('signLabel resolves new keys, legacy keys, and returns unknown keys raw', () => {
+  assert.equal(L.signLabel('not_urinating_36h'), 'Not urinating > 36 hours');
+  assert.equal(L.signLabel('not_eating'), 'Not eating');
+  assert.equal(L.signLabel('laboured_breathing'), 'Laboured breathing');
+  assert.equal(L.signLabel('bleeding'), 'Bleeding');
+  assert.equal(L.signLabel('cant_stand'), "Can't stand / collapsed");
+  assert.equal(L.signLabel('repeated_vomiting'), 'Repeated vomiting');
+  assert.equal(L.signLabel('mystery'), 'mystery');
+});
+
+test('TIER_LABELS use the new wording; stored values unchanged', () => {
+  assert.deepEqual(L.TIER_LABELS, { red_flag: 'Emergency', urgent: 'Urgent', routine: 'Request checks' });
+  assert.equal(L.normTier('soon'), 'urgent');
+  assert.equal(L.normTier('red_flag'), 'red_flag');
+});
+
+test('Offsite: unmapped space, but never counted as an unmapped-space warning', () => {
+  assert.equal(L.LOCATIONS[L.LOCATIONS.length - 1], 'Offsite');
+  assert.deepEqual(L.OFFSITE_NAMES, ['Offsite']);
+  const since = new Date(NOW - 3 * 24 * H);
+  const r = L.buildSurvey([trow('O1', 'Offsite', 'cat_flu', 1 * H), trow('O2', 'Offsite — foster home', 'cat_flu', 1 * H),
+    trow('E1', 'Mystery Room / 9', 'other', 1 * H)], LOC, since);
+  assert.equal(r.unmapped, 1, 'only the genuinely unknown space is reported');
+  r.spaces.forEach(s => assert.equal(s.cases, 0));
+});
+
+test('stageOf: flagged, picked_up, waiting_medication, completed', () => {
+  const t = (extra) => task('urgent', 1 * H, extra);
+  assert.equal(L.stageOf(t({}), NOW), 'flagged');
+  assert.equal(L.stageOf(t({ claimed_at: new Date(NOW).toISOString() }), NOW), 'picked_up');
+  assert.equal(L.stageOf(t({ needs_medication: true, vet_done_at: new Date(NOW).toISOString() }), NOW), 'waiting_medication');
+  assert.equal(L.stageOf(t({ needs_medication: true, claimed_at: new Date(NOW).toISOString() }), NOW), 'picked_up');
+  assert.equal(L.stageOf(t({ needs_medication: true, vet_done_at: 'x', done: true }), NOW), 'completed');
+  assert.equal(L.stageOf(t({ done: true }), NOW), 'completed');
+  assert.equal(L.stageOf(t({ vet_done_at: 'x' }), NOW), 'flagged', 'vet_done_at only matters for medication tasks');
+});
+
+test('caseList: open sorted by sortQueue; completed within 24 h, newest first; done without completed_at uses created_at', () => {
+  const iso = (ms) => new Date(NOW - ms).toISOString();
+  const o1 = task('routine', 1 * H, { title: 'o-routine' }), o2 = task('red_flag', 1 * H, { title: 'o-emerg' });
+  const c1 = task('urgent', 30 * H, { title: 'c-old-inside', done: true, completed_at: iso(23 * H) });
+  const c2 = task('urgent', 30 * H, { title: 'c-new', done: true, completed_at: iso(1 * H) });
+  const c3 = task('urgent', 30 * H, { title: 'c-outside', done: true, completed_at: iso(24 * H + M) });
+  const c4 = task('urgent', 5 * H, { title: 'c-nostamp', done: true });
+  const c5 = task('urgent', 30 * H, { title: 'c-nostamp-old', done: true });
+  const r = L.caseList([o1, c1, c3, o2, c2, c4, c5], NOW);
+  assert.deepEqual(r.open.map(t => t.title), ['o-emerg', 'o-routine']);
+  assert.deepEqual(r.completed.map(t => t.title), ['c-new', 'c-nostamp', 'c-old-inside']);
+});
+
+test('medCopyText: SM number, location, offsite detail, label', () => {
+  const base = { title: 'Bella', sm_number: '12345', location: 'Cat Room 1 / 4', med_label: 'Meloxicam 0.1 mg SID' };
+  assert.equal(L.medCopyText(base), 'Bella | SM 12345 | Cat Room 1 / 4\nMeloxicam 0.1 mg SID');
+  assert.equal(L.medCopyText({ ...base, location: 'Offsite', location_detail: 'foster Sam' }), 'Bella | SM 12345 | Offsite — foster Sam\nMeloxicam 0.1 mg SID');
+  assert.equal(L.medCopyText({ ...base, location: 'Offsite' }), 'Bella | SM 12345 | Offsite\nMeloxicam 0.1 mg SID');
+  assert.equal(L.medCopyText({ title: 'Bella', location: 'Pound 1' }), 'Bella | SM — | Pound 1\n');
+});
+
+test('CHLORSIG_OPTIONS', () => {
+  assert.deepEqual(L.CHLORSIG_OPTIONS, [{ label: 'Chlorsig — left eye (L)' }, { label: 'Chlorsig — right eye (R)' }, { label: 'Chlorsig — both eyes' }]);
 });

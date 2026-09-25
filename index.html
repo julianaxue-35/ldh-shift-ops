@@ -21,6 +21,7 @@
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
+<script src="lib/ops-core.js"></script>
 <script src="lib/surveillance-view.js"></script>
 <link rel="stylesheet" href="lib/surveillance.css">
 <style>
@@ -65,27 +66,9 @@
   }
   h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
 
-  /* Login gate — shown before anything else; nothing is fetched until a
-     session exists (spec: "no data until a valid session exists"). */
-  #login-screen {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  }
-  #login-card {
-    background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card);
-    padding: 32px; width: 320px;
-  }
-  #login-card h1 { font-size: 1.2rem; margin: 0 0 6px; }
-  #login-card p { font-size: 0.85rem; color: var(--muted); margin: 0 0 20px; }
-  #login-error { color: var(--critical); font-size: 0.82rem; margin: -6px 0 10px; display: none; }
-
   .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
   aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
   aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
-  aside label {
-    display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
-    text-transform: uppercase; color: var(--sidebar-text-muted); margin-bottom: 8px;
-  }
-  aside select { width: 100%; background: #2A2F4A; color: #fff; border: none; box-shadow: none; margin-bottom: 24px; font-size: 0.9rem; }
   aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
   aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
   main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
@@ -125,13 +108,6 @@
   .completion-side { font-size: 0.78rem; color: var(--muted); }
   .completion-side b { display: block; font-size: 1.1rem; color: var(--ink); }
 
-  /* Two-column dashboard body — wider main column for the case queues,
-     narrower side rail for completed/memos, instead of every section
-     stacked full-width one after another. */
-  .dashboard-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
-  .main-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .side-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; align-items: start; min-width: 0; }
-
   .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
   .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
   .bar-track { height: 10px; border-radius: 6px; background: var(--neutral-100); overflow: hidden; margin-bottom: 10px; }
@@ -162,51 +138,13 @@
   .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
   .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
   .nurse-card { background: #eef8fb; border-left: 5px solid #2a9db5; }
   .nurse-card h2 { color: #1c7387; }
   .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
-  .nr-form, .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
-  .nr-form label, .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .nr-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nr-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
   .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
-
-  .completed-row {
-    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
-    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
-  }
-  .completed-row:last-child { border-bottom: none; }
-  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
-
-  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
-  .shift-launch b { font-size: 0.95rem; }
-  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
-  .filter-chip {
-    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
-    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
-  }
-  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
-  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
-  .urgency-col h3.red-h { color: var(--critical); }
-  .urgency-col h3.urgent-h { color: #c26a00; }
-  .urgency-col h3.routine-h { color: var(--muted); }
-  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
-  .attn-item:last-child { border-bottom: none; }
-  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
-  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
-  .nt-h.overdue { color: var(--critical); }
-  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
-  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); }
-  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
-  .urgency-col .attn-item .ameta { margin-top: 2px; }
-  .attn-item .pickup-check { width: 18px; height: 18px; margin: 0; padding: 0; flex: none; }
-  .attn-item button.mark-done { padding: 5px 10px; font-size: 0.72rem; }
-
-  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
-  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
-  .memo strong { font-weight: 700; }
-  #memo-post textarea { min-height: 60px; }
 
   .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
   .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
@@ -220,9 +158,8 @@
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
   @media (max-width: 1000px) {
-    .urgency-board, .trend-grid { grid-template-columns: 1fr; }
+    .trend-grid { grid-template-columns: 1fr; }
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
-    .dashboard-body { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
@@ -232,30 +169,10 @@
 </head>
 <body>
 
-<div id="login-screen">
-  <div id="login-card">
-    <h1>LDH Shift Ops</h1>
-    <p>Sign in with the shared staff account to continue.</p>
-    <p id="login-error"></p>
-    <input id="login-email" type="email" placeholder="Email" autocomplete="username">
-    <input id="login-password" type="password" placeholder="Password" autocomplete="current-password">
-    <button id="login-submit" style="width:100%">Sign in</button>
-  </div>
-</div>
-
 <div class="layout" id="app-root" style="display:none;">
   <aside>
     <h2>LDH Shift Ops</h2>
-    <label>Viewing as</label>
-    <select id="role-select">
-      <option value="attendant">Shelter Staff</option>
-      <option value="vet_nurse">Vet / Nurse</option>
-    </select>
-    <div id="initials-box" style="display:none; margin-top:14px;">
-      <label for="initials-input">Your initials</label>
-      <input id="initials-input" maxlength="4" placeholder="e.g. AB" autocomplete="off">
-      <p class="hint" style="margin-top:6px;">Used when you pick up or tick off a nurse task. Type yours in — change it if someone else is using this device.</p>
-    </div>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
     <p class="hint">
       This is the live dashboard — everything here is real and shared with
       everyone signed in. Clinical detail stays in the offline shift tools;
@@ -265,8 +182,6 @@
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
       &nbsp;·&nbsp;
       <a href="https://julianaxue-35.github.io/ldh-shift-tools/" style="color:var(--sidebar-text-muted);">Shift Tools ↗</a>
-      &nbsp;·&nbsp;
-      <a href="stats.html" style="color:var(--sidebar-text-muted);">Stats →</a>
     </p>
     <span id="signout-link">Sign out</span>
   </aside>
@@ -288,6 +203,7 @@
         <div style="display:flex; gap:6px;">
           <select id="req-location" style="margin:0; flex:2;"></select>
           <input id="req-pen" placeholder="Pen #" style="margin:0; flex:1; min-width:0;">
+          <input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="margin:0; flex:1; min-width:0; display:none;">
         </div>
         <select id="req-type" style="margin:0;">
           <option value="shelter">Shelter request</option>
@@ -311,29 +227,24 @@
         <input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg" style="margin:0;">
       </div>
       <div id="req-redflags-wrap" style="margin:12px 0 4px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Red flags — tick any that apply</div>
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Emergency signs — tick any that apply</div>
         <div id="req-redflags" style="display:flex; flex-wrap:wrap; gap:8px 18px;"></div>
         <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
-        <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">Emergency? Radio the vet — don't wait for this board.</div>
+        <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
+      </div>
+      <div id="req-med-wrap" style="margin:4px 0 4px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;">
+          <input type="checkbox" id="req-needs-med" style="width:auto; margin:0;"> Needs medication
+        </label>
+        <input id="req-sm-number" placeholder="SM number" style="margin-top:8px; display:none;">
+        <div id="req-sm-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-4px 0 8px;">Enter the SM number — it's required when Needs medication is ticked.</div>
       </div>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
 
-    <section class="card" id="start-shift-card" style="display:none">
-      <h2>Start a shift</h2>
-      <p class="subtle">Opens the shift tool in a new tab. Clinical detail is entered there, not here.</p>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/processing.html" target="_blank" rel="noopener"><b>Processing</b><span>Intake, exams, vaccination</span></a>
-        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html" target="_blank" rel="noopener"><b>Sick &amp; Injured</b><span>Rechecks and flagged animals</span></a>
-        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/surgery.html" target="_blank" rel="noopener"><b>Surgery</b><span>Desexing list, notes, sharing</span></a>
-      </div>
-    </section>
-
-
     <section class="card nurse-card" id="nurse-requests">
-      <h2>Nurse requests — vaccination on arrival</h2>
-      <p class="subtle">Log animals that need vaccinating. The clock is 3 hours from arrival.</p>
-      <div id="nr-list"></div>
+      <h2>Request nurse vaccination</h2>
+      <p class="subtle">Log animals that need vaccinating on arrival. The clock is 2 hours from arrival.</p>
       <div class="nr-form" id="nr-form">
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
@@ -342,28 +253,6 @@
         <button class="secondary" id="nr-now" type="button">Arrived now</button>
         <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
         <button id="nr-submit" type="button">Log request</button>
-      </div>
-    </section>
-    <section class="card nurse-card" id="nurse-doses" style="display:none">
-      <h2>Treatments due — nurses</h2>
-      <p class="subtle">Treatments the vets have asked for. Tick each dose off; your initials are recorded.</p>
-      <div id="nt-overdue"></div>
-      <div id="nt-today"></div>
-    </section>
-
-    <section class="card" id="nurse-treatments" style="display:none">
-      <h2>Request a treatment — vets</h2>
-      <p class="subtle">Ask the nurses to give a treatment to an animal in the ward, e.g. flush a dental extraction site twice a day for 7 days.</p>
-      <div id="nt-courses"></div>
-      <h3 style="font-size:0.85rem; margin:18px 0 0;">New request</h3>
-      <div class="nt-form">
-        <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
-        <label>Space<select id="nt-location"></select></label>
-        <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
-        <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
-        <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
-        <label>Start date<input id="nt-start" type="date"></label>
-        <button id="nt-submit" type="button">Request</button>
       </div>
     </section>
 
@@ -378,6 +267,19 @@
       <div id="shift-progress-row" style="display:contents;"></div>
     </div>
 
+    <section class="card" id="cases-list">
+      <h2>Cases</h2>
+      <p class="subtle">Every case from flagged to completed, across all shifts.</p>
+      <table class="queue-table">
+        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Tier</th><th>Stage</th><th>Flagged</th><th>Time left</th><th>Plan</th></tr></thead>
+        <tbody id="cases-open-tbody"></tbody>
+      </table>
+      <h3 style="font-size:0.85rem; margin:18px 0 8px;">Completed (last 24 h)</h3>
+      <table class="queue-table">
+        <tbody id="cases-completed-tbody"></tbody>
+      </table>
+    </section>
+
     <section class="card" id="disease-watch" style="display:none">
       <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
         <h2 style="margin:0;">Disease watch — last 3 days</h2>
@@ -386,240 +288,81 @@
       <p class="subtle" style="margin:6px 0 12px;">Flagged cases in the last 3 days as a share of each space's cages (an animal counts once for each sign flagged). No threshold line yet — a baseline is being collected first.</p>
       <div id="disease-watch-map"></div>
     </section>
-    <div class="dashboard-body">
-      <div class="main-col">
-        <section class="card" id="cases-flagged">
-          <h2>Cases flagged</h2>
-          <p class="subtle">Open cases across all shifts.</p>
-          <table class="queue-table">
-            <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Urgency</th><th>Flagged</th><th>Time left</th></tr></thead>
-            <tbody id="queue-tbody"></tbody>
-          </table>
-        </section>
-
-        <section class="card" id="vet-board">
-          <h2>Cases flagged</h2>
-          <p class="subtle">Split by urgency and request type — pick up as available. Filter to Medication for remote-only cases.</p>
-          <div class="filter-bar" id="type-filter-bar">
-            <button class="filter-chip active" data-type="all">All types</button>
-            <button class="filter-chip" data-type="shelter">Shelter</button>
-            <button class="filter-chip" data-type="foster">Foster</button>
-            <button class="filter-chip" data-type="rescue">Rescue</button>
-            <button class="filter-chip" data-type="medication">Medication</button>
-            <button class="filter-chip" data-type="check_recheck">Check/recheck</button>
-          </div>
-          <div id="batch-pickup-bar" style="display:none; margin-bottom:14px;">
-            <a id="batch-pickup-link" href="#" target="_blank" rel="noopener" style="text-decoration:none; color:var(--ink); display:inline-block; padding:10px 16px; border-radius:14px; background:var(--amber); font-weight:700; font-size:0.85rem;">Pick up <span id="batch-pickup-count">0</span> selected, sorted by location →</a>
-            <button class="secondary" id="batch-pickup-clear" style="padding:10px 14px; font-size:0.82rem; margin-left:8px;">Clear selection</button>
-          </div>
-          <div class="urgency-board">
-            <div class="urgency-col"><h3 class="red-h">Red flag · within 2 h</h3><div id="board-redflag"></div></div>
-            <div class="urgency-col"><h3 class="urgent-h">Urgent · 12–24 h</h3><div id="board-urgent"></div></div>
-            <div class="urgency-col"><h3 class="routine-h">Routine · 24–48 h</h3><div id="board-routine"></div></div>
-          </div>
-        </section>
-      </div>
-
-      <div class="side-col">
-        <section class="card" id="completed-panel">
-          <h2>Recently completed</h2>
-          <p class="subtle">Status only, for the documentation cross-check — clinical detail stays in the offline shift tool.</p>
-          <div id="completed-list"></div>
-        </section>
-
-        <section class="card" id="memo-board">
-          <h2>Memo board</h2>
-          <div id="memo-list"></div>
-          <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
-          <div id="memo-completed-list"></div>
-          <div id="memo-post">
-            <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
-            <button id="memo-submit">Post</button>
-          </div>
-        </section>
-      </div>
-    </div>
-
-
   </main>
 </div>
 
 <script>
-  const SUPABASE_URL = 'https://yeazfafvylawwgoxlhbl.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_fow5B_VGO3gKPf4BaULsOQ_ZiSH8q8Y';
-  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let sb = null;
+  const esc = OpsCore.esc;
 
   let TASKS = [];
-  let MEMOS = [];
-  let NURSE_REQUESTS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [];
   let LOCATION_ROWS = [];
   let ROSTER = {};
-  let ROLE = 'attendant';
-  let typeFilter = 'all';
-  let selectedPickup = new Set();
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
   const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
   const SHIFT_ICONS = { processing: '👥', sick_injured: '➕', surgery: '✂️' };
   const URGENCY_COLOR = { red_flag: 'var(--critical)', urgent: 'var(--amber)', soon: 'var(--amber)', routine: 'var(--neutral-300)' };
   const TYPE_LABELS = { shelter: 'Shelter request', foster: 'Foster request', rescue: 'Rescue request', medication: 'Medication', check_recheck: 'Check/recheck' };
-  /* 2026-09-19: "Pick up" hand-off — opens the matching offline tool with
-     the animal's ID/location/issue pre-filled via URL params, so a vet
-     doesn't have to re-type what's already on the dashboard. Supports
-     picking up several at once, sorted by location, so a vet can walk
-     the shelter once instead of back-and-forth — the offline tool already
-     groups its own list by location regardless of add order, so this only
-     needs to hand off a location-sorted batch, not reorder anything there.
-     Only sick_injured has the receiving code in the offline tool so far;
-     a batch is only ever built from one shift at a time (checkboxes are
-     disabled for shifts with no tool URL yet). */
-  const SHIFT_TOOL_URLS = {
-    sick_injured: 'https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html',
-  };
-  function pickUpUrl(tasks) {
-    if (!tasks.length) return null;
-    const base = SHIFT_TOOL_URLS[tasks[0].shift];
-    if (!base) return null;
-    const sorted = [...tasks].sort((a, b) => (a.location || '').localeCompare(b.location || ''));
-    const items = sorted.map(t => ({
-      id: t.title, location: t.location || '', problem: t.problem || '',
-      redFlags: (t.red_flags || []).map(k => (LDHLogic.RED_FLAGS.find(f => f.key === k) || { label: k }).label),
-      condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
-    }));
-    const params = new URLSearchParams({ items: JSON.stringify(items) });
-    return `${base}?${params.toString()}`;
-  }
-  function updatePickupBar() {
-    const bar = document.getElementById('batch-pickup-bar');
-    // Re-derive from TASKS, not just the Set's size — a selected task can
-    // vanish out from under a viewer (someone else marks it done via
-    // realtime) without this tab's checkbox ever firing a change event.
-    const tasks = TASKS.filter(t => selectedPickup.has(t.id));
-    if (!tasks.length) { selectedPickup.clear(); bar.style.display = 'none'; return; }
-    const url = pickUpUrl(tasks);
-    document.getElementById('batch-pickup-count').textContent = tasks.length;
-    const link = document.getElementById('batch-pickup-link');
-    if (url) { link.href = url; link.style.opacity = 1; link.style.pointerEvents = 'auto'; }
-    else { link.removeAttribute('href'); link.style.opacity = 0.5; link.style.pointerEvents = 'none'; }
-    bar.style.display = 'block';
-  }
-  document.getElementById('batch-pickup-link').addEventListener('click', () => {
-    stampPickedUp(Array.from(selectedPickup));
-    selectedPickup.clear();
-    setTimeout(() => renderVetBoard(), 300);
-  });
-  document.getElementById('batch-pickup-clear').addEventListener('click', () => {
-    selectedPickup.clear();
-    renderVetBoard();
-  });
+  const STAGE_LABELS = { flagged: 'Flagged', picked_up: 'Picked up', waiting_medication: 'Vet check done — waiting on medication', completed: 'Completed' };
 
   function todayDateStr() {
     const d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
-  /* ---------- auth ---------- */
-  async function initAuth() {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) { await enterApp(); } else { showLogin(); }
-  }
-  function showLogin() {
-    document.getElementById('login-screen').style.display = 'flex';
-    document.getElementById('app-root').style.display = 'none';
-  }
-  async function enterApp() {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-root').style.display = 'grid';
-    applyRoleVisibility();
-    await loadAll();
-    subscribeRealtime();
-  }
-  document.getElementById('login-submit').addEventListener('click', async () => {
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errEl = document.getElementById('login-error');
-    errEl.style.display = 'none';
-    if (!email || !password) return;
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
-    await enterApp();
-  });
-  document.getElementById('login-password').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') document.getElementById('login-submit').click();
-  });
-  document.getElementById('signout-link').addEventListener('click', async () => {
-    await sb.auth.signOut();
-    location.reload();
-  });
-
   /* ---------- data loading ---------- */
   async function loadAll() {
-    const [tasksRes, memosRes, rosterRes, nrRes, ntRes, ndRes, lcRes] = await Promise.all([
+    const [tasksRes, rosterRes, lcRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
-      sb.from('memos').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
-      sb.from('nurse_requests').select('*').order('arrived_at', { ascending: true }),
-      sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
-      sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
       sb.from('locations').select('*').order('sort', { ascending: true }),
     ]);
     TASKS = tasksRes.data || [];
-    MEMOS = memosRes.data || [];
-    NURSE_REQUESTS = nrRes.data || [];
-    NURSE_TREATMENTS = ntRes.data || [];
-    NURSE_DOSES = ndRes.data || [];
     LOCATION_ROWS = lcRes.data || [];
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
   }
 
-  function subscribeRealtime() {
-    sb.channel('tasks-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => { loadAll(); })
-      .subscribe();
-    sb.channel('memos-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'memos' }, () => { loadAll(); })
-      .subscribe();
-    ['nurse_requests', 'nurse_treatments', 'nurse_treatment_doses'].forEach(tb => {
-      sb.channel(tb + '-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: tb }, () => { loadAll(); })
-        .subscribe();
-    });
+  document.getElementById('req-location').addEventListener('change', updateLocationFields);
+  function updateLocationFields() {
+    const isOffsite = document.getElementById('req-location').value === 'Offsite';
+    document.getElementById('req-pen').style.display = isOffsite ? 'none' : '';
+    document.getElementById('req-location-detail').style.display = isOffsite ? '' : 'none';
   }
 
-  function applyRoleVisibility() {
-    const isStaff = ROLE === 'attendant';
-    document.getElementById('new-request-form').style.display = isStaff ? 'block' : 'none';
-    document.getElementById('search-box').style.display = isStaff ? 'block' : 'none';
-    document.getElementById('cases-flagged').style.display = isStaff ? 'block' : 'none';
-    document.getElementById('vet-board').style.display = isStaff ? 'none' : 'block';
-    document.getElementById('start-shift-card').style.display = isStaff ? 'none' : 'block';
-    document.getElementById('nr-form').style.display = isStaff ? '' : 'none';
-    document.getElementById('initials-box').style.display = isStaff ? 'none' : 'block';
-    document.getElementById('nurse-doses').style.display = isStaff ? 'none' : 'block';
-    document.getElementById('nurse-treatments').style.display = isStaff ? 'none' : 'block';
-    document.getElementById('memo-board').style.display = isStaff ? 'none' : 'block';
-    renderAll();
-  }
-  document.getElementById('role-select').addEventListener('change', (e) => { ROLE = e.target.value; applyRoleVisibility(); });
+  document.getElementById('req-needs-med').addEventListener('change', (e) => {
+    document.getElementById('req-sm-number').style.display = e.target.checked ? '' : 'none';
+    document.getElementById('req-sm-error').style.display = 'none';
+  });
 
   document.getElementById('req-submit').addEventListener('click', async () => {
     const title = document.getElementById('req-title').value.trim();
     if (!title) return;
+    const needsMed = document.getElementById('req-needs-med').checked;
+    const smNumber = document.getElementById('req-sm-number').value.trim();
+    const smErr = document.getElementById('req-sm-error');
+    if (needsMed && !smNumber) { smErr.style.display = 'block'; return; }
+    smErr.style.display = 'none';
     const btn = document.getElementById('req-submit');
     btn.disabled = true;
     // Matches the offline tools' existing "Room / pen number" convention
     // (e.g. sick-injured.html's AA Flag Log import), so locations line up
     // consistently across the dashboard and the offline tools.
     const room = document.getElementById('req-location').value;
+    const isOffsite = room === 'Offsite';
     const pen = document.getElementById('req-pen').value.trim();
+    const detail = document.getElementById('req-location-detail').value.trim();
     const { error } = await sb.from('tasks').insert({
       title,
-      location: pen ? `${room} / ${pen}` : room,
+      location: isOffsite ? room : (pen ? `${room} / ${pen}` : room),
+      location_detail: isOffsite ? (detail || null) : null,
       shift: 'sick_injured',
       type: document.getElementById('req-type').value,
       urgency: LDHLogic.tierFromFlags(selectedFlags()),
       red_flags: selectedFlags(),
+      needs_medication: needsMed,
+      sm_number: needsMed ? smNumber : null,
       problem: document.getElementById('req-problem').value.trim() || null,
       condition: document.getElementById('req-condition').value || null,
       done: false,
@@ -628,39 +371,17 @@
     if (error) { alert('Could not submit: ' + error.message); return; }
     document.getElementById('req-title').value = '';
     document.getElementById('req-pen').value = '';
+    document.getElementById('req-location-detail').value = '';
     document.getElementById('req-problem').value = '';
     document.getElementById('req-condition').value = '';
+    document.getElementById('req-needs-med').checked = false;
+    document.getElementById('req-sm-number').value = '';
+    document.getElementById('req-sm-number').style.display = 'none';
     document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });
     updateTierPreview();
   });
 
-  document.getElementById('search-box').addEventListener('input', renderQueueTable);
-
-  document.querySelectorAll('#type-filter-bar .filter-chip').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      typeFilter = btn.dataset.type;
-      document.querySelectorAll('#type-filter-bar .filter-chip').forEach((b) => b.classList.toggle('active', b === btn));
-      renderVetBoard();
-    });
-  });
-
-  async function markDone(id) {
-    const { error } = await sb.from('tasks').update({
-      done: true, completed_by_role: ROLE, completed_at: new Date().toISOString(),
-    }).eq('id', id);
-    if (error) alert('Could not mark done: ' + error.message);
-  }
-
-  /* 2026-09-19 amendment: undo an accidental "Mark done" — clears the
-     completion fields back to their pre-completion state rather than just
-     flipping done to false, so a later real completion doesn't show a
-     stale completed_by_role/completed_at from the undone click. */
-  async function undoDone(id) {
-    const { error } = await sb.from('tasks').update({
-      done: false, completed_by_role: null, completed_at: null, note: null,
-    }).eq('id', id);
-    if (error) alert('Could not undo: ' + error.message);
-  }
+  document.getElementById('search-box').addEventListener('input', renderCases);
 
   /* ---------- render ---------- */
   function renderCompletion() {
@@ -742,31 +463,6 @@
     });
   }
 
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-
-  function renderQueueTable() {
-    const q = document.getElementById('search-box').value.trim().toLowerCase();
-    let open = TASKS.filter(t => !t.done);
-    if (q) open = open.filter(t => t.title.toLowerCase().includes(q));
-    open = LDHLogic.sortQueue(open, Date.now());
-    const tbody = document.getElementById('queue-tbody');
-    if (!open.length) {
-      tbody.innerHTML = `<tr><td colspan="7"><p class="empty-state">Nothing matches.</p></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = open.map(t => `
-      <tr>
-        <td><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${esc(t.title)}</strong></td>
-        <td>${esc(t.location)}</td>
-        <td style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
-        <td>${TYPE_LABELS[t.type] || t.type}</td>
-        <td><span class="status-pill ${LDHLogic.normTier(t.urgency)}">${LDHLogic.TIER_LABELS[LDHLogic.normTier(t.urgency)]}</span></td>
-        <td>${esc(fmtFlagged(t.created_at))}</td>
-        <td>${statusChipHtml(t)}</td>
-      </tr>
-    `).join('');
-  }
-
   function statusChipHtml(t) {
     const st = LDHLogic.statusOf(t, Date.now());
     if (st.level === 'seen') return `<span class="lvl lvl-seen">${t.claimed_at ? 'Picked up ' + esc(fmtTime(t.claimed_at)) : 'Done'}</span>`;
@@ -777,157 +473,55 @@
     const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' + time;
   }
-  // Initials come from the visible box in the sidebar (Vet / Nurse view). Deliberately NOT remembered between visits:
-  // a remembered value silently mislabelled other people's work on shared devices.
-  function cleanInitials(v) { return String(v || '').trim().toUpperCase().slice(0, 4); }
-  function myInitials() {
-    const el = document.getElementById('initials-input');
-    let v = cleanInitials(el.value);
-    if (!v) {
-      v = cleanInitials(window.prompt('Your initials:'));
-      if (v) el.value = v;
-    }
-    return v;
-  }
-  document.getElementById('initials-input').addEventListener('input', (e) => { e.target.value = cleanInitials(e.target.value); });
-  try { localStorage.removeItem('ldh_ops_initials'); } catch (e) {}   // clear the old remembered value (it showed up as "JX" for everyone)
+  function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 
-  // "Pick up" stamps a case as picked up (no initials — the shift tool records the vet). It stops ageing.
-  async function stampPickedUp(ids) {
-    const fresh = ids.filter(id => { const t = TASKS.find(x => x.id === id); return t && !t.claimed_at; });
-    if (!fresh.length) return;
-    const { error } = await sb.from('tasks').update({ claimed_at: new Date().toISOString() }).in('id', fresh);
-    if (error) alert('Could not record the pick-up: ' + error.message);
-    loadAll();
-  }
-  async function bumpToUrgent(id) {
-    const { error } = await sb.from('tasks').update({ urgency: 'urgent' }).eq('id', id);
-    if (error) alert('Could not update: ' + error.message);
-    loadAll();
+  // Location text for a case row: "Offsite — <detail>" when Offsite and a
+  // detail was given, plain "Offsite" with no detail, else the stored
+  // location text (pen number is already folded into it). Mirrors
+  // LDHLogic.medCopyText's location rule so the wording matches everywhere.
+  function locationText(t) {
+    const off = LDHLogic.OFFSITE_NAMES.includes(t.location);
+    return off ? (t.location_detail ? t.location + ' — ' + t.location_detail : t.location) : t.location;
   }
 
-  function renderBoardCol(containerId, tasks) {
-    const el = document.getElementById(containerId);
-    if (!tasks.length) { el.innerHTML = '<p class="empty-state">Nothing here.</p>'; return; }
-    el.innerHTML = tasks.map(t => {
-      const url = pickUpUrl([t]);
-      const canPickUp = !!SHIFT_TOOL_URLS[t.shift];
-      const tier = LDHLogic.normTier(t.urgency);
-      return `
-      <div class="attn-item">
-        <label style="display:flex; align-items:center; gap:8px; flex:1; margin:0; cursor:${canPickUp ? 'pointer' : 'default'};">
-          <input type="checkbox" class="pickup-check" data-id="${t.id}" ${selectedPickup.has(t.id) ? 'checked' : ''} ${canPickUp ? '' : 'disabled'}>
-          <div><div class="aname">${esc(t.title)} ${statusChipHtml(t)}</div><div class="ameta">Flagged ${esc(fmtFlagged(t.created_at))} · ${esc(t.location)} · ${SHIFT_LABELS[t.shift]} · ${TYPE_LABELS[t.type] || t.type}${t.problem ? ' · ' + esc(t.problem) : ''}${(t.red_flags && t.red_flags.length) ? ' · flags: ' + esc(t.red_flags.join(', ').replace(/_/g, ' ')) : ''}</div></div>
-        </label>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          ${tier === 'routine' && !t.claimed_at ? `<button class="secondary bump-btn" data-id="${t.id}">Bump to urgent</button>` : ''}
-          ${url ? `<a class="secondary pick-up" data-id="${esc(t.id)}" href="${url}" target="_blank" rel="noopener" style="padding:5px 10px; font-size:0.72rem; border-radius:14px; text-decoration:none; color:var(--ink); display:inline-block;">Pick up →</a>` : ''}
-          <button class="secondary mark-done" data-id="${t.id}">Mark done</button>
-        </div>
-      </div>
-    `;
-    }).join('');
-    el.querySelectorAll('.mark-done').forEach(btn => btn.addEventListener('click', () => markDone(btn.dataset.id)));
-    el.querySelectorAll('.pick-up').forEach(a => a.addEventListener('click', () => stampPickedUp([a.dataset.id])));
-    el.querySelectorAll('.bump-btn').forEach(btn => btn.addEventListener('click', () => bumpToUrgent(btn.dataset.id)));
-    el.querySelectorAll('.pickup-check').forEach(cb => cb.addEventListener('change', () => {
-      if (cb.checked) selectedPickup.add(cb.dataset.id); else selectedPickup.delete(cb.dataset.id);
-      updatePickupBar();
-    }));
+  function caseRowHtml(t, isCompleted) {
+    const tier = LDHLogic.normTier(t.urgency);
+    const stage = LDHLogic.stageOf(t, Date.now());
+    return `
+      <tr>
+        <td><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${esc(t.title)}</strong>${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''}</td>
+        <td>${esc(locationText(t))}</td>
+        <td style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
+        <td>${TYPE_LABELS[t.type] || t.type}</td>
+        <td><span class="status-pill ${tier}">${esc(LDHLogic.TIER_LABELS[tier])}</span></td>
+        <td>${esc(STAGE_LABELS[stage] || stage)}</td>
+        <td>${esc(fmtFlagged(t.created_at))}</td>
+        <td>${isCompleted ? '—' : statusChipHtml(t)}</td>
+        <td>${t.note ? esc(t.note) : ''}</td>
+      </tr>`;
   }
 
-  function renderVetBoard() {
-    const open = LDHLogic.sortQueue(TASKS.filter(t => !t.done && (typeFilter === 'all' || t.type === typeFilter)), Date.now());
-    renderBoardCol('board-redflag', open.filter(t => LDHLogic.normTier(t.urgency) === 'red_flag'));
-    renderBoardCol('board-urgent', open.filter(t => LDHLogic.normTier(t.urgency) === 'urgent'));
-    renderBoardCol('board-routine', open.filter(t => LDHLogic.normTier(t.urgency) === 'routine'));
-    updatePickupBar();
+  function renderCases() {
+    const q = document.getElementById('search-box').value.trim().toLowerCase();
+    const pool = q ? TASKS.filter(t => t.title.toLowerCase().includes(q)) : TASKS;
+    const { open, completed } = LDHLogic.caseList(pool, Date.now());
+    const openBody = document.getElementById('cases-open-tbody');
+    openBody.innerHTML = open.length ? open.map(t => caseRowHtml(t, false)).join('')
+      : `<tr><td colspan="9"><p class="empty-state">Nothing matches.</p></td></tr>`;
+    const doneBody = document.getElementById('cases-completed-tbody');
+    doneBody.innerHTML = completed.length ? completed.map(t => caseRowHtml(t, true)).join('')
+      : `<tr><td colspan="9"><p class="empty-state">Nothing completed in the last 24 hours.</p></td></tr>`;
   }
-
-  function renderCompleted() {
-    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const recent = TASKS.filter(t => t.done && t.completed_at && new Date(t.completed_at).getTime() > cutoff)
-      .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at));
-    const canUndo = ROLE === 'vet_nurse';
-    document.getElementById('completed-list').innerHTML = recent.map(t => `
-      <div class="completed-row">
-        <span>${esc(t.title)} — ${SHIFT_LABELS[t.shift]} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}${t.note ? ' — ' + esc(t.note) : ''}</span>
-        <span style="display:flex; align-items:center; gap:8px;">
-          <span class="time">${new Date(t.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-          ${canUndo ? `<button class="secondary undo-done" data-id="${t.id}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>` : ''}
-        </span>
-      </div>
-    `).join('') || '<p class="empty-state">Nothing completed recently.</p>';
-    document.getElementById('completed-list').querySelectorAll('.undo-done').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (confirm(`Undo completion for ${btn.closest('.completed-row').querySelector('span').textContent.split(' — ')[0]}? This puts it back in the open queue.`)) {
-          undoDone(btn.dataset.id);
-        }
-      });
-    });
-  }
-
-  let showCompletedMemos = false;
-  function memoRowHtml(m, isDone) {
-    return `<div class="memo ${isDone ? 'memo-done' : ''}">
-      <label style="display:flex; gap:8px; align-items:flex-start; margin:0; cursor:pointer;">
-        <input type="checkbox" class="memo-tick" data-id="${esc(m.id)}" ${isDone ? 'checked' : ''} style="width:auto; margin-top:4px;">
-        <span><strong>${esc(m.author)}</strong>: ${esc(m.text)}</span>
-      </label>
-      ${isDone ? `<button class="secondary memo-del" data-id="${esc(m.id)}" style="padding:3px 10px; font-size:0.7rem; margin-top:6px;">Delete</button>` : ''}
-    </div>`;
-  }
-  function renderMemos() {
-    const { active, completed } = LDHLogic.splitMemos(MEMOS);
-    document.getElementById('memo-list').innerHTML =
-      active.map(m => memoRowHtml(m, false)).join('') || '<p class="empty-state">No open memos.</p>';
-    const toggle = document.getElementById('memo-completed-toggle');
-    toggle.textContent = (showCompletedMemos ? 'Hide' : 'Show') + ' completed (' + completed.length + ')';
-    toggle.style.display = completed.length ? 'inline-block' : 'none';
-    document.getElementById('memo-completed-list').innerHTML =
-      showCompletedMemos ? completed.map(m => memoRowHtml(m, true)).join('') : '';
-  }
-  document.getElementById('memo-board').addEventListener('change', async (e) => {
-    const cb = e.target.closest('.memo-tick'); if (!cb) return;
-    const { error } = await sb.from('memos').update({ done: cb.checked, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
-    if (error) alert('Could not update memo: ' + error.message);
-    loadAll();
-  });
-  document.getElementById('memo-board').addEventListener('click', async (e) => {
-    const del = e.target.closest('.memo-del');
-    if (del) {
-      if (confirm('Delete this memo permanently?')) {
-        const { error } = await sb.from('memos').delete().eq('id', del.dataset.id);
-        if (error) alert('Could not delete memo: ' + error.message);
-        loadAll();
-      }
-      return;
-    }
-    if (e.target.id === 'memo-completed-toggle') { showCompletedMemos = !showCompletedMemos; renderMemos(); }
-  });
-  document.getElementById('memo-submit').addEventListener('click', async () => {
-    const text = document.getElementById('memo-text').value.trim();
-    if (!text) return;
-    const author = ROLE === 'vet_nurse' ? 'Vet team' : 'Shelter Staff';
-    const { error } = await sb.from('memos').insert({ author, text });
-    if (error) { alert('Could not post: ' + error.message); return; }
-    document.getElementById('memo-text').value = '';
-  });
 
   function renderAll() {
     renderCompletion();
     renderShiftProgress();
-    renderQueueTable();
-    renderVetBoard();
-    renderCompleted();
-    renderMemos();
-    renderNurseRequests();
-    renderNurseTreatments();
+    renderCases();
     renderDiseaseWatch();
   }
 
   function fillLocationSelects() {
-    ['req-location', 'nr-location', 'nt-location'].forEach(id => {
+    ['req-location', 'nr-location'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
     });
@@ -939,32 +533,14 @@
   }
   function renderRedFlagForm() {
     const wrap = document.getElementById('req-redflags');
-    wrap.innerHTML = LDHLogic.RED_FLAGS.map(f =>
+    wrap.innerHTML = LDHLogic.EMERGENCY_SIGNS.map(f =>
       `<label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; margin:0;"><input type="checkbox" class="req-flag" value="${f.key}" style="width:auto; margin:0;"> ${esc(f.label)}</label>`).join('');
     wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', updateTierPreview));
     updateTierPreview();
   }
-  function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   function nowLocalInput() {
     const d = new Date();
     return LDHLogic.localISO(d) + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  }
-  function renderNurseRequests() {
-    const now = Date.now();
-    const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
-    const canAct = ROLE === 'vet_nurse';
-    document.getElementById('nr-list').innerHTML = open.map(r => {
-      const st = LDHLogic.vaccStatus(r, now);
-      return `<div class="attn-item nr-item">
-        <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
-          <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
-        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
-          ${canAct ? `<button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
-            <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
-            <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>` : ''}
-        </div></div>`;
-    }).join('') || '<p class="empty-state">No vaccination requests open.</p>';
   }
   const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Transport' };
   function applyNrDefaultLocation() {
@@ -986,126 +562,17 @@
         animal_count: count,
         arrived_at: new Date(arrivedRaw).toISOString(),
         note: document.getElementById('nr-note').value.trim() || null,
-        created_by: ROLE === 'vet_nurse' ? 'Vet team' : 'Shelter Staff'
+        created_by: 'Shelter Staff'
       });
       if (error) { alert('Could not log request: ' + error.message); return; }
       document.getElementById('nr-count').value = '1';
-    applyNrDefaultLocation();
+      applyNrDefaultLocation();
       document.getElementById('nr-note').value = '';
       document.getElementById('nr-arrived').value = nowLocalInput();
       loadAll();
     } finally { _btn.disabled = false; }
   });
-  document.getElementById('nr-list').addEventListener('click', async (e) => {
-    const btn = e.target.closest('button'); if (!btn) return;
-    const r = NURSE_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
-    let patch = null;
-    if (btn.classList.contains('nr-claim')) {
-      if (r.claimed_by) patch = { claimed_by: null };
-      else { const who = myInitials(); if (!who) return; patch = { claimed_by: who }; }
-    } else if (btn.classList.contains('nr-plus')) {
-      const n = Math.min(r.done_count + 1, r.animal_count);
-      patch = { done_count: n, completed_at: n >= r.animal_count ? new Date().toISOString() : null };
-    } else if (btn.classList.contains('nr-all')) {
-      patch = { done_count: r.animal_count, completed_at: new Date().toISOString() };
-    }
-    if (!patch) return;
-    const { error } = await sb.from('nurse_requests').update(patch).eq('id', r.id);
-    if (error) alert('Could not update: ' + error.message);
-    loadAll();
-  });
-  function activeDoses() {
-    const by = new Map(NURSE_TREATMENTS.map(t => [t.id, t]));
-    return NURSE_DOSES
-      .filter(d => by.has(d.treatment_id) && !by.get(d.treatment_id).stopped)
-      .map(d => {
-        const t = by.get(d.treatment_id);
-        return Object.assign({}, d, { animal_id: t.animal_id, location: t.location, treatment: t.treatment,
-          times_per_day: t.times_per_day, slot_label: LDHLogic.slotLabel(t.times_per_day, d.slot_no) });
-      });
-  }
-  function doseRowHtml(d, todayISO) {
-    const done = !!d.done_at;
-    return `<label class="attn-item" style="cursor:pointer;">
-      <span style="display:flex; gap:10px; align-items:center;">
-        <input type="checkbox" class="nt-tick" data-id="${esc(d.id)}" ${done ? 'checked' : ''} style="width:20px; height:20px; margin:0;">
-        <span><span class="aname">${esc(d.animal_id)} — ${esc(d.treatment)}</span><br>
-          <span class="ameta">${esc(d.slot_label)}${d.due_date !== todayISO ? ' · due ' + esc(d.due_date) : ''}${done ? ' · done by ' + esc(d.done_by || '?') + ' ' + fmtTime(d.done_at) : ''}</span></span>
-      </span></label>`;
-  }
-  function groupedDoseHtml(list, todayISO) {
-    const by = {};
-    list.forEach(d => { (by[d.location] = by[d.location] || []).push(d); });
-    return Object.keys(by).sort().map(loc =>
-      `<div><div class="nt-loc-h">${esc(loc)}</div>${by[loc].map(d => doseRowHtml(d, todayISO)).join('')}</div>`).join('');
-  }
-  function renderNurseTreatments() {
-    const todayISO = LDHLogic.localISO(new Date());
-    const doses = activeDoses();
-    const overdue = doses.filter(d => LDHLogic.doseLevel(d, todayISO) === 'overdue');
-    const today = doses.filter(d => d.due_date === todayISO);
-    document.getElementById('nt-overdue').innerHTML = overdue.length
-      ? `<div class="nt-h overdue">Overdue (${overdue.length})</div>${groupedDoseHtml(overdue, todayISO)}` : '';
-    const todayDone = today.filter(d => d.done_at).length;
-    document.getElementById('nt-today').innerHTML = today.length
-      ? `<div class="nt-h">Due today (${todayDone} of ${today.length} done)</div>${groupedDoseHtml(today, todayISO)}`
-      : '<p class="empty-state">No treatments due today.</p>';
-    const courses = NURSE_TREATMENTS.filter(t => !t.stopped).map(t => {
-      const p = LDHLogic.courseProgress(NURSE_DOSES.filter(d => d.treatment_id === t.id));
-      return { t, p };
-    }).filter(c => c.p.total === 0 || c.p.done < c.p.total);
-    document.getElementById('nt-courses').innerHTML = courses.length
-      ? `<div class="nt-h">Courses in progress</div>` + courses.map(c => `<div class="attn-item">
-          <div><div class="aname">${esc(c.t.animal_id)} — ${esc(c.t.treatment)}</div>
-            <div class="ameta">${esc(c.t.location)} · ${c.t.times_per_day}× a day for ${c.t.days} days · ${c.p.done} of ${c.p.total} done${c.t.requested_by ? ' · requested by ' + esc(c.t.requested_by) : ''}</div></div>
-          <button class="secondary nt-stop" data-id="${esc(c.t.id)}">Stop course</button></div>`).join('')
-      : '';
-  }
-  document.getElementById('nt-start').value = LDHLogic.localISO(new Date());
-  document.getElementById('nt-submit').addEventListener('click', async () => {
-    const _btn = document.getElementById('nt-submit'); _btn.disabled = true;
-    try {
-      const animal = document.getElementById('nt-animal').value.trim();
-      const treatment = document.getElementById('nt-treatment').value.trim();
-      const times = parseInt(document.getElementById('nt-times').value, 10);
-      const days = parseInt(document.getElementById('nt-days').value, 10);
-      const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
-      if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
-      if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
-      const who = myInitials() || 'Vet team';
-      const { data: tr, error } = await sb.from('nurse_treatments').insert({
-        animal_id: animal, location: document.getElementById('nt-location').value, treatment,
-        times_per_day: times, days, start_date: start, requested_by: who
-      }).select().single();
-      if (error) { alert('Could not save the request: ' + error.message); return; }
-      const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
-      const { error: doseErr } = await sb.from('nurse_treatment_doses').insert(slots);
-      if (doseErr) {
-        await sb.from('nurse_treatments').delete().eq('id', tr.id);   // never leave a course without its doses
-        alert('Could not create the dose list: ' + doseErr.message);
-        return;
-      }
-      document.getElementById('nt-animal').value = '';
-      document.getElementById('nt-treatment').value = '';
-      loadAll();
-    } finally { _btn.disabled = false; }
-  });
-  document.getElementById('nurse-doses').addEventListener('change', async (e) => {
-    const cb = e.target.closest('.nt-tick'); if (!cb) return;
-    let who = null;
-    if (cb.checked) { who = myInitials(); if (!who) { cb.checked = false; return; } }
-    const { error } = await sb.from('nurse_treatment_doses')
-      .update({ done_by: who, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
-    if (error) alert('Could not save the tick: ' + error.message);
-    loadAll();
-  });
-  document.getElementById('nurse-treatments').addEventListener('click', async (e) => {
-    const btn = e.target.closest('.nt-stop'); if (!btn) return;
-    if (!confirm('Stop this course? Its remaining doses will disappear from the lists.')) return;
-    const { error } = await sb.from('nurse_treatments').update({ stopped: true }).eq('id', btn.dataset.id);
-    if (error) alert('Could not stop the course: ' + error.message);
-    loadAll();
-  });
+
   function renderDiseaseWatch() {
     const card = document.getElementById('disease-watch');
     if (!LOCATION_ROWS.length) { card.style.display = 'none'; return; }
@@ -1115,17 +582,26 @@
   }
   function refreshTimers() {
     renderDiseaseWatch();
-    renderQueueTable();
-    renderVetBoard();
-    if (typeof renderNurseRequests === 'function') renderNurseRequests();
-    if (typeof renderNurseTreatments === 'function') renderNurseTreatments();
+    renderCases();
   }
   setInterval(refreshTimers, 60000);
   fillLocationSelects();
   applyNrDefaultLocation();
   renderRedFlagForm();
+  updateLocationFields();
 
-  initAuth();
+  /* ---------- auth (OpsCore) ---------- */
+  (async function () {
+    const { sb: client } = await OpsCore.init({ page: 'staff' });
+    sb = client;
+    document.getElementById('app-root').style.display = 'grid';
+    await loadAll();
+    OpsCore.subscribe(['tasks'], loadAll);
+    document.getElementById('signout-link').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      location.reload();
+    });
+  })();
 </script>
 <!-- ip-notice-footer -->
 <footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">

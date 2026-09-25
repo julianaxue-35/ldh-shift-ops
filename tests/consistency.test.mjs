@@ -11,7 +11,8 @@ test('the migration seeds exactly the spaces the flag form offers (same names; o
   assert.equal(new Set(names).size, names.length, 'no duplicate names in the migration');
   assert.equal(new Set(L.LOCATIONS).size, L.LOCATIONS.length, 'no duplicate names in LOCATIONS');
   // Order is presentation only: the dropdown keeps its familiar order, the heat map orders by the migration's sort column.
-  assert.deepEqual([...names].sort(), [...L.LOCATIONS].sort());
+  // Offsite is a flag-form option only: it has no cages, so it is not a heat-map space.
+  assert.deepEqual([...names].sort(), L.LOCATIONS.filter(n => !L.OFFSITE_NAMES.includes(n)).sort());
 });
 
 test('the migration allows exactly the reported signs the JS knows about', () => {
