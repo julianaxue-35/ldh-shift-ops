@@ -232,10 +232,6 @@
         <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
         <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
-      <div id="req-med-wrap" style="margin:4px 0 4px;">
-        <input id="req-sm-number" placeholder="SM number" style="margin-top:0; display:none;">
-        <div id="req-sm-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-4px 0 8px;">Enter the SM number — it's required for a Medication request.</div>
-      </div>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
 
@@ -328,20 +324,13 @@
     document.getElementById('req-location-detail').style.display = isOffsite ? '' : 'none';
   }
 
-  document.getElementById('req-type').addEventListener('change', (e) => {
-    const needsMed = e.target.value === 'medication';
-    document.getElementById('req-sm-number').style.display = needsMed ? '' : 'none';
-    document.getElementById('req-sm-error').style.display = 'none';
-  });
-
   document.getElementById('req-submit').addEventListener('click', async () => {
     const title = document.getElementById('req-title').value.trim();
     if (!title) return;
+    // The Animal ID she types IS the SM number at LDH — there's no separate
+    // number to enter (2026-09-26: she found the extra box redundant/
+    // confusing next to the ID field right above it).
     const needsMed = document.getElementById('req-type').value === 'medication';
-    const smNumber = document.getElementById('req-sm-number').value.trim();
-    const smErr = document.getElementById('req-sm-error');
-    if (needsMed && !smNumber) { smErr.style.display = 'block'; return; }
-    smErr.style.display = 'none';
     const btn = document.getElementById('req-submit');
     btn.disabled = true;
     // Matches the offline tools' existing "Room / pen number" convention
@@ -360,7 +349,7 @@
       urgency: LDHLogic.tierFromFlags(selectedFlags()),
       red_flags: selectedFlags(),
       needs_medication: needsMed,
-      sm_number: needsMed ? smNumber : null,
+      sm_number: needsMed ? title : null,
       problem: document.getElementById('req-problem').value.trim() || null,
       condition: document.getElementById('req-condition').value || null,
       done: false,
@@ -373,8 +362,6 @@
     document.getElementById('req-problem').value = '';
     document.getElementById('req-condition').value = '';
     document.getElementById('req-type').value = 'shelter';
-    document.getElementById('req-sm-number').value = '';
-    document.getElementById('req-sm-number').style.display = 'none';
     document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });
     updateTierPreview();
   });
@@ -492,7 +479,7 @@
         <td style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
         <td>${TYPE_LABELS[t.type] || t.type}</td>
         <td><span class="status-pill ${tier}">${esc(LDHLogic.TIER_LABELS[tier])}</span></td>
-        <td>${esc(STAGE_LABELS[stage] || stage)}</td>
+        <td>${esc(STAGE_LABELS[stage] || stage)}${stage === 'completed' && t.needs_medication && t.med_done_by ? ' — meds by ' + esc(t.med_done_by) : ''}</td>
         <td>${esc(fmtFlagged(t.created_at))}</td>
         <td>${isCompleted ? '—' : statusChipHtml(t)}</td>
         <td>${t.note ? esc(t.note) : ''}</td>

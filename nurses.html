@@ -184,6 +184,10 @@
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
+      <div id="med-batch-bar" style="display:none; margin-bottom:14px;">
+        <button type="button" id="med-batch-done-btn">Mark <span id="med-batch-count">0</span> selected done, entering initials once →</button>
+        <button type="button" class="secondary" id="med-batch-clear" style="margin-left:8px; padding:10px 14px; font-size:0.82rem;">Clear selection</button>
+      </div>
       <div id="med-labels-list"></div>
     </section>
 
@@ -262,12 +266,21 @@
   /* ============================================================
      Medication labels to make
      ============================================================ */
+  // Batch Done (2026-09-26): picking up several medication labels used to
+  // mean typing initials once per animal — she wants one initials entry to
+  // cover a whole batch, both to save re-typing and so it's clear exactly
+  // who prepared the lot (if a medication can't be found later, that's who
+  // to ask).
+  let selectedMedDone = new Set();
   function medLabelTasks() {
     return TASKS.filter(t => t.needs_medication && t.vet_done_at && !t.done);
   }
   function medLabelCardHtml(t) {
     return `<div class="med-label-card" data-id="${esc(t.id)}">
-      <div class="aname">${esc(t.title)} <span class="ameta">SM ${esc(t.sm_number || '—')}</span></div>
+      <label style="display:flex; gap:8px; align-items:flex-start; margin:0 0 6px;">
+        <input type="checkbox" class="med-select" data-id="${esc(t.id)}" ${selectedMedDone.has(t.id) ? 'checked' : ''} style="width:auto; margin-top:3px;">
+        <span class="aname">${esc(t.title)} <span class="ameta">SM ${esc(t.sm_number || '—')}</span></span>
+      </label>
       <div class="ameta">${esc(locationText(t))} · ${t.med_chart_done ? 'Chart printed by admission' : 'No chart'}</div>
       <div class="med-label-text">${esc(t.med_label || '')}</div>
       <div class="med-label-actions">
@@ -276,9 +289,20 @@
       </div>
     </div>`;
   }
+  function updateMedBatchBar() {
+    // Drop any selected id that's no longer an open medication label (done
+    // elsewhere, or the vet undid it) so the count/batch never acts on a
+    // stale selection.
+    const openIds = new Set(medLabelTasks().map(t => t.id));
+    selectedMedDone.forEach(id => { if (!openIds.has(id)) selectedMedDone.delete(id); });
+    const bar = document.getElementById('med-batch-bar');
+    bar.style.display = selectedMedDone.size ? '' : 'none';
+    document.getElementById('med-batch-count').textContent = String(selectedMedDone.size);
+  }
   function renderMedLabels() {
     const list = medLabelTasks();
     document.getElementById('med-labels-list').innerHTML = list.map(medLabelCardHtml).join('') || '<p class="empty-state">No medication labels waiting.</p>';
+    updateMedBatchBar();
   }
   function copyTextFallback(text) {
     const ta = document.createElement('textarea');
@@ -319,6 +343,28 @@
       if (error) alert('Could not mark done: ' + error.message);
       loadAll();
     }
+  });
+  document.getElementById('med-labels-list').addEventListener('change', (e) => {
+    const cb = e.target.closest('.med-select'); if (!cb) return;
+    if (cb.checked) selectedMedDone.add(cb.dataset.id); else selectedMedDone.delete(cb.dataset.id);
+    updateMedBatchBar();
+  });
+  document.getElementById('med-batch-clear').addEventListener('click', () => {
+    selectedMedDone.clear();
+    renderMedLabels();
+  });
+  document.getElementById('med-batch-done-btn').addEventListener('click', async () => {
+    const ids = Array.from(selectedMedDone);
+    if (!ids.length) return;
+    const initials = myInitials();
+    if (!initials) { alert('Enter your initials before marking these done.'); return; }
+    const { error } = await sb.from('tasks').update({
+      med_done_by: initials, med_done_at: new Date().toISOString(), done: true,
+      completed_by_role: 'vet_nurse', completed_at: new Date().toISOString()
+    }).in('id', ids);
+    if (error) { alert('Could not mark these done: ' + error.message); return; }
+    selectedMedDone.clear();
+    loadAll();
   });
 
   /* ============================================================

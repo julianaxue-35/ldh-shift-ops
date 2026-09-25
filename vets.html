@@ -526,7 +526,7 @@
 
   function completedRowHtml(t) {
     return `<div class="completed-row">
-      <span>${esc(t.title)} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}</span>
+      <span>${esc(t.title)} — ${t.needs_medication && t.med_done_by ? 'meds by ' + esc(t.med_done_by) : 'done by ' + (t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff')}</span>
       <span style="display:flex; align-items:center; gap:8px;">
         <span class="time">${esc(fmtTime(t.completed_at || t.created_at))}</span>
         <button type="button" class="secondary undo-done" data-id="${esc(t.id)}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>

@@ -22,6 +22,10 @@ const H = 3600 * 1000, M = 60 * 1000;
     ROUND3_TASKS.offsite,
     ROUND3_TASKS.completedYesterday,
     ROUND3_TASKS.completed2DaysAgo,
+    mk('MED-DONE-YDAY', 'urgent', 20 * H, {
+      type: 'medication', needs_medication: true, sm_number: 'MED-DONE-YDAY', vet_done_at: ago(21 * H),
+      med_done_by: 'JX', med_done_at: ago(20 * H), done: true, completed_by_role: 'vet_nurse', completed_at: ago(20 * H)
+    }),
   ] };
   const { browser, page, errors } = await open(seed);
   try {
@@ -53,6 +57,11 @@ const H = 3600 * 1000, M = 60 * 1000;
     t.ok(completedText.includes('DONE-YDAY'), 'a case completed 20h ago is in the Completed group');
     t.ok(!completedText.includes('DONE-2DAY'), 'a case completed over 24h ago is not shown (kept, just hidden)');
     t.ok(!openText.includes('DONE-YDAY') && !openText.includes('DONE-2DAY'), 'completed cases are not in the open table');
+
+    // Completed medication case shows WHO made up the medication (2026-09-26:
+    // "if we can't find the medication, we can go back to that nurse").
+    const medDoneRow = page.locator('#cases-completed-tbody tr', { hasText: 'MED-DONE-YDAY' });
+    t.ok((await medDoneRow.textContent()).includes('meds by JX'), 'a completed medication case shows which nurse made it up, by initials');
 
     // No vet action buttons on this page — pick-up / bump / DONE move to
     // vets.html (Task 5's test file covers the hand-off and those actions).

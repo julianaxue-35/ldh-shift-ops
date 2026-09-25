@@ -273,5 +273,61 @@ const todayISO = LDHLogic.localISO(new Date());
     await d.browser.close();
   }
 
+  /* ============================================================
+     Tab E: batch Done on medication labels — select several, enter
+     initials once, all complete together (2026-09-26: "only enter
+     initial ONCE, so it prevents overhandling").
+     ============================================================ */
+  const seedE = {
+    tasks: [
+      { title: 'BMED-1', location: 'Pound 1', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+        needs_medication: true, sm_number: 'BMED-1', vet_done_at: ago(1 * H), med_label: 'Metacam 0.5mL SID', created_at: ago(2 * H) },
+      { title: 'BMED-2', location: 'Pound 2', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+        needs_medication: true, sm_number: 'BMED-2', vet_done_at: ago(1 * H), med_label: 'Amoxicillin BID', created_at: ago(2 * H) },
+      { title: 'BMED-3', location: 'Pound 3', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+        needs_medication: true, sm_number: 'BMED-3', vet_done_at: ago(1 * H), med_label: 'Prednisolone SID', created_at: ago(2 * H) },
+    ]
+  };
+  const eTab = await open(seedE, 'nurses.html');
+  try {
+    t.ok(!(await eTab.page.isVisible('#med-batch-bar')), 'batch bar hidden with nothing selected');
+
+    await eTab.page.locator('.med-label-card', { hasText: 'BMED-1' }).locator('.med-select').check();
+    await eTab.page.locator('.med-label-card', { hasText: 'BMED-2' }).locator('.med-select').check();
+    t.ok(await eTab.page.isVisible('#med-batch-bar'), 'batch bar appears once >=1 selected');
+    t.ok((await eTab.page.textContent('#med-batch-count')) === '2', 'selected count shows 2');
+
+    await eTab.page.evaluate(() => { window.prompt = () => null; });
+    await eTab.page.click('#med-batch-done-btn');
+    await eTab.page.waitForTimeout(200);
+    let dbTasks = (await eTab.db()).tasks;
+    t.ok(!dbTasks.find(x => x.title === 'BMED-1').done, 'batch Done is blocked with no initials (same rule as single Done)');
+
+    await eTab.page.fill('#initials-input', 'cd');
+    await eTab.page.click('#med-batch-done-btn');
+    await eTab.page.waitForTimeout(200);
+    dbTasks = (await eTab.db()).tasks;
+    const b1 = dbTasks.find(x => x.title === 'BMED-1'), b2 = dbTasks.find(x => x.title === 'BMED-2'), b3 = dbTasks.find(x => x.title === 'BMED-3');
+    t.ok(b1.done === true && b2.done === true, 'both selected medication cases complete together from one initials entry');
+    t.ok(b1.med_done_by === 'CD' && b2.med_done_by === 'CD', 'both record the SAME initials, entered once');
+    t.ok(!b3.done, 'the un-selected third case is untouched');
+
+    let cardsText = await eTab.page.textContent('#med-labels-list');
+    t.ok(!cardsText.includes('BMED-1') && !cardsText.includes('BMED-2') && cardsText.includes('BMED-3'), 'the two done cases drop off the list; the untouched one stays');
+    t.ok(!(await eTab.page.isVisible('#med-batch-bar')), 'batch bar clears after a successful batch Done');
+
+    /* ---------- Clear selection ---------- */
+    await eTab.page.locator('.med-label-card', { hasText: 'BMED-3' }).locator('.med-select').check();
+    t.ok(await eTab.page.isVisible('#med-batch-bar'), 'bar reappears for a fresh selection');
+    await eTab.page.click('#med-batch-clear');
+    t.ok(!(await eTab.page.isVisible('#med-batch-bar')), 'Clear selection empties the bar');
+    dbTasks = (await eTab.db()).tasks;
+    t.ok(!dbTasks.find(x => x.title === 'BMED-3').done, 'Clear selection does not mark anything done');
+
+    t.ok(eTab.errors.length === 0, 'no page errors in tab E: ' + JSON.stringify(eTab.errors));
+  } finally {
+    await eTab.browser.close();
+  }
+
   t.done();
 })();

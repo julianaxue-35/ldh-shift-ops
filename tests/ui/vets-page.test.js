@@ -408,5 +408,34 @@ const H = 3600 * 1000;
     await g.browser.close();
   }
 
+  /* ============================================================
+     Part 8: a completed medication case's row shows which nurse made
+     it up (med_done_by), not the generic "Vet/Nurse" — 2026-09-26,
+     "if we can't find the medication, we can go back to that nurse".
+     ============================================================ */
+  const seedH = {
+    tasks: [
+      { title: 'MEDX-DONE', location: 'Pound 1', shift: 'sick_injured', type: 'medication', urgency: 'urgent',
+        needs_medication: true, sm_number: 'MEDX-DONE', vet_done_at: ago(2 * H),
+        med_done_by: 'AB', med_done_at: ago(1 * H),
+        done: true, completed_by_role: 'vet_nurse', completed_at: ago(1 * H), created_at: ago(3 * H) },
+      { title: 'PLAIN-DONE', location: 'Pound 2', shift: 'sick_injured', type: 'shelter', urgency: 'urgent',
+        done: true, completed_by_role: 'vet_nurse', completed_at: ago(1 * H), created_at: ago(3 * H) },
+    ]
+  };
+  const h = await open(seedH, 'vets.html');
+  try {
+    const medRow = await h.page.locator('.completed-row', { hasText: 'MEDX-DONE' }).textContent();
+    t.ok(medRow.includes('meds by AB'), 'completed medication case shows the nurse\'s initials: ' + medRow);
+    t.ok(!medRow.includes('done by Vet/Nurse'), 'the generic "done by Vet/Nurse" wording is replaced for a medication case');
+
+    const nonMedRow = await h.page.locator('.completed-row', { hasText: 'PLAIN-DONE' }).textContent();
+    t.ok(nonMedRow.includes('done by Vet/Nurse'), 'a non-medication completed case still shows the generic wording (no initials tracked for vets)');
+
+    t.ok(h.errors.length === 0, 'no page errors: ' + h.errors.join('; '));
+  } finally {
+    await h.browser.close();
+  }
+
   t.done();
 })();
