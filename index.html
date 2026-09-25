@@ -233,11 +233,8 @@
         <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
       <div id="req-med-wrap" style="margin:4px 0 4px;">
-        <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;">
-          <input type="checkbox" id="req-needs-med" style="width:auto; margin:0;"> Needs medication
-        </label>
-        <input id="req-sm-number" placeholder="SM number" style="margin-top:8px; display:none;">
-        <div id="req-sm-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-4px 0 8px;">Enter the SM number — it's required when Needs medication is ticked.</div>
+        <input id="req-sm-number" placeholder="SM number" style="margin-top:0; display:none;">
+        <div id="req-sm-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-4px 0 8px;">Enter the SM number — it's required for a Medication request.</div>
       </div>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
@@ -331,15 +328,16 @@
     document.getElementById('req-location-detail').style.display = isOffsite ? '' : 'none';
   }
 
-  document.getElementById('req-needs-med').addEventListener('change', (e) => {
-    document.getElementById('req-sm-number').style.display = e.target.checked ? '' : 'none';
+  document.getElementById('req-type').addEventListener('change', (e) => {
+    const needsMed = e.target.value === 'medication';
+    document.getElementById('req-sm-number').style.display = needsMed ? '' : 'none';
     document.getElementById('req-sm-error').style.display = 'none';
   });
 
   document.getElementById('req-submit').addEventListener('click', async () => {
     const title = document.getElementById('req-title').value.trim();
     if (!title) return;
-    const needsMed = document.getElementById('req-needs-med').checked;
+    const needsMed = document.getElementById('req-type').value === 'medication';
     const smNumber = document.getElementById('req-sm-number').value.trim();
     const smErr = document.getElementById('req-sm-error');
     if (needsMed && !smNumber) { smErr.style.display = 'block'; return; }
@@ -374,7 +372,7 @@
     document.getElementById('req-location-detail').value = '';
     document.getElementById('req-problem').value = '';
     document.getElementById('req-condition').value = '';
-    document.getElementById('req-needs-med').checked = false;
+    document.getElementById('req-type').value = 'shelter';
     document.getElementById('req-sm-number').value = '';
     document.getElementById('req-sm-number').style.display = 'none';
     document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });

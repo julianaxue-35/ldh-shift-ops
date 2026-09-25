@@ -1,6 +1,11 @@
 // Round 3, Task 6: nurses.html — medication labels (Copy/Done), vaccination
 // pick-up, treatment dose ticks, the NO-GA required list, and the shared
-// memo board (post ungated, tick/delete gated).
+// memo board.
+// 2026-09-26: the passcode moved from gating each action to gating entry to
+// the page itself (she found per-click prompts unhelpful — "not when i pick
+// things up"). Tab 0 covers the entry gate; every other tab opens the page
+// with the harness's default auto-clear-the-gate behaviour and then expects
+// every action to run immediately, with no per-action prompt.
 const { open } = require('./harness');
 const t = require('./check')('nurses-page');
 const LDHLogic = require('../../lib/ldh-logic');
@@ -8,17 +13,37 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
 const H = 3600 * 1000;
 const todayISO = LDHLogic.localISO(new Date());
 
-async function waitPasscodeError(page) {
-  await page.waitForFunction(() => document.querySelector('.oc-modal-error') && getComputedStyle(document.querySelector('.oc-modal-error')).display !== 'none');
-}
-async function waitPasscodeClosed(page) {
-  await page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
-}
-
 (async () => {
   /* ============================================================
+     Tab 0: the page itself is gated — wrong passcode blocks entry
+     and keeps re-prompting; the right one reveals the app once and
+     nothing on the page prompts again afterward.
+     ============================================================ */
+  const zero = await open({}, 'nurses.html', { skipRoleGate: true });
+  try {
+    t.ok(await zero.page.locator('#oc-role-gate').count() === 1, 'nurses.html shows the entry gate before the app');
+    t.ok(!(await zero.page.isVisible('#app-root')), 'the app is not visible while the gate is up');
+    t.ok((await zero.page.getAttribute('#oc-role-gate', 'data-role')) === 'nurse', 'the gate is for the nurse role');
+
+    await zero.page.fill('#oc-role-gate .oc-gate-input', 'wrong-code');
+    await zero.page.click('#oc-role-gate .oc-gate-submit');
+    await zero.page.waitForFunction(() => document.querySelector('#oc-gate-error') && getComputedStyle(document.querySelector('#oc-gate-error')).display !== 'none');
+    t.ok(await zero.page.locator('#oc-role-gate').count() === 1, 'the wrong passcode keeps the gate up');
+
+    await zero.page.fill('#oc-role-gate .oc-gate-input', 'nurse');
+    await zero.page.click('#oc-role-gate .oc-gate-submit');
+    await zero.page.waitForSelector('#oc-role-gate', { state: 'detached' });
+    t.ok(await zero.page.isVisible('#app-root'), 'the right passcode reveals the app');
+    t.ok((await zero.page.locator('#ops-nav a.active').textContent()) === 'Nurses', 'nav populates once the gate clears');
+
+    t.ok(zero.errors.length === 0, 'no page errors: ' + zero.errors.join('; '));
+  } finally {
+    await zero.browser.close();
+  }
+
+  /* ============================================================
      Tab A: medication labels, vaccination pick-up, dose tick — all
-     gated by the SAME per-tab nurse-passcode unlock (like vets.html).
+     immediate now that the page itself is gated at entry.
      ============================================================ */
   const seedA = {
     tasks: [
@@ -55,7 +80,7 @@ async function waitPasscodeClosed(page) {
     t.ok(cardsText.includes('Offsite — Foster carer Amy'), 'Offsite location renders with the em-dash detail rule');
     t.ok(cardsText.includes('No chart'), 'chart status shown for a card with no chart printed');
 
-    /* ---------- Copy button: exact medCopyText() content, ungated ---------- */
+    /* ---------- Copy button: exact medCopyText() content ---------- */
     let dbTasks = (await a.db()).tasks;
     const med1 = dbTasks.find(x => x.title === 'MED-1');
     const expectedCopy = LDHLogic.medCopyText(med1);
@@ -66,44 +91,24 @@ async function waitPasscodeClosed(page) {
     t.ok(clip === expectedCopy, 'Copy writes the exact medCopyText() string to the clipboard: ' + JSON.stringify(clip));
     t.ok((await med1Card.locator('.med-copy-btn').textContent()) === 'Copied', 'Copy button shows "Copied" feedback');
 
-    /* ---------- Done: cancelling the passcode leaves it untouched ---------- */
-    await med1Card.locator('.med-done-btn').click();
-    await a.page.waitForSelector('.oc-modal-overlay');
-    await a.page.click('.oc-modal-cancel');
-    await a.page.waitForTimeout(150);
-    dbTasks = (await a.db()).tasks;
-    t.ok(!dbTasks.find(x => x.title === 'MED-1').done, 'cancelling the passcode leaves the medication case untouched');
-
-    /* ---------- Done: wrong passcode rejected ---------- */
-    await med1Card.locator('.med-done-btn').click();
-    await a.page.waitForSelector('.oc-modal-overlay');
-    await a.page.fill('.oc-modal-input', 'wrong-code');
-    await a.page.click('.oc-modal-submit');
-    await waitPasscodeError(a.page);
-    t.ok(await a.page.locator('.oc-modal-overlay').count() === 1, 'wrong passcode keeps the modal open');
-
-    /* ---------- Done: right passcode, but empty initials blocks it ---------- */
+    /* ---------- Done: empty initials still blocks it (no passcode step anymore) ---------- */
     // Initials box starts empty and is NOT remembered between visits. myInitials()
     // falls back to window.prompt() when empty; override it to simulate the nurse
-    // leaving that prompt blank/cancelled (Playwright's own dialog auto-accept, set
-    // up by the harness, only covers native dialogs we don't override — alert() below
-    // still goes through it undisturbed).
+    // leaving that prompt blank/cancelled.
     await a.page.evaluate(() => { window.prompt = () => null; });
     t.ok((await a.page.inputValue('#initials-input')) === '', 'initials box starts empty');
-    await a.page.fill('.oc-modal-input', 'nurse');
-    await a.page.click('.oc-modal-submit');
-    await waitPasscodeClosed(a.page);
+    await med1Card.locator('.med-done-btn').click();
     await a.page.waitForTimeout(200);
+    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'Done runs with no passcode prompt');
     dbTasks = (await a.db()).tasks;
-    t.ok(!dbTasks.find(x => x.title === 'MED-1').done, 'Done is blocked with no initials, even with the right passcode');
+    t.ok(!dbTasks.find(x => x.title === 'MED-1').done, 'Done is still blocked with no initials');
     t.ok(await a.page.locator('.med-label-card', { hasText: 'MED-1' }).count() === 1, 'MED-1 still on the medication-labels list');
 
-    /* ---------- Done: with initials typed in, completes the case (passcode already unlocked, no re-prompt) ---------- */
+    /* ---------- Done: with initials typed in, completes the case ---------- */
     await a.page.fill('#initials-input', 'jx');
     t.ok((await a.page.inputValue('#initials-input')) === 'JX', 'initials are cleaned/uppercased');
     await med1Card.locator('.med-done-btn').click();
-    await a.page.waitForTimeout(150);
-    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'no re-prompt: nurse already unlocked this tab');
+    await a.page.waitForTimeout(200);
     dbTasks = (await a.db()).tasks;
     const doneMed1 = dbTasks.find(x => x.title === 'MED-1');
     t.ok(doneMed1.done === true, 'Done completes the case');
@@ -119,7 +124,7 @@ async function waitPasscodeClosed(page) {
     await nrItem.locator('.nr-claim').click();
     await a.page.waitForTimeout(200);
     let nurseRequests = (await a.db()).nurse_requests;
-    t.ok(nurseRequests[0].claimed_by === 'JX', 'pick-up claims with the current initials (already-unlocked tab)');
+    t.ok(nurseRequests[0].claimed_by === 'JX', 'pick-up claims with the current initials, immediately');
     await a.page.locator('.attn-item.nr-item', { hasText: 'Cat Room 1' }).locator('.nr-plus').click();
     await a.page.waitForTimeout(200);
     nurseRequests = (await a.db()).nurse_requests;
@@ -129,7 +134,7 @@ async function waitPasscodeClosed(page) {
     const doseCheckbox = a.page.locator('.nt-tick').first();
     await doseCheckbox.check();
     await a.page.waitForTimeout(200);
-    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'dose tick does not re-prompt (already unlocked)');
+    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'dose tick runs with no passcode prompt');
     const dose = (await a.db()).nurse_treatment_doses.find(d => d.id === 'dose1');
     t.ok(dose.done_at != null, 'dose tick stamps done_at');
     t.ok(dose.done_by === 'JX', 'dose tick records done_by from the current initials');
@@ -140,7 +145,7 @@ async function waitPasscodeClosed(page) {
   }
 
   /* ============================================================
-     Tab B: NO-GA required list — add and done, both nurse-gated.
+     Tab B: NO-GA required list — add and done, both immediate now.
      ============================================================ */
   const seedB = {
     noga_requests: [
@@ -159,39 +164,21 @@ async function waitPasscodeClosed(page) {
     await b.page.selectOption('#noga-task', 'fiv_test');
     await b.page.fill('#noga-note', 'urgent test');
 
-    /* ---------- Add: cancelling the passcode adds nothing ---------- */
+    /* ---------- Add: runs immediately, no passcode prompt ---------- */
     await b.page.click('#noga-submit');
-    await b.page.waitForSelector('.oc-modal-overlay');
-    await b.page.click('.oc-modal-cancel');
-    await b.page.waitForTimeout(150);
-    let noga = (await b.db()).noga_requests;
-    t.ok(noga.length === 1, 'cancelling the passcode leaves the NO-GA list unchanged');
-
-    /* ---------- Add: wrong passcode rejected ---------- */
-    await b.page.click('#noga-submit');
-    await b.page.waitForSelector('.oc-modal-overlay');
-    await b.page.fill('.oc-modal-input', 'nope');
-    await b.page.click('.oc-modal-submit');
-    await waitPasscodeError(b.page);
-    noga = (await b.db()).noga_requests;
-    t.ok(noga.length === 1, 'wrong passcode still adds nothing');
-
-    /* ---------- Add: right passcode inserts and it appears in the list ---------- */
-    await b.page.fill('.oc-modal-input', 'nurse');
-    await b.page.click('.oc-modal-submit');
-    await waitPasscodeClosed(b.page);
     await b.page.waitForTimeout(200);
-    noga = (await b.db()).noga_requests;
+    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'NO-GA add runs with no passcode prompt');
+    let noga = (await b.db()).noga_requests;
     const added = noga.find(r => r.animal_id === 'CAT-42');
     t.ok(added && added.location === 'Offsite' && added.location_detail === 'Vet clinic' && added.task === 'fiv_test' && added.note === 'urgent test',
       'NO-GA add stores animal/location/detail/task/note');
     listText = await b.page.textContent('#noga-list');
     t.ok(listText.includes('CAT-42') && listText.includes('Offsite — Vet clinic') && listText.includes('FIV test'), 'new NO-GA request appears in the list');
 
-    /* ---------- Done: initials recorded (passcode already unlocked from the add above) ---------- */
+    /* ---------- Done: initials recorded ---------- */
     await b.page.locator('.attn-item.noga-item', { hasText: 'DOG-99' }).locator('.noga-done').click();
     await b.page.waitForTimeout(200);
-    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'NO-GA done does not re-prompt (already unlocked)');
+    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'NO-GA done runs with no passcode prompt');
     noga = (await b.db()).noga_requests;
     const doneRow = noga.find(r => r.animal_id === 'DOG-99');
     t.ok(doneRow.done === true && doneRow.done_by, 'NO-GA Done stamps done + done_by (initials filled via the prompt fallback)');
@@ -202,8 +189,7 @@ async function waitPasscodeClosed(page) {
   }
 
   /* ============================================================
-     Tab C: memo board — tick blocked without the nurse passcode,
-     allowed after providing it.
+     Tab C: memo board — post and tick both run immediately.
      ============================================================ */
   const seedC = {
     memos: [{ author: 'Vet team', text: 'Fridge stock low', done: false, created_at: ago(1 * H) }]
@@ -212,20 +198,10 @@ async function waitPasscodeClosed(page) {
   try {
     const memoCb = c.page.locator('.memo-tick').first();
     await memoCb.click();
-    await c.page.waitForSelector('.oc-modal-overlay');
-    await c.page.click('.oc-modal-cancel');
-    await c.page.waitForTimeout(150);
-    let memos = (await c.db()).memos;
-    t.ok(memos[0].done === false, 'memo tick is blocked without the nurse passcode');
-
-    await memoCb.click();
-    await c.page.waitForSelector('.oc-modal-overlay');
-    await c.page.fill('.oc-modal-input', 'nurse');
-    await c.page.click('.oc-modal-submit');
-    await waitPasscodeClosed(c.page);
     await c.page.waitForTimeout(200);
-    memos = (await c.db()).memos;
-    t.ok(memos[0].done === true, 'correct nurse passcode allows the memo tick');
+    t.ok(await c.page.locator('.oc-modal-overlay').count() === 0, 'memo tick runs with no passcode prompt');
+    const memos = (await c.db()).memos;
+    t.ok(memos[0].done === true, 'the tick took effect immediately');
 
     t.ok(c.errors.length === 0, 'no page errors in tab C: ' + JSON.stringify(c.errors));
   } finally {

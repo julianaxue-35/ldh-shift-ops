@@ -26,22 +26,26 @@ const t = require('./check')('flag-form');
   tasks = (await db()).tasks;
   t.ok(tasks.length === 2 && tasks[1].urgency === 'routine' && tasks[1].red_flags.length === 0, 'no signs saves as routine');
 
-  /* ---------- Needs medication reveals SM number, blocks empty submit ---------- */
+  /* ---------- Medication request type reveals SM number, blocks empty submit ----------
+     2026-09-26: the standalone "Needs medication" checkbox was removed — she
+     found it confusing next to the existing "Medication" request type, so
+     that dropdown option is now the one control that drives the medication
+     hand-off. */
   await page.fill('#req-title', 'T102');
-  t.ok(!(await page.isVisible('#req-sm-number')), 'SM number hidden until Needs medication is ticked');
-  await page.check('#req-needs-med');
-  t.ok(await page.isVisible('#req-sm-number'), 'ticking Needs medication reveals the SM number field');
+  t.ok(!(await page.isVisible('#req-sm-number')), 'SM number hidden for a non-medication request type');
+  await page.selectOption('#req-type', 'medication');
+  t.ok(await page.isVisible('#req-sm-number'), 'choosing the Medication request type reveals the SM number field');
   await page.click('#req-submit');
   await page.waitForTimeout(200);
   tasks = (await db()).tasks;
-  t.ok(tasks.length === 2, 'submit is blocked while Needs medication is ticked with no SM number');
+  t.ok(tasks.length === 2, 'submit is blocked for a Medication request with no SM number');
   t.ok(await page.isVisible('#req-sm-error'), 'a visible message explains the block');
   await page.fill('#req-sm-number', 'SM55512');
   await page.click('#req-submit');
   await page.waitForTimeout(200);
   tasks = (await db()).tasks;
-  t.ok(tasks.length === 3 && tasks[2].needs_medication === true && tasks[2].sm_number === 'SM55512', 'submits once the SM number is filled in');
-  t.ok(!(await page.isVisible('#req-sm-number')), 'SM number field hidden again after a successful submit');
+  t.ok(tasks.length === 3 && tasks[2].needs_medication === true && tasks[2].sm_number === 'SM55512' && tasks[2].type === 'medication', 'submits once the SM number is filled in, needs_medication follows the request type');
+  t.ok(!(await page.isVisible('#req-sm-number')), 'SM number field hidden again after a successful submit (type resets to Shelter)');
 
   /* ---------- Offsite hides the pen field, reveals an optional detail field ---------- */
   t.ok(await page.isVisible('#req-pen') && !(await page.isVisible('#req-location-detail')), 'pen shown, detail hidden for a normal space');

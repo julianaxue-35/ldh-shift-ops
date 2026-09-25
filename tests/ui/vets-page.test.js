@@ -1,7 +1,11 @@
 // Round 3, Task 5: vets.html — case queue (pick up / bump / DONE), the
 // medication DONE panel, "Request a treatment" (moved unchanged), "Start a
-// shift" (moved unchanged), and the shared memo board (post ungated,
-// tick/delete gated).
+// shift" (moved unchanged), and the shared memo board.
+// 2026-09-26: the passcode moved from gating each action to gating entry to
+// the page itself (she found per-click prompts unhelpful — "not when i pick
+// things up"). Part 0 covers the entry gate; every other part opens the page
+// with the harness's default auto-clear-the-gate behaviour and then expects
+// every action to run immediately, with no per-action prompt.
 const { open } = require('./harness');
 const t = require('./check')('vets-page');
 const ago = ms => new Date(Date.now() - ms).toISOString();
@@ -9,8 +13,36 @@ const H = 3600 * 1000;
 
 (async () => {
   /* ============================================================
-     Part 1: passcode gate on pick-up, then bump/DONE reuse the
-     same tab-session unlock (no re-prompt).
+     Part 0: the page itself is gated — wrong passcode blocks entry
+     and keeps re-prompting; the right one reveals the app once and
+     nothing on the page prompts again afterward.
+     ============================================================ */
+  const zero = await open({}, 'vets.html', { skipRoleGate: true });
+  try {
+    t.ok(await zero.page.locator('#oc-role-gate').count() === 1, 'vets.html shows the entry gate before the app');
+    t.ok(!(await zero.page.isVisible('#app-root')), 'the app is not visible while the gate is up');
+    t.ok((await zero.page.getAttribute('#oc-role-gate', 'data-role')) === 'vet', 'the gate is for the vet role');
+
+    await zero.page.fill('#oc-role-gate .oc-gate-input', 'wrong-code');
+    await zero.page.click('#oc-role-gate .oc-gate-submit');
+    await zero.page.waitForFunction(() => document.querySelector('#oc-gate-error') && getComputedStyle(document.querySelector('#oc-gate-error')).display !== 'none');
+    t.ok(await zero.page.locator('#oc-role-gate').count() === 1, 'the wrong passcode keeps the gate up');
+    t.ok(!(await zero.page.isVisible('#app-root')), 'the app still is not visible');
+
+    await zero.page.fill('#oc-role-gate .oc-gate-input', 'vet2026');
+    await zero.page.click('#oc-role-gate .oc-gate-submit');
+    await zero.page.waitForSelector('#oc-role-gate', { state: 'detached' });
+    t.ok(await zero.page.isVisible('#app-root'), 'the right passcode reveals the app');
+    t.ok((await zero.page.locator('#ops-nav a.active').textContent()) === 'Vets', 'nav populates once the gate clears');
+
+    t.ok(zero.errors.length === 0, 'no page errors: ' + zero.errors.join('; '));
+  } finally {
+    await zero.browser.close();
+  }
+
+  /* ============================================================
+     Part 1: pick up, bump, DONE — all immediate, no per-action
+     prompt now that the page itself is gated at entry.
      ============================================================ */
   const seedA = {
     tasks: [
@@ -44,32 +76,14 @@ const H = 3600 * 1000;
     // exact hand-off URL).
     await a.page.evaluate(() => { window.__openedUrls = []; window.open = (u) => { window.__openedUrls.push(u); }; });
 
-    /* ---------- Pick up: cancel blocks it ---------- */
-    const pickupBtn = a.page.locator('.pick-up-btn', { hasText: 'Pick up' }).first();
+    /* ---------- Pick up: immediate, no prompt ---------- */
     await a.page.locator('.attn-item', { hasText: 'PICKUP-1' }).locator('.pick-up-btn').click();
-    await a.page.waitForSelector('.oc-modal-overlay');
-    t.ok((await a.page.textContent('.oc-modal-text')) === 'Enter the vet passcode to pick up cases.', 'pick-up modal names the exact reason');
-    await a.page.click('.oc-modal-cancel');
-    await a.page.waitForTimeout(150);
-    let tasks = (await a.db()).tasks;
-    t.ok(tasks.find(x => x.title === 'PICKUP-1').claimed_at == null, 'cancelling the passcode leaves the case unclaimed');
-    t.ok((await a.page.evaluate(() => window.__openedUrls.length)) === 0, 'no hand-off tab opened on cancel');
-
-    /* ---------- Pick up: wrong code rejected, right code unlocks ---------- */
-    await a.page.locator('.attn-item', { hasText: 'PICKUP-1' }).locator('.pick-up-btn').click();
-    await a.page.waitForSelector('.oc-modal-overlay');
-    await a.page.fill('.oc-modal-input', 'wrong-code');
-    await a.page.click('.oc-modal-submit');
-    await a.page.waitForFunction(() => document.querySelector('.oc-modal-error') && getComputedStyle(document.querySelector('.oc-modal-error')).display !== 'none');
-    t.ok(await a.page.locator('.oc-modal-overlay').count() === 1, 'wrong code keeps the modal open');
-    await a.page.fill('.oc-modal-input', 'vet2026');
-    await a.page.click('.oc-modal-submit');
-    await a.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
     await a.page.waitForTimeout(250);
+    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'pick-up runs with no passcode prompt (the page itself was already gated)');
 
-    tasks = (await a.db()).tasks;
+    let tasks = (await a.db()).tasks;
     const pickedUp = tasks.find(x => x.title === 'PICKUP-1');
-    t.ok(pickedUp.claimed_at != null, 'correct code stamps claimed_at');
+    t.ok(pickedUp.claimed_at != null, 'pick-up stamps claimed_at');
     t.ok(pickedUp.claimed_by === null, 'claimed_by stays null (no initials for vets)');
 
     const openedUrls = await a.page.evaluate(() => window.__openedUrls);
@@ -82,10 +96,10 @@ const H = 3600 * 1000;
     t.ok(items[0].redFlags.join() === "Bleeding wound (large cut / can't stop the bleeding)", 'hand-off redFlags use signLabel() text');
     t.ok(items[0].condition === 'Wounds / injury / trauma', 'hand-off condition uses the label, not the raw key');
 
-    /* ---------- Bump: no re-prompt (vet already unlocked this tab) ---------- */
+    /* ---------- Bump: immediate, no prompt ---------- */
     await a.page.locator('.attn-item', { hasText: 'BUMP-1' }).locator('.bump-btn').click();
     await a.page.waitForTimeout(200);
-    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'bump does not re-prompt once vet is unlocked');
+    t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'bump runs with no passcode prompt');
     tasks = (await a.db()).tasks;
     t.ok(tasks.find(x => x.title === 'BUMP-1').urgency === 'urgent', 'bump moved Request-checks case to Urgent');
     await a.page.waitForTimeout(150);
@@ -139,7 +153,7 @@ const H = 3600 * 1000;
 
   /* ============================================================
      Part 2: "Request a treatment" + courses, "Start a shift", and
-     the memo board (post ungated; tick/delete gated).
+     the memo board (posting and ticking both immediate now).
      ============================================================ */
   const b = await open({ memos: [{ author: 'Shelter Staff', text: 'Cage 4 latch is loose', done: false }] }, 'vets.html');
   try {
@@ -148,33 +162,22 @@ const H = 3600 * 1000;
     t.ok(await b.page.isVisible('#start-shift-card'), 'Start a shift card present');
     t.ok(await b.page.locator('#start-shift-card a.shift-launch').count() === 3, 'Start a shift links to all three shift tools');
 
-    // Posting a memo needs no passcode.
     await b.page.fill('#memo-text', 'Extra towels needed in Pound 3');
     await b.page.click('#memo-submit');
     await b.page.waitForTimeout(200);
     let memos = (await b.db()).memos;
-    t.ok(memos.some(m => m.text === 'Extra towels needed in Pound 3'), 'posting a memo is not gated');
+    t.ok(memos.some(m => m.text === 'Extra towels needed in Pound 3'), 'posting a memo works');
 
-    // Ticking one off IS gated. (Posting the memo above triggers a realtime
+    // Ticking one off runs immediately too — no per-action prompt now that
+    // the page itself is gated. (Posting the memo above triggers a realtime
     // reload that re-sorts the list newest-first, so target the original
     // memo by its text rather than by position.)
     const tick = b.page.locator('.memo', { hasText: 'Cage 4 latch is loose' }).locator('.memo-tick');
     await tick.click();
-    await b.page.waitForSelector('.oc-modal-overlay');
-    t.ok((await b.page.textContent('.oc-modal-text')) === 'Enter the vet passcode to tick off a memo.', 'memo tick names the reason');
-    await b.page.click('.oc-modal-cancel');
-    await b.page.waitForTimeout(150);
-    memos = (await b.db()).memos;
-    t.ok(memos.every(m => !m.done), 'cancelling the passcode leaves the memo untouched');
-    t.ok(!(await tick.isChecked()), 'the checkbox visually reverts when the passcode is cancelled');
-
-    await tick.click();
-    await b.page.waitForSelector('.oc-modal-overlay');
-    await b.page.fill('.oc-modal-input', 'vet2026');
-    await b.page.click('.oc-modal-submit');
     await b.page.waitForTimeout(250);
+    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'ticking a memo runs with no passcode prompt');
     memos = (await b.db()).memos;
-    t.ok(memos.find(m => m.text === 'Cage 4 latch is loose').done === true, 'the right code allows the tick');
+    t.ok(memos.find(m => m.text === 'Cage 4 latch is loose').done === true, 'the tick took effect immediately');
 
     t.ok(b.errors.length === 0, 'no page errors: ' + b.errors.join('; '));
   } finally {
@@ -183,7 +186,7 @@ const H = 3600 * 1000;
 
   /* ============================================================
      Part 3: batch pick-up — select cases across tier columns, one
-     gated hand-off for all of them sorted by location, clear
+     immediate hand-off for all of them sorted by location, clear
      selection.
      ============================================================ */
   const seedC = {
@@ -206,28 +209,14 @@ const H = 3600 * 1000;
     t.ok((await c.page.textContent('#batch-pickup-count')) === '2', 'selected count shows 2 across different tier columns');
     t.ok((await c.page.textContent('#batch-pickup-bar')).includes('2 selected, sorted by location'), 'bar wording: "N selected, sorted by location"');
 
-    /* ---------- batch pick-up is gated; cancelling leaves selection + cases untouched ---------- */
+    /* ---------- batch pick-up runs immediately, no prompt ---------- */
     await c.page.click('#batch-pickup-btn');
-    await c.page.waitForSelector('.oc-modal-overlay');
-    t.ok((await c.page.textContent('.oc-modal-text')) === 'Enter the vet passcode to pick up cases.', 'batch pick-up uses the same gate/reason as single pick-up');
-    await c.page.click('.oc-modal-cancel');
-    await c.page.waitForTimeout(150);
-    let tasks = (await c.db()).tasks;
-    t.ok(tasks.find(x => x.title === 'BATCH-A').claimed_at == null && tasks.find(x => x.title === 'BATCH-B').claimed_at == null,
-      'cancelling the batch passcode leaves both cases unclaimed');
-    t.ok(await c.page.isVisible('#batch-pickup-bar'), 'selection survives a cancelled passcode attempt');
-
-    /* ---------- right code: one prompt for the whole batch, one combined hand-off ---------- */
-    await c.page.click('#batch-pickup-btn');
-    await c.page.waitForSelector('.oc-modal-overlay');
-    await c.page.fill('.oc-modal-input', 'vet2026');
-    await c.page.click('.oc-modal-submit');
-    await c.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
     await c.page.waitForTimeout(300);
+    t.ok(await c.page.locator('.oc-modal-overlay').count() === 0, 'batch pick-up runs with no passcode prompt');
 
-    tasks = (await c.db()).tasks;
+    let tasks = (await c.db()).tasks;
     const bA = tasks.find(x => x.title === 'BATCH-A'), bB = tasks.find(x => x.title === 'BATCH-B');
-    t.ok(bA.claimed_at != null && bB.claimed_at != null, 'the right code stamps claimed_at on every selected case');
+    t.ok(bA.claimed_at != null && bB.claimed_at != null, 'the batch pick-up stamps claimed_at on every selected case');
     t.ok(bA.claimed_by === null && bB.claimed_by === null, 'claimed_by stays null for both (no initials)');
 
     const openedUrls = await c.page.evaluate(() => window.__openedUrls);
@@ -276,11 +265,7 @@ const H = 3600 * 1000;
     await d.page.evaluate((id) => { window.__db.tasks.find(t => t.id === id).claimed_at = new Date().toISOString(); }, raceId);
 
     await d.page.locator('.attn-item', { hasText: 'RACE-1' }).locator('.pick-up-btn').click();
-    await d.page.waitForSelector('.oc-modal-overlay');
-    await d.page.fill('.oc-modal-input', 'vet2026');
-    await d.page.click('.oc-modal-submit');
-    await d.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
-    await d.page.waitForTimeout(250);
+    await d.page.waitForTimeout(300);
 
     const alertsD = await d.page.evaluate(() => window.__alerts);
     t.ok(alertsD.some(m => m.includes('RACE-1') && m.includes('already picked up by someone else')),
@@ -319,11 +304,7 @@ const H = 3600 * 1000;
     await eTab.page.evaluate((id) => { window.__db.tasks.find(t => t.id === id).claimed_at = new Date().toISOString(); }, raceBId);
 
     await eTab.page.click('#batch-pickup-btn');
-    await eTab.page.waitForSelector('.oc-modal-overlay');
-    await eTab.page.fill('.oc-modal-input', 'vet2026');
-    await eTab.page.click('.oc-modal-submit');
-    await eTab.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
-    await eTab.page.waitForTimeout(250);
+    await eTab.page.waitForTimeout(300);
 
     const tasksAfterE = (await eTab.db()).tasks;
     t.ok(tasksAfterE.find(x => x.title === 'RACE-A').claimed_at != null, 'batch pick-up still claims the case that was actually free');
@@ -362,11 +343,8 @@ const H = 3600 * 1000;
     t.ok((await f.page.textContent('#completed-list')).includes('UNDO-MED'), 'the completed medication case starts in the Completed list');
 
     await f.page.locator('.completed-row', { hasText: 'UNDO-MED' }).locator('.undo-done').click();
-    await f.page.waitForSelector('.oc-modal-overlay');
-    await f.page.fill('.oc-modal-input', 'vet2026');
-    await f.page.click('.oc-modal-submit');
-    await f.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
-    await f.page.waitForTimeout(250);
+    await f.page.waitForTimeout(300);
+    t.ok(await f.page.locator('.oc-modal-overlay').count() === 0, 'undo runs with no passcode prompt');
 
     const tasksAfterF = (await f.db()).tasks;
     const undone = tasksAfterF.find(x => x.title === 'UNDO-MED');
@@ -407,11 +385,7 @@ const H = 3600 * 1000;
     await g.page.evaluate(() => { window.__openedUrls = []; window.open = (u) => window.__openedUrls.push(u); });
 
     await g.page.locator('.attn-item', { hasText: 'OFFSITE-PICKUP' }).locator('.pick-up-btn').click();
-    await g.page.waitForSelector('.oc-modal-overlay');
-    await g.page.fill('.oc-modal-input', 'vet2026');
-    await g.page.click('.oc-modal-submit');
-    await g.page.waitForFunction(() => document.querySelectorAll('.oc-modal-overlay').length === 0);
-    await g.page.waitForTimeout(250);
+    await g.page.waitForTimeout(300);
 
     let openedUrlsG = await g.page.evaluate(() => window.__openedUrls);
     t.ok(openedUrlsG.length === 1, 'Offsite pick-up opens exactly one hand-off tab');
@@ -423,7 +397,7 @@ const H = 3600 * 1000;
     // A second Offsite case with no free-text problem: the detail should
     // still appear, with no stray leading separator.
     await g.page.locator('.attn-item', { hasText: 'OFFSITE-NOPROBLEM' }).locator('.pick-up-btn').click();
-    await g.page.waitForTimeout(250);
+    await g.page.waitForTimeout(300);
     openedUrlsG = await g.page.evaluate(() => window.__openedUrls);
     t.ok(openedUrlsG.length === 2, 'second Offsite pick-up opens its own hand-off tab');
     const itemsG2 = JSON.parse(new URL(openedUrlsG[1]).searchParams.get('items'));

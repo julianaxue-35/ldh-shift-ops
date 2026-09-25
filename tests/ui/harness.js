@@ -1,6 +1,9 @@
 const { chromium } = require('playwright');
 const path = require('path');
 const pageUrl = (name) => 'file://' + path.resolve(__dirname, '../../' + (name || 'index.html'));
+// Node-side mirror of the STUB's own PASSCODES (below) — open() runs outside
+// the page, so it needs its own copy to auto-clear the vets/nurses entry gate.
+const PASSCODES = { nurse: 'nurse', vet: 'vet2026' };
 
 // In-memory stand-in for the Supabase client. Runs inside the page.
 const STUB = `
@@ -142,6 +145,19 @@ async function open(seed = {}, pageName, opts = {}) {
   page.on('dialog', d => d.accept('JX'));   // prompt() -> initials "JX"; confirm() -> OK
   await page.goto(pageUrl(pageName));
   await page.waitForTimeout(500);
+  // vets.html/nurses.html show a full-screen role-passcode gate right after
+  // sign-in (2026-09-26). Auto-clear it with the matching seeded code so
+  // existing tests reach the page as before; pass opts.skipRoleGate to drive
+  // it manually in a test that specifically exercises the gate itself.
+  if (!opts.skipRoleGate) {
+    const gate = page.locator('#oc-role-gate');
+    if (await gate.count()) {
+      const role = await gate.getAttribute('data-role');
+      await page.fill('#oc-role-gate .oc-gate-input', PASSCODES[role] || '');
+      await page.click('#oc-role-gate .oc-gate-submit');
+      await gate.waitFor({ state: 'detached' });
+    }
+  }
   return { browser, page, errors, db: () => page.evaluate(() => window.__db) };
 }
 module.exports = { open };

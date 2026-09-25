@@ -266,6 +266,23 @@ test('caseList: open sorted by sortQueue; completed within 24 h, newest first; d
   assert.deepEqual(r.completed.map(t => t.title), ['c-new', 'c-nostamp', 'c-old-inside']);
 });
 
+test('caseList/isRequest: a synced-but-never-flagged animal (type check_recheck) never appears in the queue', () => {
+  // 2026-09-26: every animal on today's offline-tool list is synced to `tasks`
+  // so the completion donut can show "X of Y done" (see sync-completion's
+  // batch-list shape) — that sync never sets `type`, so it keeps the column
+  // default 'check_recheck'. The flag form always sends shelter/foster/
+  // rescue/medication. Only the latter belong in the Cases queue.
+  const synced = task('routine', 1 * H, { title: 'synced-only', type: 'check_recheck' });
+  const flagged = task('routine', 1 * H, { title: 'real-request', type: 'shelter' });
+  const syncedDone = task('urgent', 1 * H, { title: 'synced-done', type: 'check_recheck', done: true, completed_at: new Date(NOW - 1 * H).toISOString() });
+  const flaggedDone = task('urgent', 1 * H, { title: 'real-done', type: 'foster', done: true, completed_at: new Date(NOW - 1 * H).toISOString() });
+  assert.equal(L.isRequest(synced), false);
+  assert.equal(L.isRequest(flagged), true);
+  const r = L.caseList([synced, flagged, syncedDone, flaggedDone], NOW);
+  assert.deepEqual(r.open.map(t => t.title), ['real-request']);
+  assert.deepEqual(r.completed.map(t => t.title), ['real-done']);
+});
+
 test('medCopyText: SM number, location, offsite detail, label', () => {
   const base = { title: 'Bella', sm_number: '12345', location: 'Cat Room 1 / 4', med_label: 'Meloxicam 0.1 mg SID' };
   assert.equal(L.medCopyText(base), 'Bella | SM 12345 | Cat Room 1 / 4\nMeloxicam 0.1 mg SID');

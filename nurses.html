@@ -310,8 +310,6 @@
     if (doneBtn) {
       const t = TASKS.find(x => x.id === doneBtn.dataset.id);
       if (!t) return;
-      const ok = await OpsCore.requirePasscode('nurse', 'mark medication done');
-      if (!ok) return;
       const initials = myInitials();
       if (!initials) { alert('Enter your initials before marking this done.'); return; }
       const { error } = await sb.from('tasks').update({
@@ -345,7 +343,6 @@
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
     const r = NURSE_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
-    const ok = await OpsCore.requirePasscode('nurse', 'update a vaccination request'); if (!ok) return;
     let patch = null;
     if (btn.classList.contains('nr-claim')) {
       if (r.claimed_by) patch = { claimed_by: null };
@@ -400,10 +397,7 @@
     const cb = e.target.closest('.nt-tick'); if (!cb) return;
     let who = null;
     if (cb.checked) {
-      const ok = await OpsCore.requirePasscode('nurse', 'tick off a dose'); if (!ok) { cb.checked = false; return; }
       who = myInitials(); if (!who) { cb.checked = false; return; }
-    } else {
-      const ok = await OpsCore.requirePasscode('nurse', 'undo a dose'); if (!ok) { cb.checked = true; return; }
     }
     const { error } = await sb.from('nurse_treatment_doses').update({ done_by: who, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
     if (error) alert('Could not save the tick: ' + error.message);
@@ -431,7 +425,6 @@
   document.getElementById('noga-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('.noga-done'); if (!btn) return;
     const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
-    const ok = await OpsCore.requirePasscode('nurse', 'mark a NO-GA task done'); if (!ok) return;
     const initials = myInitials();
     if (!initials) { alert('Enter your initials before marking this done.'); return; }
     const { error } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString() }).eq('id', r.id);
@@ -448,7 +441,6 @@
     const detail = document.getElementById('noga-location-detail').value.trim();
     const task = document.getElementById('noga-task').value;
     const note = document.getElementById('noga-note').value.trim();
-    const ok = await OpsCore.requirePasscode('nurse', 'add a NO-GA request'); if (!ok) return;
     // Initials are NOT required to add a NO-GA request (only to mark one
     // done) — read the box directly rather than myInitials(), which would
     // pop a window.prompt() when it's empty.
@@ -488,8 +480,6 @@
   document.getElementById('memo-board').addEventListener('change', async (e) => {
     const cb = e.target.closest('.memo-tick'); if (!cb) return;
     const wantDone = cb.checked;
-    const ok = await OpsCore.requirePasscode('nurse', 'tick off a memo');
-    if (!ok) { cb.checked = !wantDone; return; }
     const { error } = await sb.from('memos').update({ done: wantDone, done_at: wantDone ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
     if (error) alert('Could not update memo: ' + error.message);
     loadAll();
@@ -497,8 +487,6 @@
   document.getElementById('memo-board').addEventListener('click', async (e) => {
     const del = e.target.closest('.memo-del');
     if (del) {
-      const ok = await OpsCore.requirePasscode('nurse', 'delete a memo');
-      if (!ok) return;
       if (confirm('Delete this memo permanently?')) {
         const { error } = await sb.from('memos').delete().eq('id', del.dataset.id);
         if (error) alert('Could not delete memo: ' + error.message);
@@ -618,7 +606,7 @@
 
   (async function () {
     document.getElementById('noga-location').innerHTML = LDHLogic.LOCATIONS.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
-    const { sb: client } = await OpsCore.init({ page: 'nurses' });
+    const { sb: client } = await OpsCore.init({ page: 'nurses', gateRole: 'nurse' });
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();

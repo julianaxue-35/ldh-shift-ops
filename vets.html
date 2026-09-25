@@ -41,6 +41,8 @@
     --neutral-300: #D8D6CE;
     --border: rgba(30,34,56,0.10);
     --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+    --donut-teal: #4FC1D6;
+    --donut-track: #E5E7EB;
   }
   * { box-sizing: border-box; }
   html { font-size: 15px; }
@@ -78,6 +80,37 @@
   }
   button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
   button:disabled { opacity: 0.6; cursor: default; }
+
+  /* Top KPI row — completion donut and the 3 shift progress cards, same
+     component as the shelter-staff page (2026-09-26: she wants shift
+     progress visible here too, above the case queue). */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
+  .completion-donut {
+    width: 110px; height: 110px; position: relative;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  .completion-donut svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .completion-donut .val { position: relative; font-size: 1.5rem; font-weight: 700; }
+  .completion-donut .lbl { position: relative; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.04em; }
+  .completion-side { font-size: 0.78rem; color: var(--muted); }
+  .completion-side b { display: block; font-size: 1.1rem; color: var(--ink); }
+  .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
+  .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+  .bar-track { height: 10px; border-radius: 6px; background: var(--neutral-100); overflow: hidden; margin-bottom: 10px; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .shift-card .onshift { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .shift-card .shift-icon {
+    float: right; width: 30px; height: 30px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 0.95rem; color: #fff;
+  }
+  .chip {
+    display: inline-block; padding: 5px 12px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border);
+    margin: 2px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  }
+  .roster-add-row { display: flex; gap: 6px; margin-top: 8px; }
+  .roster-add-row input { margin: 0; }
+  .roster-add-row button { padding: 8px 12px; font-size: 0.75rem; white-space: nowrap; }
 
   .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
   .filter-chip {
@@ -132,9 +165,11 @@
 
   @media (max-width: 1000px) {
     .urgency-board { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -164,6 +199,44 @@
       </div>
     </div>
 
+    <section class="card" id="start-shift-card">
+      <h2>Start a shift</h2>
+      <p class="subtle">Opens the shift tool in a new tab. Clinical detail is entered there, not here.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/processing.html" target="_blank" rel="noopener"><b>Processing</b><span>Intake, exams, vaccination</span></a>
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html" target="_blank" rel="noopener"><b>Sick &amp; Injured</b><span>Rechecks and flagged animals</span></a>
+        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/surgery.html" target="_blank" rel="noopener"><b>Surgery</b><span>Desexing list, notes, sharing</span></a>
+      </div>
+    </section>
+
+    <p class="subtle" id="kpi-date" style="margin:-8px 0 0;"></p>
+    <div class="kpi-row">
+      <section class="card completion-card">
+        <div class="completion-donut" id="completion-donut"></div>
+        <div class="completion-side">
+          <b id="completion-fraction">–</b>
+          tasks completed today, across all shifts.
+        </div>
+      </section>
+      <div id="shift-progress-row" style="display:contents;"></div>
+    </div>
+
+    <section class="card" id="nurse-treatments">
+      <h2>Request a treatment — vets</h2>
+      <p class="subtle">Ask the nurses to give a treatment to an animal in the ward, e.g. flush a dental extraction site twice a day for 7 days.</p>
+      <div id="nt-courses"></div>
+      <h3 style="font-size:0.85rem; margin:18px 0 0;">New request</h3>
+      <div class="nt-form">
+        <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="nt-location"></select></label>
+        <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
+        <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+        <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
+        <label>Start date<input id="nt-start" type="date"></label>
+        <button id="nt-submit" type="button">Request</button>
+      </div>
+    </section>
+
     <section class="card" id="vet-cases">
       <h2>Cases</h2>
       <p class="subtle">Split by tier and request type — pick up as available. Filter to Medication for remote-only cases.</p>
@@ -191,32 +264,6 @@
       <div id="completed-list"></div>
     </section>
 
-    <section class="card" id="nurse-treatments">
-      <h2>Request a treatment — vets</h2>
-      <p class="subtle">Ask the nurses to give a treatment to an animal in the ward, e.g. flush a dental extraction site twice a day for 7 days.</p>
-      <div id="nt-courses"></div>
-      <h3 style="font-size:0.85rem; margin:18px 0 0;">New request</h3>
-      <div class="nt-form">
-        <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
-        <label>Space<select id="nt-location"></select></label>
-        <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
-        <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
-        <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
-        <label>Start date<input id="nt-start" type="date"></label>
-        <button id="nt-submit" type="button">Request</button>
-      </div>
-    </section>
-
-    <section class="card" id="start-shift-card">
-      <h2>Start a shift</h2>
-      <p class="subtle">Opens the shift tool in a new tab. Clinical detail is entered there, not here.</p>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/processing.html" target="_blank" rel="noopener"><b>Processing</b><span>Intake, exams, vaccination</span></a>
-        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/sick-injured.html" target="_blank" rel="noopener"><b>Sick &amp; Injured</b><span>Rechecks and flagged animals</span></a>
-        <a class="shift-launch" href="https://julianaxue-35.github.io/ldh-shift-tools/surgery.html" target="_blank" rel="noopener"><b>Surgery</b><span>Desexing list, notes, sharing</span></a>
-      </div>
-    </section>
-
     <section class="card" id="memo-board">
       <h2>Memo board</h2>
       <div id="memo-list"></div>
@@ -234,10 +281,13 @@
   let sb = null;
   const esc = OpsCore.esc;
 
-  let TASKS = [], MEMOS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [];
+  let TASKS = [], MEMOS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [], ROSTER = {};
   let CASES = { open: [], completed: [] };
   let typeFilter = 'all';
   let showCompletedMemos = false;
+  const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
+  const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
+  const SHIFT_ICONS = { processing: '👥', sick_injured: '➕', surgery: '✂️' };
   // Batch pick-up selection (case ids), tracked across all three tier
   // columns in one shared Set — see updateBatchBar() and the "Pick up N
   // selected" bar, restored from the pre-Task-4 vet board (2026-09-24).
@@ -295,23 +345,33 @@
     return `<span class="lvl lvl-${st.level}">${esc(st.label)}</span>`;
   }
 
+  function todayDateStr() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
   /* ---------- data loading ---------- */
   async function loadAll() {
-    const [tasksRes, memosRes, ntRes, ndRes] = await Promise.all([
+    const [tasksRes, memosRes, ntRes, ndRes, rosterRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('memos').select('*').order('created_at', { ascending: false }),
       sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
+      sb.from('roster').select('*').eq('roster_date', todayDateStr()),
     ]);
     TASKS = tasksRes.data || [];
     MEMOS = memosRes.data || [];
     NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || [];
+    ROSTER = {};
+    (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
   }
 
   function renderAll() {
     CASES = LDHLogic.caseList(TASKS, Date.now());
+    renderCompletion();
+    renderShiftProgress();
     renderCases();
     renderCompleted();
     renderMemos();
@@ -361,6 +421,48 @@
     const el = document.getElementById(containerId);
     el.innerHTML = tasks.length ? tasks.map(attnItemHtml).join('') : '<p class="empty-state">Nothing here.</p>';
   }
+
+  /* ---------- completion donut + per-shift progress (same component as
+     the shelter-staff page; 2026-09-26: she wants this here too) ---------- */
+  function renderCompletion() {
+    document.getElementById('kpi-date').textContent = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
+    const total = TASKS.length || 1;
+    const done = TASKS.filter(t => t.done).length;
+    const pct = Math.round((done / total) * 100);
+    const r = 46, stroke = 12, c = 2 * Math.PI * r;
+    const offset = c * (1 - pct / 100);
+    document.getElementById('completion-donut').innerHTML = `
+      <svg viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="${r}" fill="var(--neutral-100)" stroke="var(--donut-track)" stroke-width="${stroke}"/>
+        <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--donut-teal)" stroke-width="${stroke}"
+          stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+      </svg>
+      <span class="val">${pct}%</span><span class="lbl">TODAY</span>
+    `;
+    document.getElementById('completion-fraction').textContent = `${done} of ${total}`;
+  }
+  function renderShiftProgress() {
+    const container = document.getElementById('shift-progress-row');
+    container.innerHTML = '';
+    for (const shift of ['processing', 'sick_injured', 'surgery']) {
+      const items = TASKS.filter(t => t.shift === shift);
+      const total = items.length;
+      const done = items.filter(t => t.done).length;
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      const roster = ROSTER[shift] || [];
+      const card = document.createElement('section');
+      card.className = 'card shift-card';
+      card.innerHTML = `
+        <span class="shift-icon" style="background:${SHIFT_COLORS[shift]}">${SHIFT_ICONS[shift]}</span>
+        <h2 style="color:${SHIFT_COLORS[shift]}">${SHIFT_LABELS[shift]}</h2>
+        <div class="totals">${done} <span>/ ${total} processed today</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${SHIFT_COLORS[shift]};"></div></div>
+        <div class="onshift">On shift</div>
+        <div>${roster.map(r => `<span class="chip">${esc(r.staff_name)}</span>`).join('') || '<span class="empty-state">Unassigned</span>'}</div>
+      `;
+      container.appendChild(card);
+    }
+  }
   function renderCases() {
     const open = typeFilter === 'all' ? CASES.open : CASES.open.filter(t => t.type === typeFilter);
     renderBoardCol('board-redflag', open.filter(t => LDHLogic.normTier(t.urgency) === 'red_flag'));
@@ -395,8 +497,6 @@
     updateBatchBar();
   });
   document.getElementById('batch-pickup-btn').addEventListener('click', async () => {
-    const ok = await OpsCore.requirePasscode('vet', 'pick up cases');
-    if (!ok) return;
     const tasks = TASKS.filter(t => selectedPickup.has(t.id) && !t.claimed_at);
     if (!tasks.length) return;
     // .is('claimed_at', null) makes the update only succeed against rows
@@ -426,7 +526,7 @@
 
   function completedRowHtml(t) {
     return `<div class="completed-row">
-      <span>${esc(t.title)} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}${t.note ? ' — ' + esc(t.note) : ''}</span>
+      <span>${esc(t.title)} — done by ${t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'}</span>
       <span style="display:flex; align-items:center; gap:8px;">
         <span class="time">${esc(fmtTime(t.completed_at || t.created_at))}</span>
         <button type="button" class="secondary undo-done" data-id="${esc(t.id)}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>
@@ -475,8 +575,6 @@
   document.addEventListener('click', async (e) => {
     const pickBtn = e.target.closest('.pick-up-btn');
     if (pickBtn) {
-      const ok = await OpsCore.requirePasscode('vet', 'pick up cases');
-      if (!ok) return;
       const t = TASKS.find(x => x.id === pickBtn.dataset.id);
       if (!t || t.claimed_at) return;
       // .is('claimed_at', null) + .select(): only claim it if it's still
@@ -498,8 +596,6 @@
 
     const bumpBtn = e.target.closest('.bump-btn');
     if (bumpBtn) {
-      const ok = await OpsCore.requirePasscode('vet', 'bump this case to Urgent');
-      if (!ok) return;
       const { error } = await sb.from('tasks').update({ urgency: 'urgent' }).eq('id', bumpBtn.dataset.id);
       if (error) alert('Could not update: ' + error.message);
       loadAll();
@@ -508,8 +604,6 @@
 
     const doneBtn = e.target.closest('.done-btn');
     if (doneBtn) {
-      const ok = await OpsCore.requirePasscode('vet', 'complete this case');
-      if (!ok) return;
       const t = TASKS.find(x => x.id === doneBtn.dataset.id);
       if (!t) return;
       openDoneModal(t);
@@ -518,8 +612,6 @@
 
     const undoBtn = e.target.closest('.undo-done');
     if (undoBtn) {
-      const ok = await OpsCore.requirePasscode('vet', 'undo a completion');
-      if (!ok) return;
       if (!confirm('Undo completion? This puts the case back in the open queue.')) return;
       const t = TASKS.find(x => x.id === undoBtn.dataset.id);
       const patch = { done: false, completed_by_role: null, completed_at: null, note: null };
@@ -594,8 +686,6 @@
   document.getElementById('memo-board').addEventListener('change', async (e) => {
     const cb = e.target.closest('.memo-tick'); if (!cb) return;
     const wantDone = cb.checked;
-    const ok = await OpsCore.requirePasscode('vet', 'tick off a memo');
-    if (!ok) { cb.checked = !wantDone; return; }
     const { error } = await sb.from('memos').update({ done: wantDone, done_at: wantDone ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
     if (error) alert('Could not update memo: ' + error.message);
     loadAll();
@@ -603,8 +693,6 @@
   document.getElementById('memo-board').addEventListener('click', async (e) => {
     const del = e.target.closest('.memo-del');
     if (del) {
-      const ok = await OpsCore.requirePasscode('vet', 'delete a memo');
-      if (!ok) return;
       if (confirm('Delete this memo permanently?')) {
         const { error } = await sb.from('memos').delete().eq('id', del.dataset.id);
         if (error) alert('Could not delete memo: ' + error.message);
@@ -683,7 +771,7 @@
 
   /* ---------- auth (OpsCore) ---------- */
   (async function () {
-    const { sb: client } = await OpsCore.init({ page: 'vets' });
+    const { sb: client } = await OpsCore.init({ page: 'vets', gateRole: 'vet' });
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
