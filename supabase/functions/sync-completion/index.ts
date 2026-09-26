@@ -1,6 +1,6 @@
 // LDH Shift Ops — offline-tool sync (completions + list-load).
 //
-// Four request shapes (delete added 2026-09-25, chart added 2026-09-26),
+// Five request shapes (delete added 2026-09-25, chart + status 2026-09-26),
 // same endpoint, same shared secret:
 //   1. { title, location, shift }        — one item just ticked "Completed"
 //      in an offline tool. Upserts done=true, completed_at=now().
@@ -18,10 +18,14 @@
 //      medication case, or not on the dashboard at all) this is a no-op —
 //      it must never create a stray task row out of a chart record alone.
 //
+//   5. { status: {shift, items:[{title,location}]} } — read-back: which of
+//      these were already completed today by another device? Answers only
+//      about the pairs sent; never lists other animals.
+//
 // Runs with the service role key, which bypasses RLS entirely, so this
 // function itself is the only thing that must be trusted to only ever
-// touch `tasks`, and only ever insert/update, never read anything back to
-// the caller.
+// touch `tasks`. Everything writes (insert/update/delete) except shape 5,
+// which reads back only what the caller already asked about.
 //
 // Why this exists instead of a scoped "sync_writer" Supabase Auth user:
 // that approach (see the design spec's Option 2) hit an unresolved,
@@ -50,6 +54,17 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'apikey, x-sync-secret, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
+
+// ISO timestamp of the most recent midnight in Melbourne (used by the
+// read-back so only completions from today count).
+function melbourneMidnightISO(): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Australia/Melbourne', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date());
+  const g = (t: string) => parseInt(parts.find((p) => p.type === t)!.value, 10);
+  const msSinceMidnight = ((g('hour') * 60 + g('minute')) * 60 + g('second')) * 1000;
+  return new Date(Date.now() - msSinceMidnight).toISOString();
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -115,6 +130,41 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }
     return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Shape 5 (2026-09-26): { status: {shift, items:[{title,location}]} } — an
+  // offline tool asks "which of MY animals were already completed today by
+  // another device?" so it can move them out of its own pending list (a
+  // helping vet finished a room). Read-only, and only ever answers about the
+  // exact title+location pairs the caller sent (max 500) — it never lists
+  // other animals. "Today" = since midnight in Melbourne, so a completion
+  // from a previous day can't mark today's re-listed animal as done.
+  if (body.status && typeof body.status === 'object') {
+    const sShift = body.status.shift;
+    const asked = (Array.isArray(body.status.items) ? body.status.items : []).slice(0, 500)
+      .map((it) => ({
+        title: typeof it?.title === 'string' ? it.title.trim() : '',
+        location: typeof it?.location === 'string' ? it.location.trim() : '',
+      }))
+      .filter((it) => it.title && it.location);
+    if (!VALID_SHIFTS.includes(sShift) || !asked.length) {
+      return new Response(JSON.stringify({ error: 'status needs a valid shift and at least one title+location' }), { status: 400, headers: CORS_HEADERS });
+    }
+    const titles = [...new Set(asked.map((it) => it.title))];
+    const { data, error } = await supabase.from('tasks')
+      .select('title,location')
+      .eq('shift', sShift).eq('done', true)
+      .gte('completed_at', melbourneMidnightISO())
+      .in('title', titles);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    }
+    const wanted = new Set(asked.map((it) => `${it.title}|${it.location}`));
+    const done = (data ?? []).filter((r) => wanted.has(`${r.title}|${r.location}`)).map((r) => ({ title: r.title, location: r.location }));
+    return new Response(JSON.stringify({ ok: true, done }), {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
