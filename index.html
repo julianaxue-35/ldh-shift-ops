@@ -98,6 +98,13 @@
      same-weight columns, instead of the donut sitting alone in its own
      full-width row above them. */
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .totals-period { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .totals-period h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .totals-period .row { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 3px 0; }
+  .totals-period .row b { font-weight: 700; }
+  .totals-period .row.grand { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-weight: 700; }
+  @media (max-width: 700px) { .totals-grid { grid-template-columns: 1fr; } }
   .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
   .completion-donut {
     width: 110px; height: 110px; position: relative;
@@ -298,6 +305,12 @@
       <p class="subtle" style="margin:6px 0 12px;">Flagged cases in the last 3 days as a share of each space's cages (an animal counts once for each sign flagged). No threshold line yet — a baseline is being collected first.</p>
       <div id="disease-watch-map"></div>
     </section>
+
+    <section class="card" id="period-totals">
+      <h2>Totals — how much we've done</h2>
+      <p class="subtle">Completed animals by shift, beyond just today. <a href="stats.html" style="color:var(--ink);">Full trends →</a></p>
+      <div id="period-totals-grid" class="totals-grid"></div>
+    </section>
   </main>
 </div>
 
@@ -321,14 +334,18 @@
   }
 
   /* ---------- data loading ---------- */
+  let YTD_ROWS = [];
   async function loadAll() {
-    const [tasksRes, rosterRes, lcRes] = await Promise.all([
+    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+    const [tasksRes, rosterRes, lcRes, ytdRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('locations').select('*').order('sort', { ascending: true }),
+      sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart),
     ]);
     TASKS = tasksRes.data || [];
     LOCATION_ROWS = lcRes.data || [];
+    YTD_ROWS = ytdRes.data || [];
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
@@ -387,8 +404,9 @@
 
   /* ---------- render ---------- */
   function renderCompletion() {
-    const total = TASKS.length || 1;
-    const done = TASKS.filter(t => t.done).length;
+    const today = LDHLogic.todayTasks(TASKS, Date.now());
+    const total = today.length || 1;
+    const done = today.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
     // Rounded-cap SVG progress ring (matches the reference screenshot) —
     // a CSS conic-gradient can't produce rounded arc ends, so this needs a
@@ -409,8 +427,9 @@
   function renderShiftProgress() {
     const container = document.getElementById('shift-progress-row');
     container.innerHTML = '';
+    const today = LDHLogic.todayTasks(TASKS, Date.now());
     for (const shift of ['processing', 'sick_injured', 'surgery']) {
-      const items = TASKS.filter(t => t.shift === shift);
+      const items = today.filter(t => t.shift === shift);
       const total = items.length;
       const done = items.filter(t => t.done).length;
       const pct = total ? Math.round((done / total) * 100) : 0;
@@ -520,6 +539,25 @@
     renderShiftProgress();
     renderCases();
     renderDiseaseWatch();
+    renderPeriodTotals();
+  }
+
+  // 2026-09-29: month/quarter/year completed-count totals, so shelter staff
+  // can see cumulative volume, not just today's ring. Deliberately not
+  // scoped by device/location — every shift's completions across the year.
+  function renderPeriodTotals() {
+    const totals = LDHLogic.periodTotals(YTD_ROWS, Date.now());
+    const PERIOD_LABELS = { month: 'This month', quarter: 'This quarter', year: 'This year' };
+    document.getElementById('period-totals-grid').innerHTML = ['month', 'quarter', 'year'].map(key => {
+      const t = totals[key];
+      return `<div class="totals-period">
+        <h3>${PERIOD_LABELS[key]}</h3>
+        <div class="row"><span>Processing (examined)</span><b>${t.processing}</b></div>
+        <div class="row"><span>Sick &amp; Injured (attended)</span><b>${t.sick_injured}</b></div>
+        <div class="row"><span>Surgery</span><b>${t.surgery}</b></div>
+        <div class="row grand"><span>Total animals</span><b>${t.total}</b></div>
+      </div>`;
+    }).join('');
   }
 
   function fillLocationSelects() {

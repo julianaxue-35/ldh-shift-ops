@@ -198,6 +198,14 @@
   .memo strong { font-weight: 700; }
   #memo-post textarea { min-height: 60px; }
 
+  .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .totals-period { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .totals-period h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .totals-period .row { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 3px 0; }
+  .totals-period .row b { font-weight: 700; }
+  .totals-period .row.grand { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-weight: 700; }
+  @media (max-width: 700px) { .totals-grid { grid-template-columns: 1fr; } }
+
   .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
   .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
   .trend-card .trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
@@ -287,6 +295,12 @@
       <div id="heat-notes"></div>
     </section>
 
+    <section class="card" id="period-totals">
+      <h2>Totals — how much we've done</h2>
+      <p class="subtle">Completed animals by shift, for shelter staff to see beyond just today.</p>
+      <div id="period-totals-grid" class="totals-grid"></div>
+    </section>
+
     <section class="card" id="trends-section">
       <h2>Annual &amp; monthly progress</h2>
       <p class="subtle">Each category tracked on its own — cumulative, so the line only ever climbs.</p>
@@ -316,6 +330,7 @@
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   let YEAR_SERIES = { surgery: [], processing: [], sick_injured: [], attendant_flagged: [] };
   let MONTH_SERIES = { surgery: [], processing: [], sick_injured: [], attendant_flagged: [] };
+  let YEAR_ROWS = [];
   let MONTH_LABELS = [];
   let DAY_LABELS = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
 
@@ -326,6 +341,7 @@
     const yearStart = new Date(now.getFullYear(), 0, 1);
     const { data, error } = await sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
     const rows = error ? [] : (data || []);
+    YEAR_ROWS = rows; // reused by renderPeriodTotals — same completed-this-year rows, no second query
 
     const monthsSoFar = now.getMonth() + 1;
     MONTH_LABELS = MONTH_NAMES.slice(0, monthsSoFar);
@@ -383,6 +399,23 @@
     { key: 'sick_injured', title: 'Sick & Injured attended', color: 'var(--amber)' },
     { key: 'attendant_flagged', title: 'Flagged by Shelter Staff, completed', color: 'var(--violet)' },
   ];
+
+  // 2026-09-29: same period-totals block as index.html, fed by the rows
+  // loadTrends() already fetched for the year — no extra query on this page.
+  function renderPeriodTotals() {
+    const totals = LDHLogic.periodTotals(YEAR_ROWS, Date.now());
+    const PERIOD_LABELS = { month: 'This month', quarter: 'This quarter', year: 'This year' };
+    document.getElementById('period-totals-grid').innerHTML = ['month', 'quarter', 'year'].map(key => {
+      const t = totals[key];
+      return `<div class="totals-period">
+        <h3>${PERIOD_LABELS[key]}</h3>
+        <div class="row"><span>Processing (examined)</span><b>${t.processing}</b></div>
+        <div class="row"><span>Sick &amp; Injured (attended)</span><b>${t.sick_injured}</b></div>
+        <div class="row"><span>Surgery</span><b>${t.surgery}</b></div>
+        <div class="row grand"><span>Total animals</span><b>${t.total}</b></div>
+      </div>`;
+    }).join('');
+  }
 
   function renderTrends() {
     document.getElementById('trend-grid').innerHTML = TREND_CATEGORIES.map(c => `
@@ -569,6 +602,7 @@
     await loadTrends();
     await loadResponseRates();
     renderTrends();
+    renderPeriodTotals();
     renderResponseRateChart();
     await loadSurveyData();
     renderSurvey();
