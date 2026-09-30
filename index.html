@@ -256,15 +256,26 @@
     </section>
 
     <section class="card nurse-card" id="nurse-requests">
-      <h2>Request nurse vaccination</h2>
-      <p class="subtle">Log animals that need vaccinating on arrival. The clock is 2 hours from arrival.</p>
+      <h2>Nurse request</h2>
+      <p class="subtle">Log animals that need a nurse task on arrival — vaccination, FIV test, blood test or microchip.</p>
       <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
         <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
       </label>
       <div class="nr-form" id="nr-form">
+        <label>Type<select id="nr-kind">
+          <option value="vaccination">Vaccination</option>
+          <option value="fiv">FIV test</option>
+          <option value="blood">Blood test</option>
+          <option value="microchip">Microchip</option>
+        </select></label>
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
         <label>How many<input id="nr-count" type="number" min="1" value="1"></label>
+        <label>Needed within<select id="nr-window">
+          <option value="2h">Within 2 hours</option>
+          <option value="today">Within today</option>
+          <option value="24_48h">Within 24–48 hours</option>
+        </select></label>
         <span id="nr-arrived-wrap"><label>Arrived<input id="nr-arrived" type="datetime-local" step="1800"></label>
         <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
         <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
@@ -603,6 +614,8 @@
       if (!count || count < 1) { alert('Enter how many animals.'); return; }
       const scheduled = document.getElementById('nr-scheduled-toggle').checked;
       const payload = {
+        kind: document.getElementById('nr-kind').value,
+        due_window: document.getElementById('nr-window').value,
         location: document.getElementById('nr-location').value,
         species: document.getElementById('nr-species').value,
         animal_count: count,

@@ -162,7 +162,7 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <p class="hint">Medication labels, vaccination and treatment tasks, and the NO-GA list for the nurse team.</p>
+    <p class="hint">Medication labels, nurse requests (vaccination, FIV, blood test, microchip) and treatment tasks, and the NO-GA list for the nurse team.</p>
     <p class="hint" style="margin-top:14px;">
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
       &nbsp;·&nbsp;
@@ -180,7 +180,7 @@
       <span id="new-item-banner-text"></span>
       <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
     </div>
-    <div class="page-head"><div><h1>Nurses</h1><p>Medication labels, vaccination, treatments due, and the NO-GA list.</p></div></div>
+    <div class="page-head"><div><h1>Nurses</h1><p>Medication labels, nurse requests, treatments due, and the NO-GA list.</p></div></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -192,7 +192,7 @@
     </section>
 
     <section class="card" id="nurse-requests-section">
-      <h2>Vaccination requests</h2>
+      <h2>Nurse requests</h2>
       <div id="nr-list"></div>
     </section>
 
@@ -368,16 +368,26 @@
   });
 
   /* ============================================================
-     Vaccination requests
+     Nurse requests (2026-09-30: widened past vaccination-only —
+     vaccination / FIV test / blood test / microchip, each with its own
+     verb here so a card reads naturally regardless of kind)
      ============================================================ */
+  const NURSE_REQUEST_KIND = {
+    vaccination: { toDo: 'to vaccinate', doneVerb: 'vaccinated', plusLabel: '+1 vaccinated' },
+    fiv: { toDo: 'for FIV test', doneVerb: 'FIV tested', plusLabel: '+1 FIV tested' },
+    blood: { toDo: 'for blood test', doneVerb: 'blood tested', plusLabel: '+1 blood tested' },
+    microchip: { toDo: 'to microchip', doneVerb: 'microchipped', plusLabel: '+1 microchipped' }
+  };
+  function nurseReqKind(r) { return NURSE_REQUEST_KIND[r.kind] || NURSE_REQUEST_KIND.vaccination; }
   // A scheduled request (logged ahead of arrival — 2026-09-26) has no
   // arrived_at yet: show a countdown/overdue state and just a "Mark
-  // arrived" button, not the vaccination-progress actions, which only make
-  // sense once the animal is actually here.
+  // arrived" button, not the progress actions, which only make sense once
+  // the animal is actually here.
   function scheduledRowHtml(r) {
     const st = LDHLogic.arrivalStatus(r, Date.now());
+    const k = nurseReqKind(r);
     return `<div class="attn-item nr-item">
-      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
+      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} ${k.toDo}</div>
         <div class="ameta">expected ${fmtTime(r.expected_at)}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
@@ -385,21 +395,22 @@
       </div></div>`;
   }
   function arrivedRowHtml(r) {
-    const st = LDHLogic.vaccStatus(r, Date.now());
+    const st = LDHLogic.nurseRequestStatus(r, Date.now());
+    const k = nurseReqKind(r);
     return `<div class="attn-item nr-item">
-      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} to vaccinate</div>
-        <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} vaccinated</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} ${k.toDo}</div>
+        <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
-        <button class="secondary nr-plus" data-id="${esc(r.id)}">+1 vaccinated</button>
+        <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
         <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
   }
   function renderNurseRequests() {
     const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
     document.getElementById('nr-list').innerHTML = open.map(r => r.arrived_at ? arrivedRowHtml(r) : scheduledRowHtml(r)).join('')
-      || '<p class="empty-state">No vaccination requests open.</p>';
+      || '<p class="empty-state">No nurse requests open.</p>';
   }
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
@@ -593,10 +604,10 @@
      comparison happens, then every loadAll() after that only alerts on
      ids it hasn't seen before — each item alerts once, ever.
      ============================================================ */
-  let seenVaccIds = new Set(), seenMedIds = new Set(), seenInitialised = false;
+  let seenReqIds = new Set(), seenMedIds = new Set(), seenInitialised = false;
   let bannerHideTimer = null;
 
-  function openVaccRequests() { return NURSE_REQUESTS.filter(r => r.done_count < r.animal_count); }
+  function openNurseRequests() { return NURSE_REQUESTS.filter(r => r.done_count < r.animal_count); }
 
   function playAlertTone() {
     try {
@@ -624,15 +635,15 @@
   // banner+ding, worded separately from "new" items — this one's a
   // time-based warning, not something that just appeared. seenArrivalWarnIds
   // stops it repeating every refresh once it's fired for a given request;
-  // unlike seenVaccIds/seenMedIds it deliberately does NOT skip its very
+  // unlike seenReqIds/seenMedIds it deliberately does NOT skip its very
   // first check — a request already due within 15 minutes when the page is
   // opened still needs the warning, since the point is "get ready now", not
   // "this is new to me".
   let seenArrivalWarnIds = new Set();
 
-  function showAlertBanner(newVaccCount, newMedCount, arrivalWarnCount) {
+  function showAlertBanner(newReqCount, newMedCount, arrivalWarnCount) {
     const parts = [];
-    if (newVaccCount > 0) parts.push(`${newVaccCount} new vaccination request${newVaccCount > 1 ? 's' : ''}`);
+    if (newReqCount > 0) parts.push(`${newReqCount} new nurse request${newReqCount > 1 ? 's' : ''}`);
     if (newMedCount > 0) parts.push(`${newMedCount} new medication label${newMedCount > 1 ? 's' : ''}`);
     if (arrivalWarnCount > 0) parts.push(`${arrivalWarnCount} arrival${arrivalWarnCount > 1 ? 's' : ''} due in 15 minutes`);
     if (!parts.length) return;
@@ -647,23 +658,23 @@
   // (nothing pre-existing should ever alert); every call after that
   // marks ids seen the moment they're noticed, so each one alerts once.
   function checkForNewItems() {
-    const openVacc = openVaccRequests();
+    const openReqs = openNurseRequests();
     const medTasks = medLabelTasks();
     const now = Date.now();
     const dueArrivals = NURSE_REQUESTS.filter(r => LDHLogic.needsArrivalWarning(r, now) && !seenArrivalWarnIds.has(r.id));
     dueArrivals.forEach(r => seenArrivalWarnIds.add(r.id));
     if (!seenInitialised) {
-      openVacc.forEach(r => seenVaccIds.add(r.id));
+      openReqs.forEach(r => seenReqIds.add(r.id));
       medTasks.forEach(t => seenMedIds.add(t.id));
       seenInitialised = true;
       if (dueArrivals.length > 0) showAlertBanner(0, 0, dueArrivals.length);
       return;
     }
-    const newVacc = openVacc.filter(r => !seenVaccIds.has(r.id));
+    const newReqs = openReqs.filter(r => !seenReqIds.has(r.id));
     const newMed = medTasks.filter(t => !seenMedIds.has(t.id));
-    openVacc.forEach(r => seenVaccIds.add(r.id));
+    openReqs.forEach(r => seenReqIds.add(r.id));
     medTasks.forEach(t => seenMedIds.add(t.id));
-    if (newVacc.length > 0 || newMed.length > 0 || dueArrivals.length > 0) showAlertBanner(newVacc.length, newMed.length, dueArrivals.length);
+    if (newReqs.length > 0 || newMed.length > 0 || dueArrivals.length > 0) showAlertBanner(newReqs.length, newMed.length, dueArrivals.length);
   }
 
   async function loadAll() {
