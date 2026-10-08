@@ -121,7 +121,7 @@ test('CONDITION_LABELS covers every condition value the flag form can save', () 
 });
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {
-  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport', 'Offsite']);
+  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport', 'Rabbit Room', 'Pathway', 'Offsite']);
 });
 
 test('summariseConditions counts every condition, ignores unknown values, and groups flagged cases by space', () => {
@@ -257,7 +257,7 @@ test('TIER_LABELS use the new wording; stored values unchanged', () => {
 
 test('Offsite: unmapped space, but never counted as an unmapped-space warning', () => {
   assert.equal(L.LOCATIONS[L.LOCATIONS.length - 1], 'Offsite');
-  assert.deepEqual(L.OFFSITE_NAMES, ['Offsite']);
+  assert.deepEqual(L.OFFSITE_NAMES, ['Offsite', 'Pathway']);
   const since = new Date(NOW - 3 * 24 * H);
   const r = L.buildSurvey([trow('O1', 'Offsite', 'cat_flu', 1 * H), trow('O2', 'Offsite — foster home', 'cat_flu', 1 * H),
     trow('E1', 'Mystery Room / 9', 'other', 1 * H)], LOC, since);
@@ -316,4 +316,31 @@ test('medCopyText: SM number, location, offsite detail, label', () => {
 
 test('CHLORSIG_OPTIONS', () => {
   assert.deepEqual(L.CHLORSIG_OPTIONS, [{ label: 'Chlorsig — left eye (L)' }, { label: 'Chlorsig — right eye (R)' }, { label: 'Chlorsig — both eyes' }]);
+});
+
+test('boardRoomOf reads every spelling of a room + pen, and files unknowns under OTHER', () => {
+  const cases = [
+    ['Cat Room 1 / 12', 'CR1', '12'], ['CR1-30', 'CR1', '30'], ['CR2/43', 'CR2', '43'], ['cr 2 - 49', 'CR2', '49'],
+    ['Adoption 2 / 3', 'CA2', '3'], ['CA1-3', 'CA1', '3'], ['FIR Room / 21', 'FIR', '21'], ['Pound 3 / 41', 'P3', '41'],
+    ['P4-2', 'P4', '2'], ['Transport', 'TRANSPORT', ''], ['Rabbit Room - 1', 'RABBIT', '1'], ['RR-1', 'RABBIT', '1'],
+    ['rr 4', 'RABBIT', '4'], ['Rabbit Room / 7', 'RABBIT', '7'], ['Pathway', 'PATHWAY', ''], ['Cat Isolation ward / 2', 'ISO', '2'],
+    ['Cat Room 3', 'CR3', ''], ['Offsite — Smith', 'OTHER', 'Offsite — Smith'], ['', 'OTHER', ''], ['Mystery 9', 'OTHER', 'Mystery 9']
+  ];
+  cases.forEach(([loc, code, pen]) => assert.deepEqual(L.boardRoomOf(loc), { code, pen }, loc));
+});
+
+test('board rooms are in the walking order the shelter asked for, and every flag-form room has a board room', () => {
+  const order = L.BOARD_ROOMS.map(r => r.code);
+  assert.deepEqual(order.slice(0, 6), ['CR1', 'CR2', 'CA1', 'CA2', 'FIR', 'CR3']);
+  assert.deepEqual(order.slice(order.indexOf('TRANSPORT'), order.indexOf('TRANSPORT') + 5), ['TRANSPORT', 'P1', 'P2', 'P3', 'P4']);
+  assert.ok(order.indexOf('RABBIT') > order.indexOf('P4'));
+  L.LOCATIONS.filter(n => n !== 'Offsite').forEach(n => assert.ok(L.BOARD_ROOMS.some(r => r.db === n), n + ' has a board room'));
+});
+
+test('boardStage gives staff four stages', () => {
+  const now = Date.now(), t = (o) => Object.assign({ done: false, needs_medication: false, claimed_at: null, vet_done_at: null }, o);
+  assert.equal(L.boardStage(t({}), now), 'wait');
+  assert.equal(L.boardStage(t({ claimed_at: 'x' }), now), 'seen');
+  assert.equal(L.boardStage(t({ needs_medication: true, vet_done_at: 'x', claimed_at: 'x' }), now), 'meds');
+  assert.equal(L.boardStage(t({ done: true }), now), 'done');
 });

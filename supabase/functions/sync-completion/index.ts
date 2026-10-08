@@ -22,6 +22,13 @@
 //      these were already completed today by another device? Answers only
 //      about the pairs sent; never lists other animals.
 //
+//   6. { care: {title, shift, treatment, plan} } — (2026-10-09, Shelter board) the vet's
+//      treatment and plan for a flagged animal, so shelter staff can read them against the
+//      animal's room/pen. UPDATE only, never an insert: it fills in the existing dashboard
+//      request(s) for that animal ID and silently touches nothing if there isn't one. Matched on
+//      title + shift (+ a request type, created in the last 3 days) — NOT location, because the
+//      offline tools and the dashboard spell the same pen differently ("CR1-30" vs "Cat Room 1 / 30").
+//
 // Runs with the service role key, which bypasses RLS entirely, so this
 // function itself is the only thing that must be trusted to only ever
 // touch `tasks`. Everything writes (insert/update/delete) except shape 5,
@@ -126,6 +133,27 @@ Deno.serve(async (req) => {
     const { error } = await supabase.from('tasks')
       .update({ med_label: cLabel, med_chart_done: body.chart.med_chart_done === true })
       .eq('title', cTitle).eq('location', cLocation).eq('shift', cShift);
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    }
+    return new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Shape 6 (2026-10-09): { care: {title, shift, treatment, plan} } — see header. Update-only.
+  if (body.care && typeof body.care === 'object') {
+    const kTitle = typeof body.care.title === 'string' ? body.care.title.trim() : '';
+    const kShift = body.care.shift;
+    const clip = (v: unknown, n: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
+    if (!kTitle || !VALID_SHIFTS.includes(kShift)) {
+      return new Response(JSON.stringify({ error: 'care needs a title and a valid shift' }), { status: 400, headers: CORS_HEADERS });
+    }
+    const since = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
+    const { error } = await supabase.from('tasks')
+      .update({ treatment: clip(body.care.treatment, 800), plan: clip(body.care.plan, 1000) })
+      .eq('title', kTitle).eq('shift', kShift).neq('type', 'check_recheck').gte('created_at', since);
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }

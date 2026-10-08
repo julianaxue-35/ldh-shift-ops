@@ -158,7 +158,7 @@ const H = 3600 * 1000;
   const b = await open({ memos: [{ author: 'Shelter Staff', text: 'Cage 4 latch is loose', done: false }] }, 'vets.html');
   try {
     t.ok((await b.page.textContent('#nurse-treatments')).includes('Request a treatment — vets'), 'treatment request card moved here unchanged');
-    t.ok(await b.page.locator('#nt-location option').count() === 13, 'treatment form location select filled from the shared list');
+    t.ok(await b.page.locator('#nt-location option').count() === 15, 'treatment form location select filled from the shared list');
     t.ok(await b.page.isVisible('#start-shift-card'), 'Start a shift card present');
     t.ok(await b.page.locator('#start-shift-card a.shift-launch').count() === 3, 'Start a shift links to all three shift tools');
 

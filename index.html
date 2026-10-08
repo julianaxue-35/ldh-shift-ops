@@ -363,8 +363,15 @@
   }
 
   document.getElementById('req-location').addEventListener('change', updateLocationFields);
+  // Foster requests default to the Pathway "room" (2026-10-09) — still changeable.
+  document.getElementById('req-type').addEventListener('change', () => {
+    if (document.getElementById('req-type').value === 'foster') {
+      document.getElementById('req-location').value = 'Pathway';
+      updateLocationFields();
+    }
+  });
   function updateLocationFields() {
-    const isOffsite = document.getElementById('req-location').value === 'Offsite';
+    const isOffsite = LDHLogic.OFFSITE_NAMES.includes(document.getElementById('req-location').value);   // Offsite / Pathway: a detail (e.g. foster name) instead of a pen
     document.getElementById('req-pen').style.display = isOffsite ? 'none' : '';
     document.getElementById('req-location-detail').style.display = isOffsite ? '' : 'none';
   }
@@ -382,7 +389,7 @@
     // (e.g. sick-injured.html's AA Flag Log import), so locations line up
     // consistently across the dashboard and the offline tools.
     const room = document.getElementById('req-location').value;
-    const isOffsite = room === 'Offsite';
+    const isOffsite = LDHLogic.OFFSITE_NAMES.includes(room);
     const pen = document.getElementById('req-pen').value.trim();
     const detail = document.getElementById('req-location-detail').value.trim();
     const { error } = await sb.from('tasks').insert({

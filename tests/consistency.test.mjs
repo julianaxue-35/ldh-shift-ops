@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 const L = createRequire(import.meta.url)('../lib/ldh-logic.js');
-const sql = fs.readFileSync(path.resolve(import.meta.dirname, '../supabase/migrations/0009_surveillance.sql'), 'utf8');
+// 0009 seeds the original spaces; 0013 adds the Rabbit Room (2026-10-09)
+const sql = ['0009_surveillance.sql', '0013_shelter_board.sql'].map(f => fs.readFileSync(path.resolve(import.meta.dirname, '../supabase/migrations/' + f), 'utf8')).join('\n');
 
 test('the migration seeds exactly the spaces the flag form offers (same names; order differs on purpose)', () => {
   const names = [...sql.matchAll(/^\s*\('([^']+)',\s*'[^']+',\s*\d+,\s*\d+\)/gm)].map(m => m[1]);

@@ -6,7 +6,7 @@ const t = require('./check')('flag-form');
   t.ok((await page.textContent('#req-tier-preview')).startsWith('Request checks — check within 24–48 h'), 'preview starts as Request checks');
   t.ok((await page.textContent('#req-redflags-wrap')).includes("High priority emergency? Radio the vet, don't wait for this board."), 'emergency reminder shown (full sentence, locked in)');
   t.ok(await page.locator('#req-urgency').count() === 0, 'manual urgency dropdown removed');
-  t.ok(await page.locator('#req-location option').count() === 13, 'location select filled from the shared list (incl. Offsite)');
+  t.ok(await page.locator('#req-location option').count() === 15, 'location select filled from the shared list (incl. Rabbit Room, Pathway, Offsite)');
   const signOpts = await page.$$eval('#req-condition option', os => os.map(o => o.value));
   t.ok(signOpts.join() === ',cat_flu,kennel_cough,diarrhoea,vomiting,eye_condition,skin_condition,wounds_injury,other', 'flag form offers the eight reported signs (got ' + signOpts.join() + ')');
   t.ok(!(await page.textContent('#req-condition')).toLowerCase().includes('giardia'), 'no diagnoses in the sign list');

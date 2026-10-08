@@ -1,0 +1,280 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard — Shelter board
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDH Shelter Board</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
+<script src="lib/ops-core.js"></script>
+<style>
+  /* Same tokens, fonts and sizes as the main dashboard (index.html). */
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: calc(100vh); }
+  .layout > main, .layout > aside { min-width: 0; }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+  .head-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  #search-box {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px;
+    background: var(--card-bg); font: inherit; font-size: 0.85rem; width: 220px; color: var(--ink);
+  }
+  .toggle { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .toggle input { margin: 0; width: auto; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 8px; }
+  .status-pill { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; display: inline-block; }
+  .st-wait { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .st-seen { background: rgba(74,108,247,0.14); color: var(--blue); }
+  .st-meds { background: rgba(140,98,255,0.14); color: var(--violet); }
+  .st-done { background: rgba(34,154,99,0.12); color: var(--green); }
+  .st-urgent { background: rgba(208,59,59,0.14); color: var(--critical); }
+
+  .group-h { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 4px 2px 0; }
+  .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .room-card { padding: 0; overflow: hidden; }
+  .room-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .room-head h2 { margin: 0; font-size: 0.95rem; }
+  .room-head .sub { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+  .room-head .count { margin-left: auto; }
+  .room-card.empty { box-shadow: none; background: transparent; border-style: dashed; }
+  .room-card.empty .room-head { border-bottom: none; padding: 10px 18px; }
+  .room-card.empty h2 { color: var(--muted); font-weight: 600; }
+
+  .case { padding: 14px 18px; border-top: 1px solid rgba(30,34,56,0.06); border-left: 4px solid var(--amber); }
+  .room-head + .case { border-top: none; }
+  .case.seen { border-left-color: var(--blue); }
+  .case.meds { border-left-color: var(--violet); }
+  .case.done { border-left-color: var(--green); }
+  .case.done .case-body { opacity: 0.75; }
+  .case-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pen { font-size: 0.8rem; font-weight: 700; background: var(--sidebar); color: #fff; border-radius: 10px; padding: 3px 10px; white-space: nowrap; }
+  .case-top .right { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .problem { font-weight: 700; margin: 8px 0 2px; font-size: 0.95rem; }
+  .field { margin: 6px 0 0; font-size: 0.85rem; }
+  .field .lbl { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 1px; }
+  .field .txt { white-space: pre-line; }
+  .field .none { color: var(--muted); font-style: italic; }
+  .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    main { padding: 16px; }
+    .room-grid { grid-template-columns: minmax(0, 1fr); }
+    #search-box { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <p class="hint">
+      Flagged animals by room. The vet's treatment and plan appear here once they've
+      been written. Always follow the vet's written plan, and ask a vet if unsure.
+    </p>
+    <p class="hint" style="margin-top:14px;">
+      <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
+    </p>
+    <span id="signout-link">Sign out</span>
+  </aside>
+
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Shelter board</h1>
+        <p>Every flagged animal, by room and pen — with the vet's treatment and plan. Updates by itself.</p>
+      </div>
+      <div class="head-tools">
+        <label class="toggle"><input type="checkbox" id="show-empty" checked> Show rooms with nothing flagged</label>
+        <input id="search-box" placeholder="Search animal ID...">
+      </div>
+    </div>
+
+    <div class="legend" id="legend">
+      <span class="status-pill st-wait">Waiting for vet</span>
+      <span class="status-pill st-seen">Vet has picked up</span>
+      <span class="status-pill st-meds">Waiting on medication</span>
+      <span class="status-pill st-done">Done (last 24 h)</span>
+    </div>
+
+    <div id="board"></div>
+    <p class="empty-state" id="board-error" style="display:none;"></p>
+  </main>
+</div>
+
+<script>
+  let sb = null;
+  const esc = OpsCore.esc;
+  let TASKS = [];
+  let LOCATION_ROWS = [];
+  let LOAD_ERROR = '';
+
+  const STAGE_PILL = {
+    wait: ['st-wait', 'Waiting for vet'],
+    seen: ['st-seen', 'Vet has picked up'],
+    meds: ['st-meds', 'Waiting on medication'],
+    done: ['st-done', 'Done']
+  };
+
+  async function loadAll() {
+    const [tasksRes, lcRes] = await Promise.all([
+      sb.from('tasks').select('*').order('created_at', { ascending: false }),
+      sb.from('locations').select('*').order('sort', { ascending: true })
+    ]);
+    LOAD_ERROR = tasksRes.error ? ('Could not load the flagged animals: ' + tasksRes.error.message) : '';
+    if (!tasksRes.error) TASKS = tasksRes.data || [];
+    LOCATION_ROWS = lcRes.data || [];
+    renderBoard();
+  }
+
+  function fmtClock(iso) {
+    const d = new Date(iso), now = new Date();
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toDateString() === now.toDateString() ? time : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' + time;
+  }
+
+  // the foster/offsite detail is already the pill text for Pathway cases — don't repeat it in the footer
+  function r_notShown(t) { return LDHLogic.boardRoomOf(t.location).code !== 'PATHWAY'; }
+  function caseHtml(t, stage, penLabel) {
+    const [cls, label] = STAGE_PILL[stage];
+    const hasCare = !!((t.treatment && t.treatment.trim()) || (t.plan && t.plan.trim()));
+    const pill = stage === 'seen' && hasCare ? 'Vet has seen — follow plan' : label;
+    const urgent = LDHLogic.normTier(t.urgency) === 'red_flag' && stage !== 'done';
+    const problem = t.problem || (t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : '');
+    const none = '<span class="none">Not written yet — vet to add</span>';
+    const line = (title, v) => `<div class="field"><span class="lbl">${title}</span><span class="txt">${v && v.trim() ? esc(v.trim()) : none}</span></div>`;
+    return `<div class="case ${stage}" data-case="${esc(t.id)}">
+      <div class="case-top"><span class="pen">${esc(penLabel)}</span>
+        <span class="right">${urgent ? '<span class="status-pill st-urgent">Urgent</span>' : ''}<span class="status-pill ${cls}">${esc(pill)}</span></span></div>
+      <div class="case-body">
+        ${problem ? `<div class="problem">${esc(problem)}</div>` : ''}
+        ${line('Treatment', t.treatment)}
+        ${line('Plan', t.plan)}
+      </div>
+      <div class="meta">Flagged ${esc(fmtClock(t.created_at))} · ${esc(t.title)}${t.location_detail && r_notShown(t) ? ' · ' + esc(t.location_detail) : ''}</div>
+    </div>`;
+  }
+
+  function renderBoard() {
+    const errEl = document.getElementById('board-error');
+    errEl.style.display = LOAD_ERROR ? '' : 'none';
+    errEl.textContent = LOAD_ERROR;
+    const showEmpty = document.getElementById('show-empty').checked;
+    const q = document.getElementById('search-box').value.trim().toLowerCase();
+    const now = Date.now();
+    const pool = q ? TASKS.filter(t => String(t.title || '').toLowerCase().includes(q)) : TASKS;
+    const { open, completed } = LDHLogic.caseList(pool, now);
+    // Offline-tool list entries (type check_recheck) aren't flagged cases — caseList already leaves them out.
+    const byRoom = {};
+    open.concat(completed).forEach(t => {
+      const r = LDHLogic.boardRoomOf(t.location);
+      // label on the dark pill: "Pen 12" in a known room; the raw location text if the room isn't recognised
+      const penLabel = r.code === 'OTHER' ? (t.location || 'No location')
+        : r.code === 'PATHWAY' ? (t.location_detail || 'Foster')
+        : (r.pen ? 'Pen ' + r.pen : 'Pen not given');
+      (byRoom[r.code] ??= []).push({ t, stage: LDHLogic.boardStage(t, now), pen: r.pen, penLabel });
+    });
+    const cagesOf = db => { const row = LOCATION_ROWS.find(l => l.name === db); return row ? row.cages : null; };
+    let html = '', lastGrp = '', open_ = false;
+    LDHLogic.BOARD_ROOMS.forEach(room => {
+      const items = (byRoom[room.code] || []).slice().sort((a, b) =>
+        (a.stage === 'done') - (b.stage === 'done') || (parseInt(a.pen, 10) || 9999) - (parseInt(b.pen, 10) || 9999));
+      if (room.code === 'OTHER' && !items.length) return;           // catch-all only appears when needed
+      if (!items.length && (!showEmpty || q)) return;
+      if (room.grp !== lastGrp) {
+        if (open_) html += '</div>';
+        html += `<div class="group-h">${esc(room.grp)}</div><div class="room-grid">`;
+        open_ = true; lastGrp = room.grp;
+      }
+      const title = room.code === 'OTHER' ? 'Other / location not matched' : (room.db || room.code);
+      const cages = room.db ? cagesOf(room.db) : null;
+      const toFollow = items.filter(i => i.stage !== 'done').length;
+      html += `<section class="card room-card${items.length ? '' : ' empty'}" data-room="${esc(room.code)}">
+        <div class="room-head"><h2>${esc(title)}</h2><span class="sub">${esc(/^(CR|CA|P)\d$|^FIR$/.test(room.code) ? room.code : '')}${/^(CR|CA|P)\d$|^FIR$/.test(room.code) && cages ? ' · ' : ''}${cages ? cages + ' pens' : ''}</span>
+          <span class="count status-pill ${items.length ? (toFollow ? 'st-wait' : 'st-done') : 'st-done'}">${items.length ? (toFollow ? toFollow + ' to follow' : 'all done') : 'nothing flagged'}</span></div>
+        ${items.map(i => caseHtml(i.t, i.stage, i.penLabel)).join('')}
+      </section>`;
+    });
+    if (open_) html += '</div>';
+    if (!html) html = '<section class="card"><p class="empty-state">' + (q ? 'Nothing matches that animal ID.' : 'Nothing flagged right now.') + '</p></section>';
+    document.getElementById('board').innerHTML = html;
+  }
+
+  document.getElementById('search-box').addEventListener('input', renderBoard);
+  document.getElementById('show-empty').addEventListener('change', renderBoard);
+  setInterval(renderBoard, 60000);   // stage chips / "completed in the last 24 h" roll over without a reload
+
+  /* ---------- auth (OpsCore) — same sign-in as the rest of the dashboard ---------- */
+  (async function () {
+    const { sb: client } = await OpsCore.init({ page: 'board' });
+    sb = client;
+    document.getElementById('app-root').style.display = 'grid';
+    await loadAll();
+    OpsCore.subscribe(['tasks'], loadAll);
+    document.getElementById('signout-link').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      location.reload();
+    });
+  })();
+</script>
+<!-- ip-notice-footer -->
+<footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  &copy; 2026 Juliana Xue. All rights reserved.<br>
+  This work is the intellectual property of Juliana Xue and may not be copied,
+  modified, or distributed without her express written permission.
+</footer>
+</body>
+</html>
