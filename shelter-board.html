@@ -105,6 +105,7 @@
   .field .lbl { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 1px; }
   .field .txt { white-space: pre-line; }
   .field .none { color: var(--muted); font-style: italic; }
+  .hist { font-size: 0.75rem; font-weight: 600; color: #9a5b00; background: rgba(255,159,67,0.14); border-radius: 8px; padding: 4px 10px; margin: 6px 0 2px; }
   .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
   .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
   @media (max-width: 800px) {
@@ -157,8 +158,10 @@
 <script>
   let sb = null;
   const esc = OpsCore.esc;
+  const LDHLogic_HISTORY_DAYS = 92;   // history older than 3 months is not shown (the database deletes it too)
   let TASKS = [];
   let LOCATION_ROWS = [];
+  let HISTORY = [];
   let LOAD_ERROR = '';
 
   const STAGE_PILL = {
@@ -169,10 +172,13 @@
   };
 
   async function loadAll() {
-    const [tasksRes, lcRes] = await Promise.all([
+    const since = new Date(Date.now() - LDHLogic_HISTORY_DAYS * 86400000).toISOString();
+    const [tasksRes, lcRes, histRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
-      sb.from('locations').select('*').order('sort', { ascending: true })
+      sb.from('locations').select('*').order('sort', { ascending: true }),
+      sb.from('flag_history').select('*').gte('flagged_at', since)
     ]);
+    HISTORY = histRes.error ? [] : (histRes.data || []);   // history is a nice-to-have: the board still works without it
     LOAD_ERROR = tasksRes.error ? ('Could not load the flagged animals: ' + tasksRes.error.message) : '';
     if (!tasksRes.error) TASKS = tasksRes.data || [];
     LOCATION_ROWS = lcRes.data || [];
@@ -193,6 +199,7 @@
     const pill = stage === 'seen' && hasCare ? 'Vet has seen — follow plan' : label;
     const urgent = LDHLogic.normTier(t.urgency) === 'red_flag' && stage !== 'done';
     const problem = t.problem || (t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : '');
+    const histText = LDHLogic.flagHistoryText(LDHLogic.flagsBefore(HISTORY, t, Date.now()));
     const none = '<span class="none">Not written yet — vet to add</span>';
     const line = (title, v) => `<div class="field"><span class="lbl">${title}</span><span class="txt">${v && v.trim() ? esc(v.trim()) : none}</span></div>`;
     return `<div class="case ${stage}" data-case="${esc(t.id)}">
@@ -200,6 +207,7 @@
         <span class="right">${urgent ? '<span class="status-pill st-urgent">Urgent</span>' : ''}<span class="status-pill ${cls}">${esc(pill)}</span></span></div>
       <div class="case-body">
         ${problem ? `<div class="problem">${esc(problem)}</div>` : ''}
+        ${histText ? `<div class="hist">${esc(histText)}</div>` : ''}
         ${line('Treatment', t.treatment)}
         ${line('Plan', t.plan)}
       </div>
@@ -225,23 +233,21 @@
         : (r.pen ? 'Pen ' + r.pen : 'Pen not given');
       (byRoom[r.code] ??= []).push({ t, stage: LDHLogic.boardStage(t, now), pen: r.pen, penLabel });
     });
-    const cagesOf = db => { const row = LOCATION_ROWS.find(l => l.name === db); return row ? row.cages : null; };
     let html = '', lastGrp = '', open_ = false;
     LDHLogic.BOARD_ROOMS.forEach(room => {
       const items = (byRoom[room.code] || []).slice().sort((a, b) =>
         (a.stage === 'done') - (b.stage === 'done') || (parseInt(a.pen, 10) || 9999) - (parseInt(b.pen, 10) || 9999));
       if (room.code === 'OTHER' && !items.length) return;           // catch-all only appears when needed
-      if (!items.length) return;                                   // only rooms with something flagged are shown
+      if (!items.length && q) return;                              // while searching, show only rooms with a match
       if (room.grp !== lastGrp) {
         if (open_) html += '</div>';
         html += `<div class="group-h">${esc(room.grp)}</div><div class="room-grid">`;
         open_ = true; lastGrp = room.grp;
       }
       const title = room.code === 'OTHER' ? 'Other / location not matched' : (room.db || room.code);
-      const cages = room.db ? cagesOf(room.db) : null;
       const toFollow = items.filter(i => i.stage !== 'done').length;
       html += `<section class="card room-card${items.length ? '' : ' empty'}" data-room="${esc(room.code)}">
-        <div class="room-head"><h2>${esc(title)}</h2><span class="sub">${esc(/^(CR|CA|P)\d$|^FIR$/.test(room.code) ? room.code : '')}${/^(CR|CA|P)\d$|^FIR$/.test(room.code) && cages ? ' · ' : ''}${cages ? cages + ' pens' : ''}</span>
+        <div class="room-head"><h2>${esc(title)}</h2><span class="sub">${esc(/^(CR|CA|P)\d$|^FIR$/.test(room.code) ? room.code : '')}</span>
           <span class="count status-pill ${items.length ? (toFollow ? 'st-wait' : 'st-done') : 'st-done'}">${items.length ? (toFollow ? toFollow + ' to follow' : 'all done') : 'nothing flagged'}</span></div>
         ${items.map(i => caseHtml(i.t, i.stage, i.penLabel)).join('')}
       </section>`;

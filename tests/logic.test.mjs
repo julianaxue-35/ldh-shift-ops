@@ -344,3 +344,22 @@ test('boardStage gives staff four stages', () => {
   assert.equal(L.boardStage(t({ needs_medication: true, vet_done_at: 'x', claimed_at: 'x' }), now), 'meds');
   assert.equal(L.boardStage(t({ done: true }), now), 'done');
 });
+
+test('flagsBefore: only EARLIER flags of the same animal in the last 3 months, newest first; flagHistoryText is reason-only', () => {
+  const now = Date.parse('2026-10-09T10:00:00Z'), day = 86400000, at = d => new Date(now - d * day).toISOString();
+  const task = { title: 'A1', created_at: at(0) };
+  const hist = [
+    { title: 'A1', flagged_at: at(0), reason: 'Now' },                              // this flag itself
+    { title: 'A1', flagged_at: at(10), reason: 'Vomiting' },
+    { title: 'A1', flagged_at: at(40), reason: '', condition: 'cat_flu' },
+    { title: 'A1', flagged_at: at(100), reason: 'too old' },
+    { title: 'B2', flagged_at: at(5), reason: 'someone else' }
+  ];
+  const before = L.flagsBefore(hist, task, now);
+  assert.deepEqual(before.map(h => L.flagReason(h)), ['Vomiting', 'Cat flu (URI)']);
+  const txt = L.flagHistoryText(before);
+  assert.match(txt, /^Flagged before 2× — .*Vomiting.* · .*Cat flu \(URI\)$/);
+  assert.equal(L.flagHistoryText([]), '');
+  const many = [1, 2, 3, 4, 5].map(n => ({ title: 'A1', flagged_at: at(n * 3), reason: 'r' + n }));
+  assert.match(L.flagHistoryText(L.flagsBefore(many, task, now)), /5× — .*r1.*r2.*r3 · \+2 more$/);
+});

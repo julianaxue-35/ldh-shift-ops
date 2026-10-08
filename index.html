@@ -331,6 +331,7 @@
 
   let TASKS = [];
   let LOCATION_ROWS = [];
+  let HISTORY = [];   // flag_history: earlier flags per animal, last 3 months
   let ROSTER = {};
   const SHIFT_LABELS = { processing: 'Processing', sick_injured: 'Sick & Injured', surgery: 'Surgery' };
   const SHIFT_COLORS = { processing: 'var(--green)', sick_injured: 'var(--amber)', surgery: 'var(--blue)' };
@@ -348,12 +349,14 @@
   let YTD_ROWS = [];
   async function loadAll() {
     const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
-    const [tasksRes, rosterRes, lcRes, ytdRes] = await Promise.all([
+    const [tasksRes, rosterRes, lcRes, ytdRes, histRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('locations').select('*').order('sort', { ascending: true }),
       sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart),
+      sb.from('flag_history').select('*').gte('flagged_at', new Date(Date.now() - 92 * 86400000).toISOString()),
     ]);
+    HISTORY = histRes.error ? [] : (histRes.data || []);   // a nice-to-have: the page works without it
     TASKS = tasksRes.data || [];
     LOCATION_ROWS = lcRes.data || [];
     YTD_ROWS = ytdRes.data || [];
@@ -392,7 +395,7 @@
     const isOffsite = LDHLogic.OFFSITE_NAMES.includes(room);
     const pen = document.getElementById('req-pen').value.trim();
     const detail = document.getElementById('req-location-detail').value.trim();
-    const { error } = await sb.from('tasks').insert({
+    const row = {
       title,
       location: isOffsite ? room : (pen ? `${room} / ${pen}` : room),
       location_detail: isOffsite ? (detail || null) : null,
@@ -405,7 +408,23 @@
       problem: document.getElementById('req-problem').value.trim() || null,
       condition: document.getElementById('req-condition').value || null,
       done: false,
-    });
+    };
+    let { error } = await sb.from('tasks').insert(row);
+    /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
+       (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
+       flag_history, so the earlier flag is remembered); if it is still open, say so rather than failing. */
+    if (error && error.code === '23505') {
+      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+      const old = found && found[0];
+      if (old && !old.done) { btn.disabled = false; alert(title + ' is already flagged in that pen and still open — it is on the board.'); return; }
+      if (old) {
+        ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
+          created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
+          claimed_by: null, claimed_at: null, vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null,
+          note: null, treatment: null, plan: null,
+        })).eq('id', old.id));
+      }
+    }
     btn.disabled = false;
     if (error) { alert('Could not submit: ' + error.message); return; }
     document.getElementById('req-title').value = '';
@@ -523,12 +542,16 @@
     return off ? (t.location_detail ? t.location + ' — ' + t.location_detail : t.location) : t.location;
   }
 
+  function flagHistoryHtml(t) {
+    const txt = LDHLogic.flagHistoryText(LDHLogic.flagsBefore(HISTORY, t, Date.now()));
+    return txt ? `<div style="font-size:0.72rem; font-weight:600; color:#9a5b00; margin-top:3px;">${esc(txt)}</div>` : '';
+  }
   function caseRowHtml(t, isCompleted) {
     const tier = LDHLogic.normTier(t.urgency);
     const stage = LDHLogic.stageOf(t, Date.now());
     return `
       <tr>
-        <td data-label="Animal"><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${esc(t.title)}</strong>${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''}</td>
+        <td data-label="Animal"><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${esc(t.title)}</strong>${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''}${flagHistoryHtml(t)}</td>
         <td data-label="Location">${esc(locationText(t))}</td>
         <td data-label="Shift" style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
         <td data-label="Type">${TYPE_LABELS[t.type] || t.type}</td>

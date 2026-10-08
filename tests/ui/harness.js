@@ -9,7 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026' };
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], locations: [], surveillance_snapshots: [], noga_requests: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -25,6 +25,7 @@ const STUB = `
     nurse_treatments: () => ({ stopped: false, created_at: now() }),
     nurse_treatment_doses: () => ({}),
     locations: () => ({}),
+    flag_history: () => ({}),
     surveillance_snapshots: () => ({}),
     noga_requests: () => ({ task: 'other', done: false, created_at: now() })
   };
@@ -63,8 +64,16 @@ const STUB = `
           const match = () => rows.filter(r => filters.every(f => f(r)));
           const hold = row => (name === 'tasks' ? applyMedicationHold(row) : row);
           let data;
-          if (op === 'insert') { data = payload.map(p => hold(Object.assign({ id: uuid() }, defaults[name](), p))); data.forEach(d => rows.push(d)); }
-          else if (op === 'update') { data = match(); data.forEach(r => hold(Object.assign(r, payload))); }
+          // Mirrors the log_flag() trigger (0013_shelter_board.sql): real flags are logged to flag_history.
+          const logFlag = r => { if (name === 'tasks' && r.type !== 'check_recheck') db.flag_history.push({ id: uuid(), task_id: r.id, title: r.title, flagged_at: r.created_at, location: r.location, reason: (r.problem || '').trim() || null, condition: r.condition || null }); };
+          if (op === 'insert') {
+            // Opt-in mirror of tasks_title_location_shift_idx: a test sets window.__uniqueTasks = true.
+            if (name === 'tasks' && window.__uniqueTasks && payload.some(p => rows.some(r => r.title === p.title && r.location === p.location && r.shift === p.shift))) {
+              res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "tasks_title_location_shift_idx"' } }); return;
+            }
+            data = payload.map(p => hold(Object.assign({ id: uuid() }, defaults[name](), p))); data.forEach(d => { rows.push(d); logFlag(d); });
+          }
+          else if (op === 'update') { data = match(); data.forEach(r => { const before = r.created_at; hold(Object.assign(r, payload)); if (payload && payload.created_at && payload.created_at !== before) logFlag(r); }); }
           else if (op === 'upsert') {
             data = payload.map(p => {
               const existing = rows.find(r => conflictCols.every(c => r[c] === p[c]));
