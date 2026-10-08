@@ -22,8 +22,8 @@ const H = 3600 * 1000;
   const b = await open(seed, 'shelter-board.html');
   try {
     const roomOrder = await b.page.$$eval('#board section.room-card', els => els.map(e => e.dataset.room));
-    t.ok(roomOrder.join(',') === 'CR1,CR2,CA1,CA2,FIR,CR3,ISO,TRANSPORT,P1,P2,P3,P4,RABBIT,PATHWAY,OTHER',
-      'rooms show in walking order CR1, CR2, CA1, CA2, FIR, CR3 … Transport, P1-P4, Rabbit, Pathway (got ' + roomOrder.join(',') + ')');
+    t.ok(roomOrder.join(',') === 'CR1,CR2,CA2,FIR,P1,RABBIT,PATHWAY,OTHER',
+      'only rooms with a flagged animal show, still in walking order (got ' + roomOrder.join(',') + ')');
     const room = code => b.page.locator(`#board section[data-room="${code}"]`);
     const txt = async code => (await room(code).textContent()).replace(/\s+/g, ' ');
     t.ok((await txt('CR1')).includes('Pen 12') && (await txt('CR1')).includes('Pen 30'), 'CR1 holds Cat Room 1 / 12 and the "CR1-30" spelling, as pens 12 and 30');
@@ -38,12 +38,8 @@ const H = 3600 * 1000;
     t.ok((await txt('OTHER')).includes('Mystery room 9'), 'an unrecognised location is kept visible under Other, not dropped');
     t.ok((await txt('CR2')).includes('Done') && (await txt('CR2')).includes('No treatment needed') && !(await txt('CR2')).includes('Pen 9'), 'done today stays, done 40 h ago is gone');
     t.ok(!(await b.page.textContent('#board')).includes('9990010'), 'check_recheck list entries are not shown');
-    t.ok((await txt('CR3')).includes('nothing flagged') && (await room('CR3').getAttribute('class')).includes('empty'), 'a room with nothing flagged is a slim "nothing flagged" strip');
-    // empty-room toggle + search
-    await b.page.uncheck('#show-empty');
-    const hidden = await b.page.$$eval('#board section.room-card', els => els.map(e => e.dataset.room));
-    t.ok(!hidden.includes('CR3') && !hidden.includes('P2') && hidden.includes('CR1'), 'unticking "Show rooms with nothing flagged" hides empty rooms');
-    await b.page.check('#show-empty');
+    t.ok(!roomOrder.includes('CR3') && !roomOrder.includes('P2') && !roomOrder.includes('TRANSPORT') && roomOrder.includes('CR1'), 'rooms with nothing flagged are not shown at all');
+    t.ok(await b.page.locator('#show-empty').count() === 0, 'no empty-room tick-box any more');
     await b.page.fill('#search-box', 'CZT101');
     t.ok((await b.page.$$eval('#board .case', els => els.length)) === 1, 'searching an animal ID narrows to that animal');
     await b.page.fill('#search-box', '');
