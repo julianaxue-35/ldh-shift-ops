@@ -106,6 +106,8 @@
   .field .txt { white-space: pre-line; }
   .field .none { color: var(--muted); font-style: italic; }
   .hist { font-size: 0.75rem; font-weight: 600; color: #9a5b00; background: rgba(255,159,67,0.14); border-radius: 8px; padding: 4px 10px; margin: 6px 0 2px; }
+  .case-top .left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .aid { font-size: 1.35rem; font-weight: 800; letter-spacing: 0.01em; color: var(--ink, #1e2238); }
   .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
   .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
   @media (max-width: 800px) {
@@ -203,7 +205,7 @@
     const none = '<span class="none">Not written yet — vet to add</span>';
     const line = (title, v) => `<div class="field"><span class="lbl">${title}</span><span class="txt">${v && v.trim() ? esc(v.trim()) : none}</span></div>`;
     return `<div class="case ${stage}" data-case="${esc(t.id)}">
-      <div class="case-top"><span class="pen">${esc(penLabel)}</span>
+      <div class="case-top"><span class="left"><span class="aid">${esc(t.title)}</span><span class="pen">${esc(penLabel)}</span></span>
         <span class="right">${urgent ? '<span class="status-pill st-urgent">Urgent</span>' : ''}<span class="status-pill ${cls}">${esc(pill)}</span></span></div>
       <div class="case-body">
         ${problem ? `<div class="problem">${esc(problem)}</div>` : ''}
@@ -211,7 +213,7 @@
         ${line('Treatment', t.treatment)}
         ${line('Plan', t.plan)}
       </div>
-      <div class="meta">Flagged ${esc(fmtClock(t.created_at))} · ${esc(t.title)}${t.location_detail && r_notShown(t) ? ' · ' + esc(t.location_detail) : ''}</div>
+      <div class="meta">Flagged ${esc(fmtClock(t.created_at))}${t.location_detail && r_notShown(t) ? ' · ' + esc(t.location_detail) : ''}</div>
     </div>`;
   }
 
