@@ -83,12 +83,14 @@ const t = require('./check')('flag-form');
   await page.selectOption('#req-type', 'foster');
   t.ok(await page.isVisible('#req-nurse-extras'), 'foster request shows the microchip/UV options');
   await page.fill('#req-title', 'FOS-1');
+  t.ok((await page.$$eval('#req-x-window option', os => os.map(o => o.value))).join() === '2h,24_48h', 'needed-within choice: 2 hours or 24-48 hours');
   await page.check('#req-x-microchip'); await page.check('#req-x-uv');
+  await page.selectOption('#req-x-window', '24_48h');
   await page.click('#req-submit');
   await page.waitForTimeout(300);
   const nrs = (await db()).nurse_requests.filter(r => r.animal_id === 'FOS-1');
-  t.ok(nrs.length === 2 && nrs.map(r => r.kind).sort().join() === 'microchip,uv' && nrs.every(r => r.animal_count === 1 && r.due_window === 'today' && r.location === 'Pathway' && r.species === 'cat'),
-    'ticking microchip + UV creates two single-animal nurse requests due today at the foster location');
+  t.ok(nrs.length === 2 && nrs.map(r => r.kind).sort().join() === 'microchip,uv' && nrs.every(r => r.animal_count === 1 && r.due_window === '24_48h' && r.location === 'Pathway' && r.species === 'cat'),
+    'ticking microchip + UV creates two single-animal nurse requests with the chosen 24-48 h window at the foster location');
   t.ok(!(await page.isVisible('#req-nurse-extras')), 'extras reset after submit');
   await page.selectOption('#req-type', 'rescue');
   await page.fill('#req-title', 'RES-1');

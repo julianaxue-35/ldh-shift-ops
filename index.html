@@ -257,6 +257,7 @@
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
           <select id="req-x-species" style="margin:0; width:auto;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select>
+          <select id="req-x-window" style="margin:0; width:auto;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select>
         </div>
       </div>
       <div id="req-redflags-wrap" style="margin:12px 0 4px;">
@@ -457,7 +458,7 @@
       const wanted = [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k);
       for (const kind of wanted) {
         const { error: nrErr } = await sb.from('nurse_requests').insert({
-          kind, due_window: 'today', location: room, species: document.getElementById('req-x-species').value,
+          kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
           animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff',
           note: TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '')
         });
@@ -472,6 +473,7 @@
     document.getElementById('req-type').value = 'shelter';
     document.getElementById('req-nurse-extras').style.display = 'none';
     ['req-x-microchip', 'req-x-uv'].forEach(id => { document.getElementById(id).checked = false; });
+    document.getElementById('req-x-window').value = '2h';
     document.getElementById('req-birthing-wrap').style.display = 'none';
     document.getElementById('req-birthing-reason').value = '';
     document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });
