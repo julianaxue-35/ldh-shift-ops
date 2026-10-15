@@ -161,20 +161,24 @@ const todayISO = LDHLogic.localISO(new Date());
   try {
     t.ok((await b.page.textContent('#welfare-col .nurse-col-title')).trim() === 'Welfare nurse', 'left column is the Welfare nurse');
     t.ok((await b.page.textContent('#processing-col .nurse-col-title')).trim() === 'Processing nurse', 'right column is the Processing nurse');
-    t.ok(await b.page.locator('#welfare-col #med-labels-section').count() === 1 && await b.page.locator('#welfare-col #noga-section').count() === 1,
-      'Welfare nurse has medication labels and Miscellaneous tasks');
-    t.ok(await b.page.locator('#processing-col #nurse-requests-section').count() === 1 && await b.page.locator('#processing-col #nurse-doses').count() === 1,
-      'Processing nurse has nurse requests and treatments due');
+    t.ok(await b.page.locator('#welfare-col #med-labels-section').count() === 1 && await b.page.locator('#welfare-col #nurse-doses').count() === 1 && await b.page.locator('#welfare-col #noga-section').count() === 1,
+      'Welfare nurse has medication labels, treatments due and Miscellaneous tasks');
+    t.ok(await b.page.locator('#processing-col #nurse-requests-section').count() === 1 && await b.page.locator('#processing-col #nurse-doses').count() === 0,
+      'Processing nurse has nurse requests (and no treatments due)');
     t.ok((await b.page.textContent('#noga-section h2')).trim() === 'Miscellaneous tasks', 'NO-GA list renamed Miscellaneous tasks');
     t.ok(await b.page.locator('#noga-animal-id').count() === 0, 'no add form on the nurse page any more (vets request them)');
     let listText = await b.page.textContent('#noga-list');
-    t.ok(listText.includes('DOG-99') && listText.includes('Microchip'), 'open miscellaneous task renders with its task label');
+    t.ok(listText.includes('DOG-99') === false, 'a vet-requested microchip task is NOT in the Welfare nurse list');
+    t.ok(listText.includes('CAT-7'), 'the Welfare list holds the non-microchip/UV tasks');
+    const procText = await b.page.textContent('#proc-misc-list');
+    t.ok(procText.includes('DOG-99') && procText.includes('Microchip'), 'a vet-requested microchip task shows under the Processing nurse');
+    t.ok(await b.page.isVisible('#proc-misc-section'), 'the Processing microchip & UV card shows when there is one');
     t.ok(listText.includes('CAT-7') && listText.includes('Flu cat — needs IVFT') && listText.includes('transferred from a vet case'), 'IVFT task and its vet-transfer note render');
     const nrText = await b.page.textContent('#nr-list');
     t.ok(nrText.includes('FOS-1') && nrText.includes('Pathway') && nrText.includes('for UV check'), 'a named-animal UV request reads "FOS-1 — Pathway for UV check"');
 
     /* ---------- Done: initials recorded ---------- */
-    await b.page.locator('.attn-item.noga-item', { hasText: 'DOG-99' }).locator('.noga-done').click();
+    await b.page.locator('#proc-misc-list .attn-item.noga-item', { hasText: 'DOG-99' }).locator('.noga-done').click();
     await b.page.waitForTimeout(200);
     t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'miscellaneous task done runs with no passcode prompt');
     const noga = (await b.db()).noga_requests;

@@ -137,7 +137,7 @@
   .med-label-text { white-space: pre-wrap; background: var(--neutral-100); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; margin: 8px 0; }
   .med-label-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-  #noga-list .attn-item { align-items: flex-start; }
+  #noga-list .attn-item, #proc-misc-list .attn-item { align-items: flex-start; }
 
   .alert-banner {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -172,7 +172,7 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <p class="hint">Welfare nurse: medication labels and miscellaneous tasks. Processing nurse: vaccination, microchip and UV requests, and treatments due.</p>
+    <p class="hint">Welfare nurse: medication labels, treatments due and miscellaneous tasks. Processing nurse: vaccination, microchip and UV requests.</p>
     <p class="hint" style="margin-top:14px;">
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
       &nbsp;·&nbsp;
@@ -205,6 +205,12 @@
       <div id="med-labels-list"></div>
     </section>
 
+    <section class="card" id="nurse-doses">
+      <h2>Treatments due</h2>
+      <div id="nt-overdue"></div>
+      <div id="nt-today"></div>
+    </section>
+
     <section class="card" id="noga-section">
       <h2>Miscellaneous tasks</h2>
       <p class="subtle">Requested by the vets — bloods, ear swabs, FIV tests, flu cats needing IVFT and other tasks.</p>
@@ -219,11 +225,12 @@
       <div id="nr-list"></div>
     </section>
 
-    <section class="card" id="nurse-doses">
-      <h2>Treatments due</h2>
-      <div id="nt-overdue"></div>
-      <div id="nt-today"></div>
+    <section class="card" id="proc-misc-section" style="display:none;">
+      <h2>Microchip &amp; UV tasks from the vets</h2>
+      <p class="subtle">Tasks a vet asked for or transferred — microchip and UV checks are done by the Processing nurse.</p>
+      <div id="proc-misc-list"></div>
     </section>
+
     </div>
     </div>
 
@@ -489,6 +496,16 @@
      Requested by the vets — from the vet page, or by transferring a case.
      ============================================================ */
   const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
+  // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
+  const PROCESSING_MISC_KINDS = ['microchip', 'uv'];
+  function miscRowHtml(r) {
+    return `
+      <div class="attn-item noga-item">
+        <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
+        ${r.done ? '' : `<button class="secondary noga-done" data-id="${esc(r.id)}">Done</button>`}
+      </div>`;
+  }
   function renderNoga() {
     const now = Date.now();
     // Same fallback-anchor style as LDHLogic.caseList's doneAt(): fall back
@@ -496,14 +513,13 @@
     // timestamp reads as "just now" (still visible) rather than vanishing.
     const doneAt = r => new Date(r.done_at || r.created_at).getTime();
     const visible = NOGA_REQUESTS.filter(r => !r.done || now - doneAt(r) <= 24 * 60 * 60 * 1000);
-    document.getElementById('noga-list').innerHTML = visible.map(r => `
-      <div class="attn-item noga-item">
-        <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
-        ${r.done ? '' : `<button class="secondary noga-done" data-id="${esc(r.id)}">Done</button>`}
-      </div>`).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
+    const welfare = visible.filter(r => !PROCESSING_MISC_KINDS.includes(r.task));
+    const processing = visible.filter(r => PROCESSING_MISC_KINDS.includes(r.task));
+    document.getElementById('noga-list').innerHTML = welfare.map(miscRowHtml).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
+    document.getElementById('proc-misc-list').innerHTML = processing.map(miscRowHtml).join('');
+    document.getElementById('proc-misc-section').style.display = processing.length ? '' : 'none';
   }
-  document.getElementById('noga-list').addEventListener('click', async (e) => {
+  async function miscDoneClick(e) {
     const btn = e.target.closest('.noga-done'); if (!btn) return;
     const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
     const initials = myInitials();
@@ -511,7 +527,9 @@
     const { error } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString() }).eq('id', r.id);
     if (error) alert('Could not update: ' + error.message);
     loadAll();
-  });
+  }
+  document.getElementById('noga-list').addEventListener('click', miscDoneClick);
+  document.getElementById('proc-misc-list').addEventListener('click', miscDoneClick);
   /* ============================================================
      Memo board
      ============================================================ */
