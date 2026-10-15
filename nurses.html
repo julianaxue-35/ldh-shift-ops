@@ -149,8 +149,14 @@
     line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
   }
 
+  .nurse-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .nurse-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .nurse-col-title { margin: 0; font-size: 1.05rem; padding: 10px 16px; border-radius: 12px; color: #fff; }
+  .nurse-col-title.welfare { background: var(--violet); }
+  .nurse-col-title.processing { background: var(--green); }
   @media (max-width: 1000px) {
     .urgency-board { grid-template-columns: 1fr; }
+    .nurse-cols { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: 1fr; }
@@ -162,7 +168,7 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <p class="hint">Medication labels, nurse requests (vaccination, FIV, blood test, microchip) and treatment tasks, and the NO-GA list for the nurse team.</p>
+    <p class="hint">Welfare nurse: medication labels and miscellaneous tasks. Processing nurse: vaccination, microchip and UV requests, and treatments due.</p>
     <p class="hint" style="margin-top:14px;">
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
       &nbsp;·&nbsp;
@@ -180,7 +186,11 @@
       <span id="new-item-banner-text"></span>
       <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
     </div>
-    <div class="page-head"><div><h1>Nurses</h1><p>Medication labels, nurse requests, treatments due, and the NO-GA list.</p></div></div>
+    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div></div>
+
+    <div class="nurse-cols">
+    <div class="nurse-col" id="welfare-col">
+    <h2 class="nurse-col-title welfare">Welfare nurse</h2>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -191,6 +201,15 @@
       <div id="med-labels-list"></div>
     </section>
 
+    <section class="card" id="noga-section">
+      <h2>Miscellaneous tasks</h2>
+      <p class="subtle">Requested by the vets — bloods, ear swabs, FIV tests, flu cats needing IVFT and other tasks.</p>
+      <div id="noga-list"></div>
+    </section>
+    </div>
+
+    <div class="nurse-col" id="processing-col">
+    <h2 class="nurse-col-title processing">Processing nurse</h2>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="nr-list"></div>
@@ -201,33 +220,8 @@
       <div id="nt-overdue"></div>
       <div id="nt-today"></div>
     </section>
-
-    <section class="card" id="noga-section">
-      <h2>NO-GA required list</h2>
-      <div id="noga-list"></div>
-      <div class="nt-form">
-        <label>Animal ID
-          <input type="text" id="noga-animal-id" autocomplete="off">
-        </label>
-        <label>Location
-          <select id="noga-location"></select>
-        </label>
-        <label id="noga-detail-wrap" style="display:none;">Offsite detail
-          <input type="text" id="noga-location-detail" autocomplete="off">
-        </label>
-        <label>Task
-          <select id="noga-task">
-            <option value="fiv_test">FIV test</option>
-            <option value="microchip">Microchip</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label>Note
-          <input type="text" id="noga-note" autocomplete="off">
-        </label>
-        <button type="button" id="noga-submit">Add</button>
-      </div>
-    </section>
+    </div>
+    </div>
 
     <section class="card" id="memo-board">
       <h2>Memo board</h2>
@@ -376,8 +370,16 @@
     vaccination: { toDo: 'to vaccinate', doneVerb: 'vaccinated', plusLabel: '+1 vaccinated' },
     fiv: { toDo: 'for FIV test', doneVerb: 'FIV tested', plusLabel: '+1 FIV tested' },
     blood: { toDo: 'for blood test', doneVerb: 'blood tested', plusLabel: '+1 blood tested' },
-    microchip: { toDo: 'to microchip', doneVerb: 'microchipped', plusLabel: '+1 microchipped' }
+    microchip: { toDo: 'to microchip', doneVerb: 'microchipped', plusLabel: '+1 microchipped' },
+    uv: { toDo: 'for UV check', doneVerb: 'UV checked', plusLabel: '+1 UV checked' }
   };
+  // A request raised for one named animal (foster / rescue flag) reads "A123 — Pathway: to microchip";
+  // a head-count request reads "FIR Room — 3 cats to vaccinate".
+  function nurseReqTitle(r) {
+    const k = nurseReqKind(r);
+    if (r.animal_id) return `${esc(r.animal_id)} — ${esc(r.location)} ${k.toDo}`;
+    return `${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} ${k.toDo}`;
+  }
   function nurseReqKind(r) { return NURSE_REQUEST_KIND[r.kind] || NURSE_REQUEST_KIND.vaccination; }
   // A scheduled request (logged ahead of arrival — 2026-09-26) has no
   // arrived_at yet: show a countdown/overdue state and just a "Mark
@@ -387,7 +389,7 @@
     const st = LDHLogic.arrivalStatus(r, Date.now());
     const k = nurseReqKind(r);
     return `<div class="attn-item nr-item">
-      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} ${k.toDo}</div>
+      <div><div class="aname">${nurseReqTitle(r)}</div>
         <div class="ameta">expected ${fmtTime(r.expected_at)}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
@@ -398,7 +400,7 @@
     const st = LDHLogic.nurseRequestStatus(r, Date.now());
     const k = nurseReqKind(r);
     return `<div class="attn-item nr-item">
-      <div><div class="aname">${esc(r.location)} — ${r.animal_count} ${esc(r.species)}${r.animal_count > 1 ? 's' : ''} ${k.toDo}</div>
+      <div><div class="aname">${nurseReqTitle(r)}</div>
         <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
@@ -479,9 +481,10 @@
   });
 
   /* ============================================================
-     NO-GA required list
+     Miscellaneous tasks (was the "NO-GA required" list; same table).
+     Requested by the vets — from the vet page, or by transferring a case.
      ============================================================ */
-  const NOGA_TASK_LABELS = { fiv_test: 'FIV test', microchip: 'Microchip', other: 'Other' };
+  const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
   function renderNoga() {
     const now = Date.now();
     // Same fallback-anchor style as LDHLogic.caseList's doneAt(): fall back
@@ -492,9 +495,9 @@
     document.getElementById('noga-list').innerHTML = visible.map(r => `
       <div class="attn-item noga-item">
         <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
         ${r.done ? '' : `<button class="secondary noga-done" data-id="${esc(r.id)}">Done</button>`}
-      </div>`).join('') || '<p class="empty-state">No NO-GA requests open.</p>';
+      </div>`).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
   }
   document.getElementById('noga-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('.noga-done'); if (!btn) return;
@@ -505,32 +508,6 @@
     if (error) alert('Could not update: ' + error.message);
     loadAll();
   });
-  document.getElementById('noga-location').addEventListener('change', (e) => {
-    document.getElementById('noga-detail-wrap').style.display = (e.target.value === 'Offsite') ? '' : 'none';
-  });
-  document.getElementById('noga-submit').addEventListener('click', async () => {
-    const animalId = document.getElementById('noga-animal-id').value.trim();
-    if (!animalId) { alert('Enter an animal ID.'); return; }
-    const location = document.getElementById('noga-location').value;
-    const detail = document.getElementById('noga-location-detail').value.trim();
-    const task = document.getElementById('noga-task').value;
-    const note = document.getElementById('noga-note').value.trim();
-    // Initials are NOT required to add a NO-GA request (only to mark one
-    // done) — read the box directly rather than myInitials(), which would
-    // pop a window.prompt() when it's empty.
-    const addedBy = cleanInitials(document.getElementById('initials-input').value) || null;
-    const { error } = await sb.from('noga_requests').insert({
-      animal_id: animalId, location, location_detail: (location === 'Offsite' ? (detail || null) : null),
-      task, note: note || null, added_by: addedBy
-    });
-    if (error) { alert('Could not add: ' + error.message); return; }
-    document.getElementById('noga-animal-id').value = '';
-    document.getElementById('noga-location-detail').value = '';
-    document.getElementById('noga-note').value = '';
-    document.getElementById('noga-detail-wrap').style.display = 'none';
-    loadAll();
-  });
-
   /* ============================================================
      Memo board
      ============================================================ */
@@ -604,7 +581,7 @@
      comparison happens, then every loadAll() after that only alerts on
      ids it hasn't seen before — each item alerts once, ever.
      ============================================================ */
-  let seenReqIds = new Set(), seenMedIds = new Set(), seenInitialised = false;
+  let seenReqIds = new Set(), seenMedIds = new Set(), seenMiscIds = new Set(), seenInitialised = false;
   let bannerHideTimer = null;
 
   function openNurseRequests() { return NURSE_REQUESTS.filter(r => r.done_count < r.animal_count); }
@@ -641,10 +618,11 @@
   // "this is new to me".
   let seenArrivalWarnIds = new Set();
 
-  function showAlertBanner(newReqCount, newMedCount, arrivalWarnCount) {
+  function showAlertBanner(newReqCount, newMedCount, arrivalWarnCount, newMiscCount) {
     const parts = [];
     if (newReqCount > 0) parts.push(`${newReqCount} new nurse request${newReqCount > 1 ? 's' : ''}`);
     if (newMedCount > 0) parts.push(`${newMedCount} new medication label${newMedCount > 1 ? 's' : ''}`);
+    if (newMiscCount > 0) parts.push(`${newMiscCount} new miscellaneous task${newMiscCount > 1 ? 's' : ''}`);
     if (arrivalWarnCount > 0) parts.push(`${arrivalWarnCount} arrival${arrivalWarnCount > 1 ? 's' : ''} due in 15 minutes`);
     if (!parts.length) return;
     document.getElementById('new-item-banner-text').textContent = '🔔 ' + parts.join(' · ') + ' — check below.';
@@ -660,21 +638,25 @@
   function checkForNewItems() {
     const openReqs = openNurseRequests();
     const medTasks = medLabelTasks();
+    const miscOpen = NOGA_REQUESTS.filter(r => !r.done);
     const now = Date.now();
     const dueArrivals = NURSE_REQUESTS.filter(r => LDHLogic.needsArrivalWarning(r, now) && !seenArrivalWarnIds.has(r.id));
     dueArrivals.forEach(r => seenArrivalWarnIds.add(r.id));
     if (!seenInitialised) {
       openReqs.forEach(r => seenReqIds.add(r.id));
       medTasks.forEach(t => seenMedIds.add(t.id));
+      miscOpen.forEach(r => seenMiscIds.add(r.id));
       seenInitialised = true;
       if (dueArrivals.length > 0) showAlertBanner(0, 0, dueArrivals.length);
       return;
     }
     const newReqs = openReqs.filter(r => !seenReqIds.has(r.id));
     const newMed = medTasks.filter(t => !seenMedIds.has(t.id));
+    const newMisc = miscOpen.filter(r => !seenMiscIds.has(r.id));
     openReqs.forEach(r => seenReqIds.add(r.id));
     medTasks.forEach(t => seenMedIds.add(t.id));
-    if (newReqs.length > 0 || newMed.length > 0 || dueArrivals.length > 0) showAlertBanner(newReqs.length, newMed.length, dueArrivals.length);
+    miscOpen.forEach(r => seenMiscIds.add(r.id));
+    if (newReqs.length > 0 || newMed.length > 0 || newMisc.length > 0 || dueArrivals.length > 0) showAlertBanner(newReqs.length, newMed.length, dueArrivals.length, newMisc.length);
   }
 
   async function loadAll() {
@@ -693,7 +675,6 @@
   }
 
   (async function () {
-    document.getElementById('noga-location').innerHTML = LDHLogic.LOCATIONS.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
     const { sb: client } = await OpsCore.init({ page: 'nurses', gateRole: 'nurse' });
     sb = client;
     document.getElementById('app-root').style.display = 'grid';

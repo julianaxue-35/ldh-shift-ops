@@ -8,7 +8,7 @@ const t = require('./check')('flag-form');
   t.ok(await page.locator('#req-urgency').count() === 0, 'manual urgency dropdown removed');
   t.ok(await page.locator('#req-location option').count() === 15, 'location select filled from the shared list (incl. Rabbit Room, Pathway, Offsite)');
   const signOpts = await page.$$eval('#req-condition option', os => os.map(o => o.value));
-  t.ok(signOpts.join() === ',cat_flu,kennel_cough,diarrhoea,vomiting,eye_condition,skin_condition,wounds_injury,other', 'flag form offers the eight reported signs (got ' + signOpts.join() + ')');
+  t.ok(signOpts.join() === ',cat_flu,kennel_cough,diarrhoea,vomiting,eye_condition,skin_condition,wounds_injury,cat_birthing,other', 'flag form offers the eight reported signs plus the urgent cat birthing check (got ' + signOpts.join() + ')');
   t.ok(!(await page.textContent('#req-condition')).toLowerCase().includes('giardia'), 'no diagnoses in the sign list');
 
   await page.fill('#req-title', 'T100');
@@ -56,6 +56,45 @@ const t = require('./check')('flag-form');
 
   await page.selectOption('#req-location', 'Pound 1');
   t.ok(await page.isVisible('#req-pen') && !(await page.isVisible('#req-location-detail')), 'switching back to a normal space restores the pen field and hides detail');
+
+
+  /* ---------- 2026-10-15: urgent cat birthing check ---------- */
+  t.ok(!(await page.isVisible('#req-birthing-wrap')), 'birthing reason is hidden until Cat birthing is chosen');
+  await page.fill('#req-title', 'CAT-BIRTH');
+  await page.selectOption('#req-condition', 'cat_birthing');
+  t.ok(await page.isVisible('#req-birthing-wrap'), 'choosing Cat birthing reveals the reason dropdown');
+  t.ok((await page.$$eval('#req-birthing-reason option', os => os.map(o => o.value))).join() === ',birth_neonates,birth_discharge,birth_mum_distress', 'reason dropdown lists the three birthing reasons');
+  let dialogs = []; page.on('dialog', d => dialogs.push(d.message()));   // the harness already accepts it
+  const before = (await db()).tasks.length;
+  await page.click('#req-submit');
+  await page.waitForTimeout(200);
+  t.ok(dialogs.length === 1 && (await db()).tasks.length === before, 'submitting without a reason is blocked');
+  await page.selectOption('#req-birthing-reason', 'birth_mum_distress');
+  t.ok((await page.textContent('#req-tier-preview')).startsWith('Emergency'), 'a birthing reason switches the preview to Emergency');
+  await page.click('#req-submit');
+  await page.waitForTimeout(200);
+  const birth = (await db()).tasks.find(x => x.title === 'CAT-BIRTH');
+  t.ok(!!birth && birth.urgency === 'red_flag' && birth.red_flags.join() === 'birth_mum_distress' && birth.condition === null && birth.problem.startsWith('Cat birthing — Mum in distress'),
+    'birthing case saves as red_flag with the reason, no surveillance condition, and a readable problem');
+  t.ok(!(await page.isVisible('#req-birthing-wrap')), 'birthing section resets after submit');
+
+  /* ---------- foster / rescue: optional microchip / UV requests for the nurses ---------- */
+  t.ok(!(await page.isVisible('#req-nurse-extras')), 'microchip/UV options hidden for a shelter request');
+  await page.selectOption('#req-type', 'foster');
+  t.ok(await page.isVisible('#req-nurse-extras'), 'foster request shows the microchip/UV options');
+  await page.fill('#req-title', 'FOS-1');
+  await page.check('#req-x-microchip'); await page.check('#req-x-uv');
+  await page.click('#req-submit');
+  await page.waitForTimeout(300);
+  const nrs = (await db()).nurse_requests.filter(r => r.animal_id === 'FOS-1');
+  t.ok(nrs.length === 2 && nrs.map(r => r.kind).sort().join() === 'microchip,uv' && nrs.every(r => r.animal_count === 1 && r.due_window === 'today' && r.location === 'Pathway' && r.species === 'cat'),
+    'ticking microchip + UV creates two single-animal nurse requests due today at the foster location');
+  t.ok(!(await page.isVisible('#req-nurse-extras')), 'extras reset after submit');
+  await page.selectOption('#req-type', 'rescue');
+  await page.fill('#req-title', 'RES-1');
+  await page.click('#req-submit');
+  await page.waitForTimeout(200);
+  t.ok((await db()).nurse_requests.filter(r => r.animal_id === 'RES-1').length === 0, 'no boxes ticked creates no nurse requests');
 
   t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   await browser.close();

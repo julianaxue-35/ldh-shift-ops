@@ -363,3 +363,10 @@ test('flagsBefore: only EARLIER flags of the same animal in the last 3 months, n
   const many = [1, 2, 3, 4, 5].map(n => ({ title: 'A1', flagged_at: at(n * 3), reason: 'r' + n }));
   assert.match(L.flagHistoryText(L.flagsBefore(many, task, now)), /5× — .*r1.*r2.*r3 · \+2 more$/);
 });
+
+test('birthing reasons are Red-flag signs with readable labels; misc task labels cover the nurse task kinds', () => {
+  assert.deepEqual(L.BIRTHING_SIGNS.map(b => b.key), ['birth_neonates', 'birth_discharge', 'birth_mum_distress']);
+  L.BIRTHING_SIGNS.forEach(b => { assert.equal(L.signLabel(b.key), b.label); assert.equal(L.tierFromFlags([b.key]), 'red_flag'); });
+  assert.ok(!L.EMERGENCY_SIGNS.some(s => s.key.startsWith('birth_')), 'birthing reasons are not general tick-boxes');
+  assert.deepEqual(Object.keys(L.MISC_TASK_LABELS).sort(), ['blood', 'ear_swab', 'fiv_test', 'ivft', 'microchip', 'other', 'uv']);
+});

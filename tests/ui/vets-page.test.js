@@ -437,5 +437,46 @@ const H = 3600 * 1000;
     await h.browser.close();
   }
 
+  /* ============================================================
+     Part 9 (2026-10-15): miscellaneous nurse tasks — a vet requests one
+     directly, or transfers a flagged case to the nurses (the case leaves
+     the vet board and the Welfare nurse gets the task).
+     ============================================================ */
+  const seedM = {
+    tasks: [
+      { title: 'XFER-1', location: 'Cat Room 1 / 4', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', problem: 'Sneezing, needs bloods', created_at: ago(1 * H) },
+      { title: 'MEDCASE', location: 'Pound 1', shift: 'sick_injured', type: 'medication', urgency: 'urgent', needs_medication: true, sm_number: 'MEDCASE', created_at: ago(1 * H) }
+    ]
+  };
+  const m = await open(seedM, 'vets.html');
+  try {
+    t.ok(await m.page.locator('#nurse-misc').count() === 1, 'vets page has a Request a nurse task card');
+    t.ok((await m.page.$$eval('#mt-task option', os => os.map(o => o.value))).join() === 'blood,ear_swab,fiv_test,ivft,microchip,uv,other', 'task list: bloods, ear swab, FIV, flu cat IVFT, microchip, UV, other');
+    await m.page.fill('#mt-animal', 'CAT-12');
+    await m.page.selectOption('#mt-location', 'Cat Room 2');
+    await m.page.selectOption('#mt-task', 'ear_swab');
+    await m.page.fill('#mt-note', 'both ears');
+    await m.page.click('#mt-submit');
+    await m.page.waitForTimeout(250);
+    let ng = (await m.db()).noga_requests;
+    t.ok(ng.length === 1 && ng[0].animal_id === 'CAT-12' && ng[0].task === 'ear_swab' && ng[0].note === 'both ears' && ng[0].location === 'Cat Room 2', 'a vet request is saved as a miscellaneous task');
+    t.ok((await m.page.textContent('#misc-list')).includes('CAT-12') && (await m.page.textContent('#misc-list')).includes('Ear swab'), 'the new task shows in the vets page list');
+
+    t.ok(await m.page.locator('.attn-item', { hasText: 'XFER-1' }).locator('.transfer-btn').count() === 1, 'an open case has a Transfer to nurse button');
+    t.ok(await m.page.locator('.attn-item', { hasText: 'MEDCASE' }).locator('.transfer-btn').count() === 0, 'a medication case does not (it has its own nurse hand-off)');
+    await m.page.locator('.attn-item', { hasText: 'XFER-1' }).locator('.transfer-btn').click();
+    await m.page.selectOption('.transfer-task', 'blood');
+    await m.page.click('.transfer-confirm');
+    await m.page.waitForTimeout(300);
+    const db2 = await m.db();
+    const tr = db2.noga_requests.find(r => r.animal_id === 'XFER-1');
+    const closed = db2.tasks.find(x => x.title === 'XFER-1');
+    t.ok(!!tr && tr.task === 'blood' && tr.location === 'Cat Room 1 / 4' && tr.note === 'Sneezing, needs bloods' && tr.source_task_id === closed.id, 'transfer creates the nurse task (blood test) linked to the case, defaulting the note to the problem');
+    t.ok(closed.done === true && closed.note === 'Transferred to nurse — Blood test', 'the vet case is closed with a transfer note');
+    t.ok(m.errors.length === 0, 'no page errors: ' + m.errors.join('; '));
+  } finally {
+    await m.browser.close();
+  }
+
   t.done();
 })();

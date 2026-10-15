@@ -242,9 +242,22 @@
           <option value="eye_condition">Eye condition</option>
           <option value="skin_condition">Skin condition</option>
           <option value="wounds_injury">Wounds / injury / trauma</option>
+          <option value="cat_birthing">🚨 Cat birthing — urgent check</option>
           <option value="other">Other</option>
         </select>
         <input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg" style="margin:0;">
+      </div>
+      <div id="req-birthing-wrap" style="display:none; margin:10px 0 0; padding:10px 12px; border:2px solid var(--critical); border-radius:12px; background:rgba(208,59,59,0.06);">
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--critical);">Urgent cat birthing check — what is wrong? (goes straight to the top of the vet board)</div>
+        <select id="req-birthing-reason" style="margin:0;"></select>
+      </div>
+      <div id="req-nurse-extras" style="display:none; margin:10px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:12px;">
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Also ask the nurses to (goes to the Processing nurse board)</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
+          <select id="req-x-species" style="margin:0; width:auto;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select>
+        </div>
       </div>
       <div id="req-redflags-wrap" style="margin:12px 0 4px;">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Emergency signs — tick any that apply</div>
@@ -257,7 +270,7 @@
 
     <section class="card nurse-card" id="nurse-requests">
       <h2>Nurse request</h2>
-      <p class="subtle">Log animals that need a nurse task on arrival — vaccination, FIV test, blood test or microchip.</p>
+      <p class="subtle">Log animals that need a nurse task on arrival — vaccination, FIV test, blood test, microchip or UV request.</p>
       <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
         <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
       </label>
@@ -267,6 +280,7 @@
           <option value="fiv">FIV test</option>
           <option value="blood">Blood test</option>
           <option value="microchip">Microchip</option>
+          <option value="uv">UV request</option>
         </select></label>
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
@@ -366,9 +380,16 @@
   }
 
   document.getElementById('req-location').addEventListener('change', updateLocationFields);
+  document.getElementById('req-condition').addEventListener('change', () => {
+    document.getElementById('req-birthing-wrap').style.display = document.getElementById('req-condition').value === 'cat_birthing' ? '' : 'none';
+    updateTierPreview();
+  });
+  document.getElementById('req-birthing-reason').addEventListener('change', () => updateTierPreview());
   // Foster requests default to the Pathway "room" (2026-10-09) — still changeable.
   document.getElementById('req-type').addEventListener('change', () => {
-    if (document.getElementById('req-type').value === 'foster') {
+    const tv = document.getElementById('req-type').value;
+    document.getElementById('req-nurse-extras').style.display = (tv === 'foster' || tv === 'rescue') ? '' : 'none';
+    if (tv === 'foster') {
       document.getElementById('req-location').value = 'Pathway';
       updateLocationFields();
     }
@@ -386,6 +407,8 @@
     // number to enter (2026-09-26: she found the extra box redundant/
     // confusing next to the ID field right above it).
     const needsMed = document.getElementById('req-type').value === 'medication';
+    const isBirthing = document.getElementById('req-condition').value === 'cat_birthing';
+    if (isBirthing && !birthingReason()) { alert('Choose the reason for the urgent cat birthing check.'); return; }
     const btn = document.getElementById('req-submit');
     btn.disabled = true;
     // Matches the offline tools' existing "Room / pen number" convention
@@ -401,12 +424,12 @@
       location_detail: isOffsite ? (detail || null) : null,
       shift: 'sick_injured',
       type: document.getElementById('req-type').value,
-      urgency: LDHLogic.tierFromFlags(selectedFlags()),
-      red_flags: selectedFlags(),
+      urgency: LDHLogic.tierFromFlags(allFlags()),
+      red_flags: allFlags(),
       needs_medication: needsMed,
       sm_number: needsMed ? title : null,
-      problem: document.getElementById('req-problem').value.trim() || null,
-      condition: document.getElementById('req-condition').value || null,
+      problem: [isBirthing ? 'Cat birthing — ' + LDHLogic.signLabel(birthingReason()) : '', document.getElementById('req-problem').value.trim()].filter(Boolean).join(' — ') || null,
+      condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
       done: false,
     };
     let { error } = await sb.from('tasks').insert(row);
@@ -427,12 +450,30 @@
     }
     btn.disabled = false;
     if (error) { alert('Could not submit: ' + error.message); return; }
+    /* Foster / rescue requests can also ask the nurses for a microchip and/or a UV check — one nurse request per
+       ticked task, for this named animal, due today, shown on the Processing nurse board. */
+    const reqType = document.getElementById('req-type').value;
+    if (reqType === 'foster' || reqType === 'rescue') {
+      const wanted = [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k);
+      for (const kind of wanted) {
+        const { error: nrErr } = await sb.from('nurse_requests').insert({
+          kind, due_window: 'today', location: room, species: document.getElementById('req-x-species').value,
+          animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff',
+          note: TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '')
+        });
+        if (nrErr) alert('The case was flagged, but the ' + (kind === 'uv' ? 'UV' : 'microchip') + ' request for the nurses could not be saved: ' + nrErr.message);
+      }
+    }
     document.getElementById('req-title').value = '';
     document.getElementById('req-pen').value = '';
     document.getElementById('req-location-detail').value = '';
     document.getElementById('req-problem').value = '';
     document.getElementById('req-condition').value = '';
     document.getElementById('req-type').value = 'shelter';
+    document.getElementById('req-nurse-extras').style.display = 'none';
+    ['req-x-microchip', 'req-x-uv'].forEach(id => { document.getElementById(id).checked = false; });
+    document.getElementById('req-birthing-wrap').style.display = 'none';
+    document.getElementById('req-birthing-reason').value = '';
     document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });
     updateTierPreview();
   });
@@ -601,15 +642,25 @@
     }).join('');
   }
 
+  function fillBirthingReasons() {
+    document.getElementById('req-birthing-reason').innerHTML = '<option value="">Choose the reason…</option>' +
+      LDHLogic.BIRTHING_SIGNS.map(b => `<option value="${esc(b.key)}">${esc(b.label)}</option>`).join('');
+  }
   function fillLocationSelects() {
+    fillBirthingReasons();
     ['req-location', 'nr-location'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
     });
   }
   function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
+  // The urgent cat-birthing reason rides along in red_flags, so it is Red flag tier like any emergency sign.
+  function birthingReason() {
+    return document.getElementById('req-condition').value === 'cat_birthing' ? document.getElementById('req-birthing-reason').value : '';
+  }
+  function allFlags() { const r = birthingReason(); return selectedFlags().concat(r ? [r] : []); }
   function updateTierPreview() {
-    const tier = LDHLogic.tierFromFlags(selectedFlags());
+    const tier = LDHLogic.tierFromFlags(allFlags());
     document.getElementById('req-tier-preview').textContent = LDHLogic.TIER_LABELS[tier] + ' — check ' + LDHLogic.TIER_TARGETS[tier];
   }
   function renderRedFlagForm() {

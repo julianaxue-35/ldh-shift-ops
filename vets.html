@@ -195,7 +195,7 @@
     <div class="page-head">
       <div>
         <h1>Vets</h1>
-        <p>Pick up, complete and hand off cases; request treatments; start a shift.</p>
+        <p>Pick up, complete and hand off cases; request treatments and nurse tasks; start a shift.</p>
       </div>
     </div>
 
@@ -234,6 +234,21 @@
         <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
         <label>Start date<input id="nt-start" type="date"></label>
         <button id="nt-submit" type="button">Request</button>
+      </div>
+    </section>
+
+    <section class="card" id="nurse-misc">
+      <h2>Request a nurse task — miscellaneous</h2>
+      <p class="subtle">Ask the Welfare nurse to do a task — bloods, ear swab, FIV test, a flu cat needing IVFT and so on. It shows on the Nurses page under Miscellaneous tasks. To pass on a flagged case, use "Transfer to nurse" on the case below.</p>
+      <div id="misc-list"></div>
+      <h3 style="font-size:0.85rem; margin:18px 0 0;">New task</h3>
+      <div class="nt-form">
+        <label>Animal ID<input id="mt-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="mt-location"></select></label>
+        <label id="mt-detail-wrap" style="display:none;">Detail<input id="mt-detail" placeholder="e.g. foster name"></label>
+        <label>Task<select id="mt-task"></select></label>
+        <label>Note (optional)<input id="mt-note" placeholder="e.g. before surgery tomorrow"></label>
+        <button id="mt-submit" type="button">Request</button>
       </div>
     </section>
 
@@ -281,7 +296,7 @@
   let sb = null;
   const esc = OpsCore.esc;
 
-  let TASKS = [], MEMOS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [], ROSTER = {};
+  let TASKS = [], MEMOS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [], NOGA_REQUESTS = [], ROSTER = {};
   let CASES = { open: [], completed: [] };
   let typeFilter = 'all';
   let showCompletedMemos = false;
@@ -352,13 +367,15 @@
 
   /* ---------- data loading ---------- */
   async function loadAll() {
-    const [tasksRes, memosRes, ntRes, ndRes, rosterRes] = await Promise.all([
+    const [tasksRes, memosRes, ntRes, ndRes, rosterRes, ngRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('memos').select('*').order('created_at', { ascending: false }),
       sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
+      sb.from('noga_requests').select('*').order('created_at', { ascending: false }),
     ]);
+    NOGA_REQUESTS = ngRes.error ? [] : (ngRes.data || []);
     TASKS = tasksRes.data || [];
     MEMOS = memosRes.data || [];
     NURSE_TREATMENTS = ntRes.data || [];
@@ -369,6 +386,7 @@
   }
 
   function renderAll() {
+    renderMisc();
     CASES = LDHLogic.caseList(TASKS, Date.now());
     renderCompletion();
     renderShiftProgress();
@@ -413,6 +431,7 @@
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           ${canBump ? `<button type="button" class="secondary bump-btn" data-id="${esc(t.id)}">Bump to Urgent</button>` : ''}
           ${canPickUp ? `<button type="button" class="secondary pick-up-btn" data-id="${esc(t.id)}">Pick up →</button>` : ''}
+          ${canDone && !t.needs_medication ? `<button type="button" class="secondary transfer-btn" data-id="${esc(t.id)}">Transfer to nurse</button>` : ''}
           ${canDone ? `<button type="button" class="secondary done-btn" data-id="${esc(t.id)}">DONE</button>` : ''}
         </div>
       </div>`;
@@ -761,9 +780,91 @@
     loadAll();
   });
 
+  /* ---------- miscellaneous nurse tasks (Welfare nurse) ---------- */
+  function renderMisc() {
+    const now = Date.now();
+    const visible = NOGA_REQUESTS.filter(r => !r.done || now - new Date(r.done_at || r.created_at).getTime() <= 24 * 60 * 60 * 1000);
+    document.getElementById('misc-list').innerHTML = visible.map(r => `
+      <div class="attn-item">
+        <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
+          <div class="ameta">${esc(LDHLogic.MISC_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ' · waiting for the nurse'}</div></div>
+      </div>`).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
+  }
+  function fillMiscSelects() {
+    document.getElementById('mt-location').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    document.getElementById('mt-task').innerHTML = Object.keys(LDHLogic.MISC_TASK_LABELS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('');
+  }
+  document.getElementById('mt-location').addEventListener('change', (e) => {
+    document.getElementById('mt-detail-wrap').style.display = LDHLogic.OFFSITE_NAMES.includes(e.target.value) ? '' : 'none';
+  });
+  document.getElementById('mt-submit').addEventListener('click', async () => {
+    const btn = document.getElementById('mt-submit'); btn.disabled = true;
+    try {
+      const animal = document.getElementById('mt-animal').value.trim();
+      if (!animal) { alert('Enter an animal ID.'); return; }
+      const location = document.getElementById('mt-location').value;
+      const detail = document.getElementById('mt-detail').value.trim();
+      const { error } = await sb.from('noga_requests').insert({
+        animal_id: animal, location, location_detail: LDHLogic.OFFSITE_NAMES.includes(location) ? (detail || null) : null,
+        task: document.getElementById('mt-task').value, note: document.getElementById('mt-note').value.trim() || null, added_by: 'Vet team'
+      });
+      if (error) { alert('Could not save the task: ' + error.message); return; }
+      document.getElementById('mt-animal').value = ''; document.getElementById('mt-note').value = ''; document.getElementById('mt-detail').value = '';
+      loadAll();
+    } finally { btn.disabled = false; }
+  });
+
+  /* ---------- transfer a flagged case to the nurses ---------- */
+  function openTransferModal(t) {
+    document.querySelectorAll('.transfer-modal-overlay').forEach(el => el.remove());
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="oc-modal-overlay transfer-modal-overlay" data-id="${esc(t.id)}">
+        <div class="oc-modal done-modal">
+          <h3 class="done-modal-title">Transfer to nurse — ${esc(t.title)}</h3>
+          <p style="font-size:0.85rem; margin:0 0 10px;">The Welfare nurse gets this under Miscellaneous tasks, and the case leaves the vet board.</p>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the nurse</label>
+          <select class="transfer-task">${Object.keys(LDHLogic.MISC_TASK_LABELS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('')}</select>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Note for the nurse (optional)</label>
+          <textarea class="transfer-note" rows="3" placeholder="${esc(t.problem || 'e.g. bloods before surgery')}"></textarea>
+          <div class="oc-modal-actions">
+            <button type="button" class="oc-modal-cancel transfer-cancel">Cancel</button>
+            <button type="button" class="oc-modal-submit transfer-confirm">Transfer</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap.firstElementChild);
+  }
+  document.addEventListener('click', async (e) => {
+    const trBtn = e.target.closest('.transfer-btn');
+    if (trBtn) { const t = TASKS.find(x => x.id === trBtn.dataset.id); if (t) openTransferModal(t); return; }
+    const cancel = e.target.closest('.transfer-cancel');
+    if (cancel) { cancel.closest('.transfer-modal-overlay').remove(); return; }
+    const ok = e.target.closest('.transfer-confirm');
+    if (!ok) return;
+    const overlay = ok.closest('.transfer-modal-overlay');
+    const t = TASKS.find(x => x.id === overlay.dataset.id);
+    if (!t) { overlay.remove(); return; }
+    ok.disabled = true;
+    const task = overlay.querySelector('.transfer-task').value;
+    const note = overlay.querySelector('.transfer-note').value.trim() || t.problem || null;
+    const { error } = await sb.from('noga_requests').insert({
+      animal_id: t.title, location: t.location, location_detail: t.location_detail || null, task, note, added_by: 'Vet team', source_task_id: t.id
+    });
+    if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
+    const { error: closeErr } = await sb.from('tasks').update({
+      done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString(),
+      note: 'Transferred to nurse — ' + (LDHLogic.MISC_TASK_LABELS[task] || task)
+    }).eq('id', t.id);
+    if (closeErr) alert('The nurse task was created, but the case could not be closed here: ' + closeErr.message);
+    overlay.remove();
+    loadAll();
+  });
+
   function fillLocationSelects() {
     const el = document.getElementById('nt-location');
     if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    fillMiscSelects();
   }
 
   function refreshTimers() { renderCases(); renderCompleted(); }
@@ -777,7 +878,7 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses'], loadAll);
+    OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {
       await sb.auth.signOut();
       location.reload();

@@ -145,43 +145,41 @@ const todayISO = LDHLogic.localISO(new Date());
   }
 
   /* ============================================================
-     Tab B: NO-GA required list — add and done, both immediate now.
+     Tab B: Welfare / Processing columns + Miscellaneous tasks (was the
+     NO-GA list; the add form moved to the vets page 2026-10-15).
      ============================================================ */
   const seedB = {
     noga_requests: [
-      { animal_id: 'DOG-99', location: 'Pound 4', task: 'microchip', done: false }
+      { animal_id: 'DOG-99', location: 'Pound 4', task: 'microchip', done: false },
+      { animal_id: 'CAT-7', location: 'Cat Room 1', task: 'ivft', note: 'flu cat', done: false, source_task_id: 'abc' }
+    ],
+    nurse_requests: [
+      { kind: 'uv', location: 'Pathway', species: 'cat', animal_count: 1, animal_id: 'FOS-1', done_count: 0, due_window: 'today' }
     ]
   };
   const b = await open(seedB, 'nurses.html');
   try {
+    t.ok((await b.page.textContent('#welfare-col .nurse-col-title')).trim() === 'Welfare nurse', 'left column is the Welfare nurse');
+    t.ok((await b.page.textContent('#processing-col .nurse-col-title')).trim() === 'Processing nurse', 'right column is the Processing nurse');
+    t.ok(await b.page.locator('#welfare-col #med-labels-section').count() === 1 && await b.page.locator('#welfare-col #noga-section').count() === 1,
+      'Welfare nurse has medication labels and Miscellaneous tasks');
+    t.ok(await b.page.locator('#processing-col #nurse-requests-section').count() === 1 && await b.page.locator('#processing-col #nurse-doses').count() === 1,
+      'Processing nurse has nurse requests and treatments due');
+    t.ok((await b.page.textContent('#noga-section h2')).trim() === 'Miscellaneous tasks', 'NO-GA list renamed Miscellaneous tasks');
+    t.ok(await b.page.locator('#noga-animal-id').count() === 0, 'no add form on the nurse page any more (vets request them)');
     let listText = await b.page.textContent('#noga-list');
-    t.ok(listText.includes('DOG-99') && listText.includes('Microchip'), 'pre-existing open NO-GA request renders with its task label');
-
-    await b.page.fill('#noga-animal-id', 'CAT-42');
-    await b.page.selectOption('#noga-location', 'Offsite');
-    t.ok(await b.page.isVisible('#noga-detail-wrap'), 'choosing Offsite reveals the detail field');
-    await b.page.fill('#noga-location-detail', 'Vet clinic');
-    await b.page.selectOption('#noga-task', 'fiv_test');
-    await b.page.fill('#noga-note', 'urgent test');
-
-    /* ---------- Add: runs immediately, no passcode prompt ---------- */
-    await b.page.click('#noga-submit');
-    await b.page.waitForTimeout(200);
-    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'NO-GA add runs with no passcode prompt');
-    let noga = (await b.db()).noga_requests;
-    const added = noga.find(r => r.animal_id === 'CAT-42');
-    t.ok(added && added.location === 'Offsite' && added.location_detail === 'Vet clinic' && added.task === 'fiv_test' && added.note === 'urgent test',
-      'NO-GA add stores animal/location/detail/task/note');
-    listText = await b.page.textContent('#noga-list');
-    t.ok(listText.includes('CAT-42') && listText.includes('Offsite — Vet clinic') && listText.includes('FIV test'), 'new NO-GA request appears in the list');
+    t.ok(listText.includes('DOG-99') && listText.includes('Microchip'), 'open miscellaneous task renders with its task label');
+    t.ok(listText.includes('CAT-7') && listText.includes('Flu cat — needs IVFT') && listText.includes('transferred from a vet case'), 'IVFT task and its vet-transfer note render');
+    const nrText = await b.page.textContent('#nr-list');
+    t.ok(nrText.includes('FOS-1') && nrText.includes('Pathway') && nrText.includes('for UV check'), 'a named-animal UV request reads "FOS-1 — Pathway for UV check"');
 
     /* ---------- Done: initials recorded ---------- */
     await b.page.locator('.attn-item.noga-item', { hasText: 'DOG-99' }).locator('.noga-done').click();
     await b.page.waitForTimeout(200);
-    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'NO-GA done runs with no passcode prompt');
-    noga = (await b.db()).noga_requests;
+    t.ok(await b.page.locator('.oc-modal-overlay').count() === 0, 'miscellaneous task done runs with no passcode prompt');
+    const noga = (await b.db()).noga_requests;
     const doneRow = noga.find(r => r.animal_id === 'DOG-99');
-    t.ok(doneRow.done === true && doneRow.done_by, 'NO-GA Done stamps done + done_by (initials filled via the prompt fallback)');
+    t.ok(doneRow.done === true && doneRow.done_by, 'Done stamps done + done_by (initials filled via the prompt fallback)');
 
     t.ok(b.errors.length === 0, 'no page errors in tab B: ' + JSON.stringify(b.errors));
   } finally {
