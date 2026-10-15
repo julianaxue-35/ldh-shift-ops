@@ -370,3 +370,24 @@ test('birthing reasons are Red-flag signs with readable labels; misc task labels
   assert.ok(!L.EMERGENCY_SIGNS.some(s => s.key.startsWith('birth_')), 'birthing reasons are not general tick-boxes');
   assert.deepEqual(Object.keys(L.MISC_TASK_LABELS).sort(), ['blood', 'ear_swab', 'fiv_test', 'ivft', 'microchip', 'other', 'uv']);
 });
+
+test('todayTasks: only today\'s checks — old open rows are carried over, duplicates count once per animal per shift', () => {
+  const now = new Date(2026, 9, 16, 15, 0, 0).getTime();                 // 16 Oct 2026, 3pm local
+  const at = (d, h) => new Date(2026, 9, d, h, 0, 0).toISOString();
+  const tasks = [
+    { title: 'A1', location: 'Cat Room 1 / 3', shift: 'sick_injured', done: true, completed_at: at(16, 10), created_at: at(16, 8) },
+    { title: 'a1 ', location: 'CR1 3', shift: 'sick_injured', done: false, created_at: at(16, 9) },        // same animal, other spelling/location, still open
+    { title: 'A 1', location: 'Cat Room 2', shift: 'processing', done: false, created_at: at(16, 9) },      // same animal, DIFFERENT shift: counts there
+    { title: 'B2', location: 'Pound 1', shift: 'sick_injured', done: false, created_at: at(16, 11) },       // opened today
+    { title: 'C3', location: 'Pound 2', shift: 'sick_injured', done: true, completed_at: at(15, 14), created_at: at(15, 9) },   // finished yesterday
+    { title: 'D4', location: 'Pound 3', shift: 'sick_injured', done: false, created_at: at(14, 9) },       // never finished, from 2 days ago
+    { title: 'E5', location: 'Pound 4', shift: 'sick_injured', done: true, completed_at: at(16, 12), created_at: at(14, 9) }, // old row finished today
+  ];
+  const today = L.todayTasks(tasks, now);
+  const si = today.filter(t => t.shift === 'sick_injured');
+  assert.deepEqual(si.map(t => t.title.trim()).sort(), ['A1', 'B2', 'E5'], 'S&I today = A1 (once), B2, E5');
+  assert.equal(si.filter(t => t.done).length, 2, 'A1 counts as done (finished row wins over its open duplicate) and E5 is done');
+  assert.equal(today.filter(t => t.shift === 'processing').length, 1, 'the same animal in another shift counts in that shift');
+  const older = L.carriedOver(tasks, now);
+  assert.deepEqual(older.map(t => t.title), ['D4'], 'only the never-finished older row is carried over');
+});

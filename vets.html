@@ -470,6 +470,7 @@
       const total = items.length;
       const done = items.filter(t => t.done).length;
       const pct = total ? Math.round((done / total) * 100) : 0;
+      const older = LDHLogic.carriedOver(TASKS, Date.now()).filter(t => t.shift === shift).length;   // open rows from earlier days — not in today's count
       const roster = ROSTER[shift] || [];
       const card = document.createElement('section');
       card.className = 'card shift-card';
@@ -477,6 +478,7 @@
         <span class="shift-icon" style="background:${SHIFT_COLORS[shift]}">${SHIFT_ICONS[shift]}</span>
         <h2 style="color:${SHIFT_COLORS[shift]}">${SHIFT_LABELS[shift]}</h2>
         <div class="totals">${done} <span>/ ${total} processed today</span></div>
+        ${older ? `<div class="subtle" style="font-size:0.72rem; color:var(--muted); margin:-4px 0 8px;">+ ${older} older still open</div>` : ''}
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${SHIFT_COLORS[shift]};"></div></div>
         <div class="onshift">On shift</div>
         <div>${roster.map(r => `<span class="chip">${esc(r.staff_name)}</span>`).join('') || '<span class="empty-state">Unassigned</span>'}</div>
