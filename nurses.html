@@ -144,6 +144,10 @@
     background: rgba(255,159,67,0.18); border: 1px solid rgba(255,159,67,0.55); border-radius: 12px;
     padding: 12px 16px; font-size: 0.88rem; font-weight: 600; color: #7a4a00;
   }
+  #new-item-banner { position: sticky; top: 0; z-index: 50; background: var(--critical); border-color: var(--critical); color: #fff; font-size: 1.05rem; font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(208,59,59,0.35); }
+  #new-item-banner .alert-banner-dismiss { color: #fff; font-size: 1.6rem; }
+  #sound-chip { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); font-size: 0.78rem; padding: 6px 12px; }
+  #sound-chip.sound-off { background: rgba(255,159,67,0.22); border-color: var(--amber); color: #7a4a00; }
   .alert-banner-dismiss {
     background: transparent; border: none; box-shadow: none; padding: 0 4px; font-size: 1.1rem;
     line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
@@ -186,7 +190,7 @@
       <span id="new-item-banner-text"></span>
       <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
     </div>
-    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div></div>
+    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div>
 
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
@@ -582,31 +586,66 @@
      ids it hasn't seen before — each item alerts once, ever.
      ============================================================ */
   let seenReqIds = new Set(), seenMedIds = new Set(), seenMiscIds = new Set(), seenInitialised = false;
-  let bannerHideTimer = null;
 
   function openNurseRequests() { return NURSE_REQUESTS.filter(r => r.done_count < r.animal_count); }
 
-  function playAlertTone() {
+  /* ---------- alert sound ----------
+     Why nobody heard a ding (2026-10-15): the tone was made with a brand-new AudioContext at the moment the alert
+     fired, and browsers keep such a context SILENT (autoplay policy) unless the person has already tapped the page.
+     Now one shared AudioContext is created/resumed on the first tap, click or key press anywhere on the page, and
+     reused for every alert. Until that first tap, a "Tap to turn on alert sound" button is shown. */
+  let audioCtx = null;
+  function audioRunning() { return !!audioCtx && audioCtx.state === 'running'; }
+  function updateSoundChip() {
+    const chip = document.getElementById('sound-chip');
+    if (!chip) return;
+    chip.textContent = audioRunning() ? '🔔 Alert sound is on' : '🔕 Tap here to turn on the alert sound';
+    chip.classList.toggle('sound-off', !audioRunning());
+  }
+  function unlockAudio() {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
-      const ctx = new Ctx();
-      const osc = ctx.createOscillator(), gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = 800;
-      gain.gain.value = 0.15;
-      osc.connect(gain).connect(ctx.destination);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
-      osc.onended = () => { try { ctx.close(); } catch (e) { /* ignore */ } };
-    } catch (e) { /* audio blocked/unsupported — the banner still shows */ }
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume().then(updateSoundChip, () => {});
+    } catch (e) { /* unsupported — the banner still shows */ }
+    updateSoundChip();
   }
+  ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+  function playAlertTone() {
+    try {
+      if (!audioRunning()) return;   // not unlocked yet — the banner + flashing tab title still alert
+      const t0 = audioCtx.currentTime;
+      [[880, 0], [660, 0.22], [880, 0.44]].forEach(([freq, at]) => {   // three clear beeps, louder than before
+        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.type = 'square'; osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.0001, t0 + at);
+        gain.gain.exponentialRampToValueAtTime(0.25, t0 + at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.18);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t0 + at); osc.stop(t0 + at + 0.2);
+      });
+    } catch (e) { /* ignore */ }
+  }
+  document.getElementById('sound-chip').addEventListener('click', () => { unlockAudio(); setTimeout(playAlertTone, 80); });
 
+  /* ---------- NEW TASK banner: stays up until dismissed (no more 10 s auto-hide), counts add up while it is
+     showing, and the browser tab title flashes so it is noticed from another tab. */
+  const pendingAlert = { req: 0, med: 0, misc: 0, arrival: 0 };
+  let titleFlashTimer = null;
+  const BASE_TITLE = document.title;
   function hideAlertBanner() {
-    if (bannerHideTimer) { clearTimeout(bannerHideTimer); bannerHideTimer = null; }
     document.getElementById('new-item-banner').style.display = 'none';
+    pendingAlert.req = pendingAlert.med = pendingAlert.misc = pendingAlert.arrival = 0;
+    if (titleFlashTimer) { clearInterval(titleFlashTimer); titleFlashTimer = null; }
+    document.title = BASE_TITLE;
   }
   document.getElementById('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
+  function flashTitle() {
+    if (titleFlashTimer) return;
+    let on = false;
+    titleFlashTimer = setInterval(() => { on = !on; document.title = on ? '🔔 NEW TASK — Nurses' : BASE_TITLE; }, 1000);
+  }
 
   // 2026-09-26: a scheduled request due within 15 minutes gets the same
   // banner+ding, worded separately from "new" items — this one's a
@@ -619,17 +658,20 @@
   let seenArrivalWarnIds = new Set();
 
   function showAlertBanner(newReqCount, newMedCount, arrivalWarnCount, newMiscCount) {
+    pendingAlert.req += newReqCount || 0; pendingAlert.med += newMedCount || 0;
+    pendingAlert.misc += newMiscCount || 0; pendingAlert.arrival += arrivalWarnCount || 0;
     const parts = [];
-    if (newReqCount > 0) parts.push(`${newReqCount} new nurse request${newReqCount > 1 ? 's' : ''}`);
-    if (newMedCount > 0) parts.push(`${newMedCount} new medication label${newMedCount > 1 ? 's' : ''}`);
-    if (newMiscCount > 0) parts.push(`${newMiscCount} new miscellaneous task${newMiscCount > 1 ? 's' : ''}`);
-    if (arrivalWarnCount > 0) parts.push(`${arrivalWarnCount} arrival${arrivalWarnCount > 1 ? 's' : ''} due in 15 minutes`);
+    if (pendingAlert.req > 0) parts.push(`${pendingAlert.req} new nurse request${pendingAlert.req > 1 ? 's' : ''}`);
+    if (pendingAlert.med > 0) parts.push(`${pendingAlert.med} new medication label${pendingAlert.med > 1 ? 's' : ''}`);
+    if (pendingAlert.misc > 0) parts.push(`${pendingAlert.misc} new miscellaneous task${pendingAlert.misc > 1 ? 's' : ''}`);
+    if (pendingAlert.arrival > 0) parts.push(`${pendingAlert.arrival} arrival${pendingAlert.arrival > 1 ? 's' : ''} due in 15 minutes`);
     if (!parts.length) return;
-    document.getElementById('new-item-banner-text').textContent = '🔔 ' + parts.join(' · ') + ' — check below.';
+    const isArrivalOnly = !pendingAlert.req && !pendingAlert.med && !pendingAlert.misc;
+    document.getElementById('new-item-banner-text').textContent = '🔔 ' + (isArrivalOnly ? 'ARRIVAL SOON' : 'NEW TASK') + ' — ' + parts.join(' · ') + ' — check below.';
     document.getElementById('new-item-banner').style.display = 'flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
     playAlertTone();
-    if (bannerHideTimer) clearTimeout(bannerHideTimer);
-    bannerHideTimer = setTimeout(hideAlertBanner, 10000);
+    flashTitle();
   }
 
   // Called on every loadAll(). The first call only seeds the seen-set

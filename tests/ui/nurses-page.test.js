@@ -237,7 +237,11 @@ const todayISO = LDHLogic.localISO(new Date());
     await insertRow(d.page, 'nurse_requests', { location: 'Cat Room 2', species: 'cat', animal_count: 2, done_count: 0 });
     await d.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 3000 });
     let bannerText = await d.page.textContent('#new-item-banner-text');
-    t.ok(bannerText.includes('vaccination request'), 'new vaccination request shows banner with vaccination wording: ' + bannerText);
+    t.ok(bannerText.includes('NEW TASK') && bannerText.includes('nurse request'), 'new nurse request shows the NEW TASK banner: ' + bannerText);
+    t.ok((await d.page.evaluate(() => getComputedStyle(document.getElementById('new-item-banner')).position)) === 'sticky', 'the banner sticks to the top of the page');
+    await d.page.click('#sound-chip');
+    await d.page.waitForTimeout(300);
+    t.ok((await d.page.textContent('#sound-chip')).includes('Alert sound is on'), 'tapping it unlocks the sound (one shared audio context)');
     t.ok(!bannerText.includes('medication label'), 'no pre-existing medication case is wrongly included: ' + bannerText);
 
     /* ---------- (d) Dismiss button hides it ---------- */
@@ -252,7 +256,7 @@ const todayISO = LDHLogic.localISO(new Date());
     await d.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 3000 });
     bannerText = await d.page.textContent('#new-item-banner-text');
     t.ok(bannerText.includes('medication label'), 'new medication-waiting case shows banner with medication wording: ' + bannerText);
-    t.ok(!bannerText.includes('vaccination request'), 'the already-seen vaccination request does not re-trigger alongside it: ' + bannerText);
+    t.ok(!bannerText.includes('nurse request'), 'the already-seen vaccination request does not re-trigger alongside it: ' + bannerText);
 
     /* ---------- sound: playAlertTone() runs (AudioContext) without throwing ---------- */
     t.ok(d.errors.length === 0, 'synthesised alert tone does not throw a page error: ' + JSON.stringify(d.errors));
