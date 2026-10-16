@@ -244,6 +244,22 @@
         <button id="memo-submit">Post</button>
       </div>
     </section>
+
+    <section class="card faq-card" id="faq">
+      <h2>FAQ — nurses</h2>
+      <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
+      <h3 class="faq-group">Working your board</h3>
+      <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
+      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the sidebar — they are recorded when you pick up or tick something off. Turn on the alert sound (tap the button at the top) and leave the page open: a banner, sound and flashing tab tell you when something new arrives.</p></div></details>
+      <details><summary>How do I pick up, share or finish a nurse request?</summary><div><p>On a request, <b>Pick up</b> puts your initials on it (press <b>Release</b> to hand it back to the pool). Use <b>+1</b> as each animal is done, or <b>All done</b>. The coloured chip shows time left against the "needed within" time.</p></div></details>
+      <details><summary>How do I do a medication label or a treatment dose?</summary><div><p>Medication labels: copy the label text, then mark it done (tick several and enter your initials once). Treatments due: tick each dose as you give it. Overdue doses are listed first.</p></div></details>
+      <details><summary>What are miscellaneous tasks?</summary><div><p>Tasks a vet asked for or transferred from a case — bloods, ear swab, FIV test, flu cat needing IVFT and so on. Press <b>Done</b> when finished.</p></div></details>
+      <h3 class="faq-group">Sending a result back to the vet</h3>
+      <details><summary>I did an FIV test or bloods — how do I get the vet to look at the result?</summary><div><p>Press <b>Send back to vet</b> on the task (on FIV and blood requests as well as miscellaneous tasks). Then:</p><ol><li>Write the <b>result / comment</b>, e.g. "FIV negative, FeLV negative" or "bloods run, printout attached to cage".</li><li>Choose <b>Vet to</b>: interpret results, upload results to ShelterMate, or other.</li><li>Choose <b>Needed within</b>: 2 hours, or 12–24 hours.</li><li>Press <b>Send to vets</b>.</li></ol><p>The vets get it as a request on their board. A miscellaneous task is closed automatically; an FIV / blood request keeps its count, so keep ticking animals off as usual.</p></div></details>
+      <details><summary>What if the animal ID is missing?</summary><div><p>Head-count requests ("3 cats to FIV test") have no single animal, so the form asks you for the animal ID of the one you are sending back.</p></div></details>
+      <h3 class="faq-group">Disease tracking</h3>
+      <details><summary>What is disease tracking and why do nurses see it?</summary><div><p>Flagged animals with a suspected condition (cat flu, kennel cough, diarrhoea, vomiting, eye, skin, wounds, other) are counted per space against its cages. It lets the team spot a cluster early and act on cleaning, isolation and vaccination. You help most by telling shelter staff or the vet when you notice several animals with the same signs in one space, and by making sure a condition is chosen when an animal is flagged.</p></div></details>
+    </section>
   </main>
 </div>
 <script>
@@ -379,8 +395,8 @@
      ============================================================ */
   const NURSE_REQUEST_KIND = {
     vaccination: { toDo: 'to vaccinate', doneVerb: 'vaccinated', plusLabel: '+1 vaccinated' },
-    fiv: { toDo: 'for FIV test', doneVerb: 'FIV tested', plusLabel: '+1 FIV tested' },
-    blood: { toDo: 'for blood test', doneVerb: 'blood tested', plusLabel: '+1 blood tested' },
+    fiv: { label: 'FIV test', toDo: 'for FIV test', doneVerb: 'FIV tested', plusLabel: '+1 FIV tested' },
+    blood: { label: 'Blood test', toDo: 'for blood test', doneVerb: 'blood tested', plusLabel: '+1 blood tested' },
     microchip: { toDo: 'to microchip', doneVerb: 'microchipped', plusLabel: '+1 microchipped' },
     uv: { toDo: 'for UV check', doneVerb: 'UV checked', plusLabel: '+1 UV checked' }
   };
@@ -416,6 +432,7 @@
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
+        ${r.kind === 'fiv' || r.kind === 'blood' ? `<button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>` : ''}
         <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
         <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
@@ -428,6 +445,7 @@
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
     const r = NURSE_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
+    if (btn.classList.contains('nr-back')) { openBackModal({ src: 'nr', row: r }); return; }
     let patch = null;
     if (btn.classList.contains('nr-arrive')) {
       patch = { arrived_at: new Date().toISOString() };
@@ -502,8 +520,8 @@
     return `
       <div class="attn-item noga-item">
         <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}</div></div>
-        ${r.done ? '' : `<button class="secondary noga-done" data-id="${esc(r.id)}">Done</button>`}
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div></div>
+        ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
   function renderNoga() {
@@ -520,6 +538,8 @@
     document.getElementById('proc-misc-section').style.display = processing.length ? '' : 'none';
   }
   async function miscDoneClick(e) {
+    const back = e.target.closest('.noga-back');
+    if (back) { const r = NOGA_REQUESTS.find(x => x.id === back.dataset.id); if (r) openBackModal({ src: 'misc', row: r }); return; }
     const btn = e.target.closest('.noga-done'); if (!btn) return;
     const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
     const initials = myInitials();
@@ -529,6 +549,88 @@
     loadAll();
   }
   document.getElementById('noga-list').addEventListener('click', miscDoneClick);
+
+  /* ============================================================
+     Send back to vet (2026-10-16). The nurse records a result (FIV test, bloods...) and the vets get it as an
+     ordinary shelter request — Within 2 hours (Emergency column) or Within 12-24 hours (Urgent column).
+     From a Miscellaneous task the task is also closed; from an FIV/blood nurse request the request is left alone
+     (the nurse still ticks off the animals) because one request can cover several animals.
+     ============================================================ */
+  function openBackModal(src) {
+    document.querySelectorAll('.back-modal-overlay').forEach(el => el.remove());
+    const r = src.row, isMisc = src.src === 'misc';
+    const label = isMisc ? (NOGA_TASK_LABELS[r.task] || r.task) : (nurseReqKind(r).label || r.kind);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="oc-modal-overlay back-modal-overlay">
+        <div class="oc-modal done-modal">
+          <h3 class="done-modal-title">Send back to vet — ${esc(label)}</h3>
+          ${r.animal_id ? `<p style="font-size:0.85rem; margin:0 0 10px;"><b>${esc(r.animal_id)}</b> — ${esc(locationText(r))}</p>`
+            : `<label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Animal ID</label><input class="back-animal" placeholder="Animal ID">`}
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Result / comment</label>
+          <textarea class="back-result" rows="3" placeholder="e.g. FIV negative, FeLV negative"></textarea>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Vet to</label>
+          <select class="back-action">${Object.keys(LDHLogic.BACK_ACTIONS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_ACTIONS[k])}</option>`).join('')}</select>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Needed within</label>
+          <select class="back-window">${Object.keys(LDHLogic.BACK_WINDOWS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_WINDOWS[k])}</option>`).join('')}</select>
+          <p class="oc-modal-error back-error"></p>
+          <div class="oc-modal-actions">
+            <button type="button" class="oc-modal-cancel back-cancel">Cancel</button>
+            <button type="button" class="oc-modal-submit back-confirm">Send to vets</button>
+          </div>
+        </div>
+      </div>`;
+    const overlay = wrap.firstElementChild;
+    overlay._src = src;
+    document.body.appendChild(overlay);
+  }
+  document.addEventListener('click', async (e) => {
+    const cancel = e.target.closest('.back-cancel');
+    if (cancel) { cancel.closest('.back-modal-overlay').remove(); return; }
+    const ok = e.target.closest('.back-confirm'); if (!ok) return;
+    const overlay = ok.closest('.back-modal-overlay');
+    const { src, row: r } = overlay._src, isMisc = src === 'misc';
+    const err = overlay.querySelector('.back-error');
+    const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
+    const animalEl = overlay.querySelector('.back-animal');
+    const animalId = r.animal_id || (animalEl ? animalEl.value.trim() : '');
+    const result = overlay.querySelector('.back-result').value.trim();
+    if (!animalId) return fail('Enter the animal ID.');
+    if (!result) return fail('Write the result or a comment for the vet.');
+    const initials = myInitials();
+    if (!initials) return fail('Enter your initials first.');
+    ok.disabled = true;
+    const row = LDHLogic.returnedResultTask({
+      animalId, location: r.location, locationDetail: r.location_detail,
+      taskLabel: isMisc ? (NOGA_TASK_LABELS[r.task] || r.task) : (nurseReqKind(r).label || r.kind),
+      result, action: overlay.querySelector('.back-action').value, window: overlay.querySelector('.back-window').value
+    });
+    row.problem += ' (sent by ' + initials + ')';
+    let { error } = await sb.from('tasks').insert(row);
+    /* Same animal already has a case in that pen on this shift (unique title+location+shift): reopen it if it is
+       finished, otherwise add the result to the open case and lift it to the sooner window. */
+    if (error && error.code === '23505') {
+      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+      const old = found && found[0];
+      if (old && !old.done) {
+        const sooner = (LDHLogic.normTier(old.urgency) === 'red_flag' || row.urgency === 'red_flag') ? 'red_flag' : LDHLogic.normTier(old.urgency);
+        ({ error } = await sb.from('tasks').update({ problem: [old.problem, row.problem].filter(Boolean).join(' — '), urgency: sooner }).eq('id', old.id));
+      } else if (old) {
+        ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
+          created_at: new Date().toISOString(), completed_at: null, completed_by_role: null, claimed_by: null, claimed_at: null,
+          vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null, note: null, treatment: null, plan: null
+        })).eq('id', old.id));
+      }
+    }
+    if (error) { ok.disabled = false; return fail('Could not send to the vets: ' + error.message); }
+    if (isMisc) {
+      const { error: e2 } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString(), result_note: result, returned_at: new Date().toISOString() }).eq('id', r.id);
+      if (e2) alert('Sent to the vets, but the task could not be closed here: ' + e2.message);
+    }
+    overlay.remove();
+    loadAll();
+  });
+
   document.getElementById('proc-misc-list').addEventListener('click', miscDoneClick);
   /* ============================================================
      Memo board

@@ -391,3 +391,31 @@ test('todayTasks: only today\'s checks — old open rows are carried over, dupli
   const older = L.carriedOver(tasks, now);
   assert.deepEqual(older.map(t => t.title), ['D4'], 'only the never-finished older row is carried over');
 });
+
+/* ---------- 2026-10-16: nurse sends a result back to the vets as a shelter request ---------- */
+test('returnedResultTask: 2 h window -> red_flag shelter request carrying result + vet action', () => {
+  const row = L.returnedResultTask({ animalId: 'A123', location: 'Cat Room 1 / 12', taskLabel: 'FIV test',
+    result: 'FIV neg, FeLV neg', action: 'upload', window: '2h' });
+  assert.equal(row.title, 'A123');
+  assert.equal(row.location, 'Cat Room 1 / 12');
+  assert.equal(row.type, 'shelter');
+  assert.equal(row.shift, 'sick_injured');
+  assert.equal(row.urgency, 'red_flag');
+  assert.equal(row.done, false);
+  assert.match(row.problem, /FIV test/);
+  assert.match(row.problem, /FIV neg, FeLV neg/);
+  assert.match(row.problem, /ShelterMate/);
+});
+test('returnedResultTask: 12-24 h window -> urgent; unknown window falls back to urgent', () => {
+  const a = L.returnedResultTask({ animalId: 'A1', location: 'Pound 1', taskLabel: 'Blood test', result: 'ran', action: 'interpret', window: '12_24h' });
+  assert.equal(a.urgency, 'urgent');
+  assert.match(a.problem, /[Ii]nterpret/);
+  const b = L.returnedResultTask({ animalId: 'A1', location: 'Pound 1', taskLabel: 'Blood test', result: 'ran', action: 'interpret', window: 'whenever' });
+  assert.equal(b.urgency, 'urgent');
+});
+test('BACK_ACTIONS has interpret / upload / other', () => {
+  assert.deepEqual(Object.keys(L.BACK_ACTIONS), ['interpret', 'upload', 'other']);
+});
+test('stageOf: a put-back case (claim cleared) is flagged again', () => {
+  assert.equal(L.stageOf({ done: false, claimed_at: null, put_back_at: '2026-10-16T03:00:00Z' }, NOW), 'flagged');
+});

@@ -289,6 +289,22 @@
         <button id="memo-submit">Post</button>
       </div>
     </section>
+
+    <section class="card faq-card" id="faq">
+      <h2>FAQ — vets</h2>
+      <p class="subtle">Quick answers for picking up cases, handing work to the nurses and handling results.</p>
+      <h3 class="faq-group">Cases</h3>
+      <details><summary>How do I pick up a case?</summary><div><p>In <b>Cases</b>, press <b>Pick up →</b> on a card. To take several, tick their boxes and press <b>Pick up N selected, sorted by location</b>. Picking up opens the shift tool for that animal. If another vet got there first you'll be told it was skipped.</p></div></details>
+      <details><summary>I picked a case up but got called away — how do I put it back?</summary><div><p>Press <b>Put back</b> on the card. The case returns to its tier column for any vet to pick up. No reason is needed. Its time target keeps running from when it was first flagged, and the card shows "Put back" with the time.</p></div></details>
+      <details><summary>How do I finish a case?</summary><div><p>Press <b>DONE</b> once you have seen the animal. For a medication case the DONE panel asks for the medication details, and the case then waits for the nurses to make the label.</p></div></details>
+      <details><summary>How do I hand a case to the nurses?</summary><div><p>Press <b>Transfer to nurse</b> on a picked-up case, choose the task (blood test, ear swab, FIV test, IVFT, microchip, UV, other) and add a note. The case leaves the vet board and appears on the Nurses page. Microchip and UV go to the Processing nurse, everything else to the Welfare nurse.</p></div></details>
+      <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Request a nurse task — miscellaneous</b> for one-off tasks, or <b>Request a treatment</b> for a course such as "flush twice a day for 7 days".</p></div></details>
+      <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p></div></details>
+      <h3 class="faq-group">Disease tracking</h3>
+      <details><summary>What is being tracked and why does it matter to me?</summary><div><p>Shelter staff pick a <b>Suspected condition</b> when they flag an animal. The eight reported signs are counted per space against its cages over the last 3 days (Disease watch on the staff page, full board on Stats). The aim is to spot a cluster in one space early, before a diagnosis, so you can act on isolation, cleaning and vaccination decisions sooner.</p></div></details>
+      <details><summary>Should I correct the suspected condition?</summary><div><p>The count reflects what staff noticed, not your diagnosis, so there is no need to edit it. Diagnoses such as Giardia are deliberately kept out of the sign list. Please make sure animals are flagged with some condition — blank ones are not counted.</p></div></details>
+      <details><summary>What is the baseline?</summary><div><p>Snapshots are taken nightly for a full year because disease changes with the season. After that, each period is compared with the same time last year. Until then rates are shown as they are, with no "high" line.</p></div></details>
+    </section>
   </main>
 </div>
 
@@ -419,6 +435,7 @@
     if (t.red_flags && t.red_flags.length) metaBits.push('signs: ' + t.red_flags.map(k => esc(LDHLogic.signLabel(k))).join(', '));
     if (stage === 'waiting_medication') metaBits.push('Vet check done — waiting on medication');
     else if (stage === 'picked_up') metaBits.push('Picked up ' + esc(fmtTime(t.claimed_at)));
+    else if (stage === 'flagged' && t.put_back_at) metaBits.push('Put back ' + esc(fmtTime(t.put_back_at)));
     return `
       <div class="attn-item" data-id="${esc(t.id)}">
         <div style="display:flex; align-items:flex-start; gap:8px; flex:1;">
@@ -431,6 +448,7 @@
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           ${canBump ? `<button type="button" class="secondary bump-btn" data-id="${esc(t.id)}">Bump to Urgent</button>` : ''}
           ${canPickUp ? `<button type="button" class="secondary pick-up-btn" data-id="${esc(t.id)}">Pick up →</button>` : ''}
+          ${stage === 'picked_up' ? `<button type="button" class="secondary put-back-btn" data-id="${esc(t.id)}">Put back</button>` : ''}
           ${canDone && !t.needs_medication ? `<button type="button" class="secondary transfer-btn" data-id="${esc(t.id)}">Transfer to nurse</button>` : ''}
           ${canDone ? `<button type="button" class="secondary done-btn" data-id="${esc(t.id)}">DONE</button>` : ''}
         </div>
@@ -596,6 +614,19 @@
 
   /* ---------- case actions (delegated) ---------- */
   document.addEventListener('click', async (e) => {
+    const putBackBtn = e.target.closest('.put-back-btn');
+    if (putBackBtn) {
+      const t = TASKS.find(x => x.id === putBackBtn.dataset.id);
+      if (!t || !t.claimed_at || t.done) return;
+      // .not('claimed_at','is',null) + .eq('done',false): only release a case that is still picked up and open.
+      const { data, error } = await sb.from('tasks')
+        .update({ claimed_at: null, claimed_by: null, put_back_at: new Date().toISOString() })
+        .eq('id', t.id).eq('done', false).not('claimed_at', 'is', null).select();
+      if (error) { alert('Could not put the case back: ' + error.message); return; }
+      if (!data || !data.length) alert(t.title + ' was already finished or put back by someone else.');
+      loadAll();
+      return;
+    }
     const pickBtn = e.target.closest('.pick-up-btn');
     if (pickBtn) {
       const t = TASKS.find(x => x.id === pickBtn.dataset.id);
