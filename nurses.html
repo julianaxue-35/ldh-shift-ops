@@ -192,6 +192,27 @@
     </div>
     <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
 
+    <section class="card" id="aa-send-card">
+      <h2>Send to Admission AA</h2>
+      <p class="subtle">The Admission AA enters it in ShelterMate and ticks it off. Your initials (left) are recorded.</p>
+      <select id="aa-kind">
+        <option value="vaccination">Vaccination update</option>
+        <option value="microchip">Microchip</option>
+        <option value="microchip_uv">Microchip + UV</option>
+        <option value="uv">UV result</option>
+        <option value="fiv">FIV result</option>
+      </select>
+      <label id="aa-ids-label" for="aa-ids" style="font-size:0.78rem; font-weight:700;">Animal ID(s), several allowed</label>
+      <textarea id="aa-ids" rows="2" placeholder="e.g. A123, A124, A125"></textarea>
+      <div id="aa-f-result"><input id="aa-result" placeholder="Result, e.g. FIV negative"></div>
+      <div id="aa-f-chip"><input id="aa-chip" inputmode="numeric" placeholder="Microchip number (15 digits)"></div>
+      <div id="aa-f-uv"><input id="aa-uv" placeholder="UV result, e.g. No fluorescence"></div>
+      <div id="aa-f-vacc"><input id="aa-vaccine" placeholder="Vaccine given, e.g. F3"><input id="aa-vdate" type="date"></div>
+      <p id="aa-error" class="oc-modal-error" style="display:none;"></p>
+      <button type="button" id="aa-send">Send to Admission AA</button>
+      <span id="aa-sent" class="subtle" style="display:none;">Sent to the Admission AA ✓</span>
+    </section>
+
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
@@ -436,6 +457,7 @@
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
+        ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}">Send to AA</button>` : ''}
         ${r.kind === 'fiv' || r.kind === 'blood' ? `<button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>` : ''}
         <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
         <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
@@ -520,12 +542,13 @@
   const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
   // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
   const PROCESSING_MISC_KINDS = ['microchip', 'uv'];
+  const AA_PREFILL_KIND = { fiv_test: 'fiv', microchip: 'microchip', uv: 'uv' };   // misc task -> Send-to-AA type
   function miscRowHtml(r) {
     return `
       <div class="attn-item noga-item">
         <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
           <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div></div>
-        ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
+        ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
   function renderNoga() {
@@ -792,6 +815,51 @@
     miscOpen.forEach(r => seenMiscIds.add(r.id));
     if (newReqs.length > 0 || newMed.length > 0 || newMisc.length > 0 || dueArrivals.length > 0) showAlertBanner(newReqs.length, newMed.length, dueArrivals.length, newMisc.length);
   }
+
+  /* ============================================================
+     Send to Admission AA (2026-10-17). One row in aa_items per send; the AA enters it in ShelterMate and ticks it off,
+     which deletes it. The rules (one ID except vaccination, chip digits, initials) live in LDHLogic.aaBuildItem.
+     ============================================================ */
+  const AA_SHOW = {
+    fiv: ['aa-f-result'], uv: ['aa-f-result'], microchip: ['aa-f-chip'],
+    microchip_uv: ['aa-f-chip', 'aa-f-uv'], vaccination: ['aa-f-vacc']
+  };
+  function syncAaFields() {
+    const kind = document.getElementById('aa-kind').value;
+    ['aa-f-result', 'aa-f-chip', 'aa-f-uv', 'aa-f-vacc'].forEach(id => { document.getElementById(id).style.display = (AA_SHOW[kind] || []).includes(id) ? '' : 'none'; });
+    document.getElementById('aa-ids-label').textContent = kind === 'vaccination' ? 'Animal ID(s), several allowed' : 'Animal ID';
+    document.getElementById('aa-result').placeholder = kind === 'uv' ? 'UV result, e.g. No fluorescence' : 'Result, e.g. FIV negative';
+    if (kind === 'vaccination' && !document.getElementById('aa-vdate').value) document.getElementById('aa-vdate').value = LDHLogic.localISO(new Date());
+  }
+  document.getElementById('aa-kind').addEventListener('change', syncAaFields);
+  function prefillAaSend(kind, ids) {
+    document.getElementById('aa-kind').value = kind;
+    document.getElementById('aa-ids').value = ids;
+    // a half-typed result from the previous animal must never ride along onto this one
+    ['aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
+    syncAaFields();
+    document.getElementById('aa-send-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.aa-prefill'); if (b) prefillAaSend(b.dataset.kind, b.dataset.ids);
+  });
+  document.getElementById('aa-send').addEventListener('click', async () => {
+    const err = document.getElementById('aa-error'), btn = document.getElementById('aa-send');
+    const val = id => document.getElementById(id).value;
+    err.style.display = 'none';
+    const built = LDHLogic.aaBuildItem({
+      kind: val('aa-kind'), idsText: val('aa-ids'), result: val('aa-result'), chipNumber: val('aa-chip'), uvResult: val('aa-uv'),
+      vaccine: val('aa-vaccine'), vaccDate: val('aa-vdate'), initials: cleanInitials(val('initials-input')) || myInitials()
+    });
+    if (built.error) { err.textContent = built.error; err.style.display = 'block'; return; }
+    btn.disabled = true;
+    const { error } = await sb.from('aa_items').insert(built.row);
+    btn.disabled = false;
+    if (error) { err.textContent = 'Could not send: ' + error.message; err.style.display = 'block'; return; }
+    ['aa-ids', 'aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
+    const ok = document.getElementById('aa-sent'); ok.style.display = ''; setTimeout(() => { ok.style.display = 'none'; }, 4000);
+  });
+  syncAaFields();
 
   async function loadAll() {
     const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([

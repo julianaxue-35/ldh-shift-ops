@@ -1,0 +1,293 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDH Shift Ops — Admission AA</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
+<script src="lib/ops-core.js"></script>
+<style>
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
+  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+  }
+  button {
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .filter-chip {
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgency-col h3.red-h { color: var(--critical); }
+  .urgency-col h3.urgent-h { color: #c26a00; }
+  .urgency-col h3.routine-h { color: var(--muted); }
+  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
+  .attn-item:last-child { border-bottom: none; }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+  .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .completed-row {
+    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
+    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
+
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
+
+  .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+  .nt-h.overdue { color: var(--critical); }
+
+  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  .memo-done { opacity: 0.6; }
+  #memo-post textarea { min-height: 60px; }
+
+  .done-modal { width: 360px; }
+  .done-modal .done-modal-title { margin: 0 0 12px; font-size: 1rem; }
+  .done-modal textarea { min-height: 90px; }
+
+  .med-label-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .med-label-card:last-child { margin-bottom: 0; }
+  .med-label-text { white-space: pre-wrap; background: var(--neutral-100); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; margin: 8px 0; }
+  .med-label-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  #noga-list .attn-item, #proc-misc-list .attn-item { align-items: flex-start; }
+
+  .alert-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: rgba(255,159,67,0.18); border: 1px solid rgba(255,159,67,0.55); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.88rem; font-weight: 600; color: #7a4a00;
+  }
+  #new-item-banner { position: sticky; top: 0; z-index: 50; background: var(--critical); border-color: var(--critical); color: #fff; font-size: 1.05rem; font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(208,59,59,0.35); }
+  #new-item-banner .alert-banner-dismiss { color: #fff; font-size: 1.6rem; }
+  #sound-chip { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); font-size: 0.78rem; padding: 6px 12px; }
+  #sound-chip.sound-off { background: rgba(255,159,67,0.22); border-color: var(--amber); color: #7a4a00; }
+  .alert-banner-dismiss {
+    background: transparent; border: none; box-shadow: none; padding: 0 4px; font-size: 1.1rem;
+    line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
+  }
+
+  .nurse-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  .nurse-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .nurse-col-title { margin: 0; font-size: 1.05rem; padding: 10px 16px; border-radius: 12px; color: #fff; }
+  .nurse-col-title.welfare { background: var(--violet); }
+  .nurse-col-title.processing { background: var(--green); }
+  @media (max-width: 1000px) {
+    .urgency-board { grid-template-columns: 1fr; }
+    .nurse-cols { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .aa-card .aa-done { background: var(--green); color: #fff; }
+</style>
+</head>
+<body>
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <p class="hint">Enter each item in ShelterMate, then tick it off here. Ticked items are deleted from the database straight away. Anything left for 24 hours turns red.</p>
+    <p class="hint" id="aa-session-count" style="margin-top:14px;"></p>
+    <span id="signout-link">Sign out</span>
+  </aside>
+  <main>
+    <div id="new-item-banner" class="alert-banner" style="display:none;">
+      <span id="new-item-banner-text"></span>
+      <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
+    </div>
+    <div class="page-head">
+      <div><h1>Admission AA</h1><p>Sent by the nurses. Enter in ShelterMate, then tick off.</p></div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span id="aa-overdue-count" class="lvl lvl-red" style="display:none;"></span>
+        <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
+      </div>
+    </div>
+    <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
+    <section class="card"><h2>To enter in ShelterMate</h2><div id="aa-list"></div></section>
+  </main>
+</div>
+<script>
+  let sb = null;
+  const esc = OpsCore.esc;
+  let ITEMS = [];
+  let doneThisSession = 0;               // a count only; no patient data is kept in the browser
+
+  function cardHtml(it, now) {
+    const c = LDHLogic.aaCountdown(it, now);
+    return `<div class="attn-item aa-card" data-id="${esc(it.id)}">
+      <div>
+        <div class="aname">${esc(it.animal_ids.join(', '))} <span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span></div>
+        <div class="ameta">${esc(LDHLogic.aaSummary(it))} · sent ${esc(new Date(it.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}${it.sent_by ? ' by ' + esc(it.sent_by) : ''}</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span class="lvl lvl-${esc(c.level)}">${esc(c.label)}</span>
+        <button type="button" class="aa-done" data-id="${esc(it.id)}">Entered in ShelterMate ✓</button>
+      </div></div>`;
+  }
+  function render() {
+    const now = Date.now();
+    const sorted = LDHLogic.aaSortItems(ITEMS, now);
+    document.getElementById('aa-list').innerHTML = sorted.map(i => cardHtml(i, now)).join('')
+      || '<p class="empty-state">Nothing waiting. New items from the nurses will appear here with a sound.</p>';
+    const late = sorted.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
+    const el = document.getElementById('aa-overdue-count');
+    el.style.display = late ? '' : 'none';
+    el.textContent = late + ' overdue';
+    document.getElementById('aa-session-count').textContent = doneThisSession ? 'Done this session: ' + doneThisSession : '';
+  }
+  document.getElementById('aa-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.aa-done'); if (!btn) return;
+    if (!confirm('Have you entered this in ShelterMate? Ticking removes it from here for good.')) return;
+    btn.disabled = true;
+    const { error } = await sb.from('aa_items').delete().eq('id', btn.dataset.id);   // already gone elsewhere = 0 rows, not an error
+    if (error) { btn.disabled = false; alert('Could not tick this off: ' + error.message); return; }
+    doneThisSession++;
+    loadAll();
+  });
+
+  /* ---------- new-item banner + sound (same shared module as the Vets and Nurses pages) ---------- */
+  const alertSound = OpsCore.createAlertSound('sound-chip');
+  const BASE_TITLE = document.title;
+  let seen = new Set(), seenInitialised = false, pendingNew = 0, titleFlashTimer = null;
+  function hideBanner() {
+    document.getElementById('new-item-banner').style.display = 'none';
+    pendingNew = 0;
+    if (titleFlashTimer) { clearInterval(titleFlashTimer); titleFlashTimer = null; }
+    document.title = BASE_TITLE;
+  }
+  document.getElementById('new-item-banner-dismiss').addEventListener('click', hideBanner);
+  function checkForNewItems() {
+    const fresh = ITEMS.filter(i => !seen.has(i.id));
+    ITEMS.forEach(i => seen.add(i.id));
+    if (!seenInitialised) { seenInitialised = true; return; }     // nothing already open alerts on page load
+    if (!fresh.length) return;
+    pendingNew += fresh.length;
+    document.getElementById('new-item-banner-text').textContent = `🔔 ${pendingNew} new item${pendingNew > 1 ? 's' : ''} sent through — enter in ShelterMate below.`;
+    document.getElementById('new-item-banner').style.display = 'flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    alertSound.play();
+    if (!titleFlashTimer) {
+      let on = false;
+      titleFlashTimer = setInterval(() => { on = !on; document.title = on ? '🔔 NEW ITEM — Admission AA' : BASE_TITLE; }, 1000);
+    }
+  }
+
+  async function loadAll() {
+    const { data, error } = await sb.from('aa_items').select('*').order('sent_at', { ascending: true });
+    const warn = document.getElementById('aa-load-error');
+    if (error) {                                  // keep what is on screen; never show "Nothing waiting" for a failed load
+      warn.style.display = 'block';
+      render();
+      return;
+    }
+    warn.style.display = 'none';
+    ITEMS = data || [];
+    checkForNewItems();
+    render();
+  }
+  setInterval(render, 60000);          // countdowns tick even with no data change
+
+  (async function () {
+    const { sb: client } = await OpsCore.init({ page: 'aa', gateRole: 'aa' });
+    sb = client;
+    document.getElementById('app-root').style.display = 'grid';
+    await loadAll();
+    OpsCore.subscribe(['aa_items'], loadAll);
+    document.getElementById('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+  })();
+</script>
+<!-- ip-notice-footer -->
+<footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  &copy; 2026 Juliana Xue. All rights reserved.<br>
+  This work is the intellectual property of Juliana Xue and may not be copied,
+  modified, or distributed without her express written permission.
+</footer>
+</body>
+</html>
