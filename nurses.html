@@ -835,6 +835,8 @@
   function prefillAaSend(kind, ids) {
     document.getElementById('aa-kind').value = kind;
     document.getElementById('aa-ids').value = ids;
+    // a half-typed result from the previous animal must never ride along onto this one
+    ['aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
     syncAaFields();
     document.getElementById('aa-send-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }

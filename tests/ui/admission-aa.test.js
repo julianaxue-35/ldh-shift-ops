@@ -68,5 +68,21 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     t.ok(/3 new items sent through/.test(await b.page.textContent('#new-item-banner-text')), 'banner summarises with a count: ' + await b.page.textContent('#new-item-banner-text'));
     t.ok(b.errors.length === 0, 'no page errors: ' + b.errors.join('; '));
   } finally { await b.browser.close(); }
+  /* Tab C (review fix): a failed load must not look like "Nothing waiting" nor re-alert every existing item. */
+  const c = await open({ aa_items: [{ id: 'keep', kind: 'fiv', animal_ids: ['A9'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(30 * H) }] }, 'admission-aa.html');
+  try {
+    await c.page.evaluate(() => { window.__fail = { aa_items: true }; return loadAll(); });
+    t.ok(/A9/.test(await c.page.textContent('#aa-list')), 'a failed refresh keeps the cards already on screen');
+    t.ok(await c.page.isVisible('#aa-load-error'), 'a failed refresh shows a "could not refresh" warning');
+    await c.page.evaluate(() => { window.__fail = {}; return loadAll(); });
+    t.ok(await c.page.isHidden('#aa-load-error'), 'the warning clears once a refresh works');
+    t.ok(await c.page.isHidden('#new-item-banner'), 'recovering does not re-alert items already seen');
+  } finally { await c.browser.close(); }
+  const d2 = await open({ aa_items: [{ id: 'k2', kind: 'fiv', animal_ids: ['A8'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(1 * H) }] }, 'admission-aa.html', { skipRoleGate: false });
+  try {
+    await d2.page.evaluate(() => { window.__fail = { aa_items: true }; return loadAll(); });
+    await d2.page.evaluate(() => { window.__fail = {}; return loadAll(); });
+    t.ok(await d2.page.isHidden('#new-item-banner'), 'banner stays hidden after fail then recover');
+  } finally { await d2.browser.close(); }
   t.done();
 })();

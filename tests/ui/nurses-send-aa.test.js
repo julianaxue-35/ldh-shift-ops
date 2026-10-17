@@ -62,6 +62,11 @@ const todayISO = LDHLogic.localISO(new Date());
     await p.page.click('.nr-item .aa-prefill');
     t.ok((await p.page.inputValue('#aa-kind')) === 'microchip_uv' && (await p.page.inputValue('#aa-ids')) === 'FOS-7', 'Microchip + UV request prefills type and ID');
 
+    // Review fix: a half-typed result must never carry over onto the next animal's prefill.
+    await p.page.evaluate(() => { aaSet = (id, v) => { document.getElementById(id).value = v; }; aaSet('aa-result', 'FIV positive'); aaSet('aa-chip', '985112000123999'); aaSet('aa-uv', 'Glow'); aaSet('aa-vaccine', 'F3'); });
+    await p.page.click('.nr-item .aa-prefill');
+    t.ok((await p.page.inputValue('#aa-result')) === '' && (await p.page.inputValue('#aa-chip')) === '' && (await p.page.inputValue('#aa-uv')) === '' && (await p.page.inputValue('#aa-vaccine')) === '', 'prefill clears old result / chip / UV / vaccine text');
+
     t.ok(p.errors.length === 0, 'no page errors: ' + p.errors.join('; '));
   } finally { await p.browser.close(); }
   t.done();
