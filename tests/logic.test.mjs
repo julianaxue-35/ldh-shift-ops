@@ -428,3 +428,37 @@ test('returnedResultCount: counts nurse results on a shelter request, 0 otherwis
   assert.equal(L.returnedResultCount({ type: 'check_recheck', problem: row.problem }), 0);
   assert.equal(L.returnedResultCount({ type: 'shelter' }), 0);
 });
+
+/* ---------- 2026-10-17: animal history lookup (last 3 months) ---------- */
+test('normId ignores case and spaces', () => {
+  assert.equal(L.normId(' a 123 '), 'a123');
+  assert.equal(L.normId(undefined), '');
+});
+test('animalHistory: matches ignoring case/spaces, 3-month cutoff, newest first, flags only, care fields carried', () => {
+  const day = n => new Date(NOW - n * 24 * H).toISOString();
+  const rows = [
+    { id: 'a', title: 'A123', type: 'shelter', created_at: day(3), done: true, completed_at: day(2), location: 'Pound 1 / 4', condition: 'cat_flu', problem: 'sneezing', treatment: 'doxy', plan: 'recheck Fri', note: 'eating well' },
+    { id: 'b', title: 'a 123', type: 'foster', created_at: day(40), done: false, claimed_at: null, location: 'Pathway', problem: 'limp' },
+    { id: 'c', title: 'A123', type: 'check_recheck', created_at: day(1), done: false },          // routine list entry: not a flag
+    { id: 'd', title: 'A123', type: 'shelter', created_at: day(120), done: true, problem: 'too old' },
+    { id: 'e', title: 'B999', type: 'shelter', created_at: day(2), done: false, problem: 'other animal' }
+  ];
+  const h = L.animalHistory(rows, [], 'A 123', NOW);
+  assert.deepEqual(h.map(x => x.id), ['a', 'b']);
+  assert.equal(h[0].treatment, 'doxy'); assert.equal(h[0].plan, 'recheck Fri'); assert.equal(h[0].note, 'eating well');
+  assert.equal(h[0].stage, 'completed'); assert.equal(h[1].stage, 'flagged');
+});
+test('animalHistory: falls back to the flag log for flags whose case row is gone; no double counting', () => {
+  const day = n => new Date(NOW - n * 24 * H).toISOString();
+  const rows = [{ id: 'a', title: 'A1', type: 'shelter', created_at: day(5), done: true, problem: 'vomiting' }];
+  const log = [
+    { task_id: 'a', title: 'A1', flagged_at: day(5), location: 'Pound 1', reason: 'vomiting' },     // same flag as the row
+    { task_id: 'gone', title: 'A1', flagged_at: day(30), location: 'Pound 2', reason: 'cough', condition: 'kennel_cough' }
+  ];
+  const h = L.animalHistory(rows, log, 'a1', NOW);
+  assert.equal(h.length, 2);
+  assert.equal(h[1].fromLogOnly, true); assert.equal(h[1].problem, 'cough'); assert.equal(h[1].treatment, undefined);
+});
+test('animalHistory: empty or too-short query returns nothing', () => {
+  assert.deepEqual(L.animalHistory([{ id: 'a', title: 'A1', type: 'shelter', created_at: new Date(NOW).toISOString() }], [], ' ', NOW), []);
+});

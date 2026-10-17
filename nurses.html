@@ -190,7 +190,7 @@
       <span id="new-item-banner-text"></span>
       <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
     </div>
-    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div>
+    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
 
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
@@ -245,7 +245,9 @@
       </div>
     </section>
 
-    <section class="card faq-card" id="faq">
+    <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
+    <div class="card faq-card faq-modal" id="faq">
+      <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
       <h2>FAQ — nurses</h2>
       <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
       <h3 class="faq-group">Working your board</h3>
@@ -259,7 +261,8 @@
       <details><summary>What if the animal ID is missing?</summary><div><p>Head-count requests ("3 cats to FIV test") have no single animal, so the form asks you for the animal ID of the one you are sending back.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
       <details><summary>What is disease tracking and why do nurses see it?</summary><div><p>Flagged animals with a suspected condition (cat flu, kennel cough, diarrhoea, vomiting, eye, skin, wounds, other) are counted per space against its cages. It lets the team spot a cluster early and act on cleaning, isolation and vaccination. You help most by telling shelter staff or the vet when you notice several animals with the same signs in one space, and by making sure a condition is chosen when an animal is flagged.</p></div></details>
-    </section>
+    </div>
+    </div>
   </main>
 </div>
 <script>

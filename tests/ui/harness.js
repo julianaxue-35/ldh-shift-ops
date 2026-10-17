@@ -53,6 +53,7 @@ const STUB = `
       lt(k, v) { filters.push(r => r[k] < v); return b; },
       in(k, vals) { filters.push(r => vals.indexOf(r[k]) !== -1); return b; },
       not(k, op, v) { if (op === 'is' && v === null) filters.push(r => r[k] != null); return b; },
+      ilike(k, pat) { const parts = String(pat).toLowerCase().split('%').filter(Boolean); filters.push(r => { let i = 0; const v = String(r[k] == null ? '' : r[k]).toLowerCase(); return parts.every(p => { const j = v.indexOf(p, i); if (j < 0) return false; i = j + p.length; return true; }); }); return b; },  // test stub: handles the lookup's %a%b% patterns only
       is(k, v) { filters.push(r => (v === null ? r[k] == null : r[k] === v)); return b; },
       order(c, o) { orderCol = c; asc = !(o && o.ascending === false); return b; },
       limit(n) { limitN = n; return b; },
