@@ -462,3 +462,81 @@ test('animalHistory: falls back to the flag log for flags whose case row is gone
 test('animalHistory: empty or too-short query returns nothing', () => {
   assert.deepEqual(L.animalHistory([{ id: 'a', title: 'A1', type: 'shelter', created_at: new Date(NOW).toISOString() }], [], ' ', NOW), []);
 });
+
+/* ---------- Admission AA (2026-10-17) ---------- */
+test('parseAnimalIds: messy separators -> clean, upper-cased, de-duplicated, order kept', () => {
+  assert.deepEqual(L.parseAnimalIds('a1, A2  a3\nA4;; a1,'), ['A1', 'A2', 'A3', 'A4']);
+  assert.deepEqual(L.parseAnimalIds('   '), []);
+  assert.deepEqual(L.parseAnimalIds(undefined), []);
+});
+
+test('aaBuildItem: vaccination takes many IDs, needs a vaccine and initials', () => {
+  const r = L.aaBuildItem({ kind: 'vaccination', idsText: 'a1, a2', vaccine: 'F3', vaccDate: '2026-10-17', initials: 'ab' });
+  assert.deepEqual(r.row, { kind: 'vaccination', animal_ids: ['A1', 'A2'], payload: { vaccine: 'F3', date: '2026-10-17' }, sent_by: 'AB' });
+  assert.match(L.aaBuildItem({ kind: 'vaccination', idsText: '', vaccine: 'F3', initials: 'AB' }).error, /animal ID/i);
+  assert.match(L.aaBuildItem({ kind: 'vaccination', idsText: 'A1', vaccine: ' ', initials: 'AB' }).error, /vaccine/i);
+  assert.match(L.aaBuildItem({ kind: 'vaccination', idsText: 'A1', vaccine: 'F3', initials: '' }).error, /initials/i);
+});
+
+test('aaBuildItem: FIV / UV / microchip take exactly one animal ID', () => {
+  assert.match(L.aaBuildItem({ kind: 'fiv', idsText: 'A1 A2', result: 'Negative', initials: 'AB' }).error, /one animal/i);
+  assert.match(L.aaBuildItem({ kind: 'uv', idsText: 'A1, A2', result: 'Clear', initials: 'AB' }).error, /one animal/i);
+  assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'A1 A2', chipNumber: '985112000123456', initials: 'AB' }).error, /one animal/i);
+  assert.deepEqual(L.aaBuildItem({ kind: 'fiv', idsText: 'a1', result: ' FIV negative ', initials: 'ab' }).row.payload, { result: 'FIV negative' });
+  assert.match(L.aaBuildItem({ kind: 'fiv', idsText: 'A1', result: '', initials: 'AB' }).error, /result/i);
+});
+
+test('aaBuildItem: microchip number is stored as digits only; 9-15 digits required', () => {
+  const ok = L.aaBuildItem({ kind: 'microchip', idsText: 'A1', chipNumber: '985 112-000 123 456', initials: 'ab' });
+  assert.equal(ok.row.payload.chip_number, '985112000123456');
+  assert.equal(ok.row.payload.implanter, 'AB');
+  assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'A1', chipNumber: '98511A000123456', initials: 'AB' }).error, /digits/i);
+  assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'A1', chipNumber: '12345678', initials: 'AB' }).error, /digits/i);
+  assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'A1', chipNumber: '1234567890123456', initials: 'AB' }).error, /digits/i);
+});
+
+test('aaBuildItem: Microchip + UV carries chip number, implanter and UV result together', () => {
+  const r = L.aaBuildItem({ kind: 'microchip_uv', idsText: 'A1', chipNumber: '985112000123456', uvResult: 'No fluorescence', initials: 'ab' });
+  assert.deepEqual(r.row.payload, { chip_number: '985112000123456', implanter: 'AB', uv_result: 'No fluorescence' });
+  assert.match(L.aaBuildItem({ kind: 'microchip_uv', idsText: 'A1', chipNumber: '985112000123456', uvResult: '', initials: 'AB' }).error, /UV/i);
+});
+
+test('aaBuildItem: unknown kind is refused', () => {
+  assert.match(L.aaBuildItem({ kind: 'bogus', idsText: 'A1', initials: 'AB' }).error, /type/i);
+});
+
+test('aaSummary: one readable line per kind', () => {
+  assert.equal(L.aaSummary({ kind: 'fiv', animal_ids: ['A1'], payload: { result: 'FIV negative' } }), 'FIV negative');
+  assert.equal(L.aaSummary({ kind: 'uv', animal_ids: ['A1'], payload: { result: 'Clear' } }), 'UV: Clear');
+  assert.equal(L.aaSummary({ kind: 'microchip', animal_ids: ['A1'], payload: { chip_number: '985112000123456', implanter: 'AB' } }), 'Chip 985112000123456 · implanted by AB');
+  assert.equal(L.aaSummary({ kind: 'microchip_uv', animal_ids: ['A1'], payload: { chip_number: '985112000123456', implanter: 'AB', uv_result: 'Clear' } }), 'Chip 985112000123456 · implanted by AB · UV: Clear');
+  assert.equal(L.aaSummary({ kind: 'vaccination', animal_ids: ['A1', 'A2', 'A3'], payload: { vaccine: 'F3', date: '2026-10-17' } }), 'F3 given 2026-10-17 · 3 animals');
+  assert.equal(L.aaSummary({ kind: 'vaccination', animal_ids: ['A1'], payload: { vaccine: 'F3', date: '' } }), 'F3 given · 1 animal');
+  assert.equal(L.aaSummary({ kind: 'weird', animal_ids: [], payload: null }), '');
+});
+
+test('aaCountdown: counts down 24 h, goes amber in the last 4 h, red and overdue after', () => {
+  const at = ms => ({ sent_at: new Date(NOW - ms).toISOString() });
+  const fresh = L.aaCountdown(at(1 * H), NOW);
+  assert.equal(fresh.level, 'ok'); assert.equal(fresh.overdue, false); assert.equal(fresh.label, '23h 0m left');
+  const soon = L.aaCountdown(at(21 * H + 30 * M), NOW);
+  assert.equal(soon.level, 'amber'); assert.equal(soon.label, '2h 30m left');
+  const justUnder = L.aaCountdown(at(24 * H - M), NOW);
+  assert.equal(justUnder.overdue, false); assert.equal(justUnder.label, '0h 1m left');
+  const exactly = L.aaCountdown(at(24 * H), NOW);
+  assert.equal(exactly.overdue, true); assert.equal(exactly.level, 'red'); assert.equal(exactly.label, 'Overdue by 0h 0m');
+  const late = L.aaCountdown(at(27 * H + 5 * M), NOW);
+  assert.equal(late.label, 'Overdue by 3h 5m'); assert.equal(late.overdueMs, 3 * H + 5 * M);
+});
+
+test('aaCountdown: a sent_at in the future (clock skew) reads as a full 24 h, never negative or NaN', () => {
+  const r = L.aaCountdown({ sent_at: new Date(NOW + 5 * M).toISOString() }, NOW);
+  assert.equal(r.label, '24h 0m left');
+  assert.equal(L.aaCountdown({ sent_at: 'not a date' }, NOW).label, '24h 0m left');
+});
+
+test('aaSortItems: overdue first (most overdue first), then oldest first', () => {
+  const mk = (id, agoH) => ({ id, sent_at: new Date(NOW - agoH * H).toISOString() });
+  const out = L.aaSortItems([mk('new', 1), mk('late', 26), mk('old', 10), mk('later', 30)], NOW).map(i => i.id);
+  assert.deepEqual(out, ['later', 'late', 'old', 'new']);
+});
