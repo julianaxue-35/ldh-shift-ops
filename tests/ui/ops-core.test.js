@@ -13,7 +13,7 @@ const FIXTURE = 'tests/ui/fixtures/ops-core-page.html';
     await page.waitForSelector('#login-screen');
     t.ok(await page.isVisible('#login-screen'), 'login screen shown when there is no session');
     t.ok(!(await page.isVisible('#app')), 'app content hidden before sign-in');
-    t.ok((await page.getAttribute('#login-password', 'placeholder')) === 'Staff password', 'one box: password field labelled "Staff password"');
+    t.ok((await page.getAttribute('#login-password', 'placeholder')) === 'LDH access code', 'one box: password field labelled "LDH access code"');
     t.ok(!(await page.isVisible('#login-email')), 'one box: no email field shown up front');
 
     // wrong password -> rejected, screen stays up
