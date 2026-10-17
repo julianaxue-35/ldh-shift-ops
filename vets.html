@@ -208,6 +208,7 @@
         <p>Pick up, complete and hand off cases; request treatments and nurse tasks; start a shift.</p>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="search-box" placeholder="Search animal ID..." autocomplete="off" style="margin:0; width:220px;">
         <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
         <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
       </div>
@@ -266,11 +267,9 @@
       </div>
     </section>
 
-    <section class="card" id="animal-lookup">
-      <h2>Look up an animal</h2>
-      <p class="subtle">Type an animal ID to see everything flagged for it in the last 3 months — problem, outcome, treatment and plan.</p>
-      <input id="hist-q" placeholder="Animal ID, e.g. A123456" autocomplete="off" style="max-width:320px;">
-      <div id="hist-out" style="margin-top:10px;"></div>
+    <section class="card" id="animal-history" style="display:none;">
+      <h2>Animal history — last 3 months</h2>
+      <div id="animal-history-out"></div>
     </section>
 
     <section class="card" id="vet-cases">
@@ -322,7 +321,7 @@
       <details><summary>How do I finish a case?</summary><div><p>Press <b>DONE</b> once you have seen the animal. For a medication case the DONE panel asks for the medication details, and the case then waits for the nurses to make the label.</p></div></details>
       <details><summary>How do I hand a case to the nurses?</summary><div><p>Press <b>Transfer to nurse</b> on a picked-up case, choose the task (blood test, ear swab, FIV test, IVFT, microchip, UV, other) and add a note. The case leaves the vet board and appears on the Nurses page. Microchip and UV go to the Processing nurse, everything else to the Welfare nurse.</p></div></details>
       <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Request a nurse task — miscellaneous</b> for one-off tasks, or <b>Request a treatment</b> for a course such as "flush twice a day for 7 days".</p></div></details>
-      <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p><p>While this page is open a red <b>RESULT BACK FROM NURSE</b> banner appears, the tab title flashes, and a beep plays. Tap the sound button at the top once so the browser allows the beep.</p></div></details>
+      <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p><p>While this page is open, every new request — including a result sent back — raises a red <b>NEW REQUEST</b> banner with one count (for example “3 new requests sent through”), flashes the tab title and beeps. The sound is on by default; browsers need one tap on the page before they will play it, and the sound button at the top mutes it.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
       <details><summary>What is being tracked and why does it matter to me?</summary><div><p>Shelter staff pick a <b>Suspected condition</b> when they flag an animal. The eight reported signs are counted per space against its cages over the last 3 days (Disease watch on the staff page, full board on Stats). The aim is to spot a cluster in one space early, before a diagnosis, so you can act on isolation, cleaning and vaccination decisions sooner.</p></div></details>
       <details><summary>Should I correct the suspected condition?</summary><div><p>The count reflects what staff noticed, not your diagnosis, so there is no need to edit it. Diagnoses such as Giardia are deliberately kept out of the sign list. Please make sure animals are flagged with some condition — blank ones are not counted.</p></div></details>
@@ -412,72 +411,48 @@
      flashing tab title. In-memory only: results already on the board when the page opens never alert; the first
      loadAll() just fills the seen-set. A result added to an already-open case also alerts (count goes up).
      ============================================================ */
-  let audioCtx = null;
-  function audioRunning() { return !!audioCtx && audioCtx.state === 'running'; }
-  function updateSoundChip() {
-    const chip = document.getElementById('sound-chip');
-    chip.textContent = audioRunning() ? '🔔 Alert sound is on' : '🔕 Tap here to turn on the alert sound';
-    chip.classList.toggle('sound-off', !audioRunning());
-  }
-  function unlockAudio() {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!audioCtx) audioCtx = new Ctx();
-      if (audioCtx.state === 'suspended') audioCtx.resume().then(updateSoundChip, () => {});
-    } catch (e) { /* unsupported — the banner still shows */ }
-    updateSoundChip();
-  }
-  ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
-  function playAlertTone() {
-    try {
-      if (!audioRunning()) return;   // not unlocked yet — the banner + flashing tab title still alert
-      const t0 = audioCtx.currentTime;
-      [[880, 0], [660, 0.22], [880, 0.44]].forEach(([freq, at]) => {
-        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-        osc.type = 'square'; osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, t0 + at);
-        gain.gain.exponentialRampToValueAtTime(0.25, t0 + at + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.18);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(t0 + at); osc.stop(t0 + at + 0.2);
-      });
-    } catch (e) { /* ignore */ }
-  }
-  document.getElementById('sound-chip').addEventListener('click', () => { unlockAudio(); setTimeout(playAlertTone, 80); });
+  const alertSound = OpsCore.createAlertSound('sound-chip');
+  const playAlertTone = () => alertSound.play();
 
-  let pendingResults = 0, titleFlashTimer = null;
+  let pendingRequests = 0, titleFlashTimer = null;
   const BASE_TITLE = document.title;
   function hideAlertBanner() {
     document.getElementById('new-item-banner').style.display = 'none';
-    pendingResults = 0;
+    pendingRequests = 0;
     if (titleFlashTimer) { clearInterval(titleFlashTimer); titleFlashTimer = null; }
     document.title = BASE_TITLE;
   }
   document.getElementById('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
-  function showResultBanner(n) {
-    pendingResults += n;
-    document.getElementById('new-item-banner-text').textContent = '🔔 RESULT BACK FROM NURSE — ' + pendingResults + ' result' + (pendingResults > 1 ? 's' : '') + ' to review — check Cases below.';
+  // One summary count — "6 new requests sent through" — not a list of each one.
+  function showRequestBanner(n) {
+    pendingRequests += n;
+    document.getElementById('new-item-banner-text').textContent = '🔔 NEW REQUEST — ' + pendingRequests + ' new request' + (pendingRequests > 1 ? 's' : '') + ' sent through — check Cases below.';
     document.getElementById('new-item-banner').style.display = 'flex';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     playAlertTone();
     if (!titleFlashTimer) {
       let on = false;
-      titleFlashTimer = setInterval(() => { on = !on; document.title = on ? '🔔 RESULT BACK — Vets' : BASE_TITLE; }, 1000);
+      titleFlashTimer = setInterval(() => { on = !on; document.title = on ? '🔔 NEW REQUEST — Vets' : BASE_TITLE; }, 1000);
     }
   }
-  const seenResults = new Map();   // task id -> number of nurse results already noticed
+  /* A request counts as new when it is an open case (a real flag, not a routine list entry) this tab has not seen
+     before — including a finished case that was flagged again — or when a nurse adds another result to a case that
+     is already open. Put-back cases keep their id, so they never alert. The first load only fills the seen-set. */
+  const seenCases = new Map();   // open task id -> number of nurse results already noticed
   let seenInitialised = false;
-  function checkForReturnedResults() {
+  function checkForNewRequests() {
     let fresh = 0;
-    TASKS.filter(t => !t.done).forEach(t => {
+    const open = TASKS.filter(t => !t.done && LDHLogic.isRequest(t));
+    const openIds = new Set(open.map(t => t.id));
+    open.forEach(t => {
       const n = LDHLogic.returnedResultCount(t);
-      if (!n) return;
-      if (seenInitialised && n > (seenResults.get(t.id) || 0)) fresh += n - (seenResults.get(t.id) || 0);
-      seenResults.set(t.id, n);
+      if (!seenCases.has(t.id)) { if (seenInitialised) fresh += 1; }
+      else if (n > seenCases.get(t.id)) fresh += 1;
+      seenCases.set(t.id, n);
     });
+    Array.from(seenCases.keys()).forEach(id => { if (!openIds.has(id)) seenCases.delete(id); });   // finished: a re-flag alerts again
     seenInitialised = true;
-    if (fresh > 0) showResultBanner(fresh);
+    if (fresh > 0) showRequestBanner(fresh);
   }
 
   async function loadAll() {
@@ -491,7 +466,7 @@
     ]);
     NOGA_REQUESTS = ngRes.error ? [] : (ngRes.data || []);
     TASKS = tasksRes.data || [];
-    checkForReturnedResults();
+    checkForNewRequests();
     MEMOS = memosRes.data || [];
     NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || [];
@@ -500,9 +475,14 @@
     renderAll();
   }
 
+  function searchPool() {
+    const q = LDHLogic.normId(document.getElementById('search-box').value);
+    return q ? TASKS.filter(t => LDHLogic.normId(t.title).includes(q)) : TASKS;
+  }
+
   function renderAll() {
     renderMisc();
-    CASES = LDHLogic.caseList(TASKS, Date.now());
+    CASES = LDHLogic.caseList(searchPool(), Date.now());
     renderCompletion();
     renderShiftProgress();
     renderCases();
@@ -999,7 +979,9 @@
     fillMiscSelects();
   }
 
-  AnimalHistoryView.attach({ sb: () => sb, input: document.getElementById('hist-q'), out: document.getElementById('hist-out') });
+  // Same search as the shelter staff page: narrows the cases below and shows the animal's last 3 months of flags.
+  AnimalHistoryView.attach({ sb: () => sb, input: document.getElementById('search-box'), out: document.getElementById('animal-history-out'), card: document.getElementById('animal-history') });
+  document.getElementById('search-box').addEventListener('input', () => { CASES = LDHLogic.caseList(searchPool(), Date.now()); renderCases(); });
 
   function refreshTimers() { renderCases(); renderCompleted(); }
   setInterval(refreshTimers, 60000);

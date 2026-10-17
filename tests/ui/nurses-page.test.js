@@ -241,12 +241,17 @@ const todayISO = LDHLogic.localISO(new Date());
     await insertRow(d.page, 'nurse_requests', { location: 'Cat Room 2', species: 'cat', animal_count: 2, done_count: 0 });
     await d.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 3000 });
     let bannerText = await d.page.textContent('#new-item-banner-text');
-    t.ok(bannerText.includes('NEW TASK') && bannerText.includes('nurse request'), 'new nurse request shows the NEW TASK banner: ' + bannerText);
+    t.ok(bannerText.includes('NEW TASK') && bannerText.includes('1 new request sent through'), 'a new nurse request shows one summary count: ' + bannerText);
     t.ok((await d.page.evaluate(() => getComputedStyle(document.getElementById('new-item-banner')).position)) === 'sticky', 'the banner sticks to the top of the page');
+    t.ok((await d.page.textContent('#sound-chip')).includes('Alert sound is on'), 'the alert sound is on by default');
     await d.page.click('#sound-chip');
     await d.page.waitForTimeout(300);
-    t.ok((await d.page.textContent('#sound-chip')).includes('Alert sound is on'), 'tapping it unlocks the sound (one shared audio context)');
-    t.ok(!bannerText.includes('medication label'), 'no pre-existing medication case is wrongly included: ' + bannerText);
+    t.ok((await d.page.textContent('#sound-chip')).includes('muted'), 'the sound button mutes it');
+    t.ok((await d.page.evaluate(() => localStorage.getItem('ldh_alert_sound_muted'))) === '1', 'the mute choice is remembered');
+    await d.page.click('#sound-chip');
+    await d.page.waitForTimeout(300);
+    t.ok((await d.page.textContent('#sound-chip')).includes('Alert sound is on'), 'tapping again turns it back on');
+    t.ok(bannerText.includes('1 new request') && !bannerText.includes('medication'), 'the already-open medication case is not counted: ' + bannerText);
 
     /* ---------- (d) Dismiss button hides it ---------- */
     await d.page.click('#new-item-banner-dismiss');
@@ -259,8 +264,8 @@ const todayISO = LDHLogic.localISO(new Date());
     });
     await d.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 3000 });
     bannerText = await d.page.textContent('#new-item-banner-text');
-    t.ok(bannerText.includes('medication label'), 'new medication-waiting case shows banner with medication wording: ' + bannerText);
-    t.ok(!bannerText.includes('nurse request'), 'the already-seen vaccination request does not re-trigger alongside it: ' + bannerText);
+    t.ok(bannerText.includes('1 new request sent through'), 'a new medication-waiting case counts as one new request: ' + bannerText);
+    t.ok(!bannerText.includes('2 new'), 'the already-seen vaccination request does not re-trigger alongside it: ' + bannerText);
 
     /* ---------- sound: playAlertTone() runs (AudioContext) without throwing ---------- */
     t.ok(d.errors.length === 0, 'synthesised alert tone does not throw a page error: ' + JSON.stringify(d.errors));

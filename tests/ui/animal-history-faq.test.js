@@ -57,9 +57,10 @@ const seed = () => ({
   /* ---------- vets page ---------- */
   const v = await open(seed(), 'vets.html');
   try {
-    await v.page.fill('#hist-q', 'a123');
-    await v.page.waitForSelector('#hist-out .ah-entry');
-    const txt = await v.page.textContent('#hist-out');
+    await v.page.fill('#search-box', 'a123');
+    await v.page.waitForSelector('#animal-history-out .ah-entry');
+    const txt = await v.page.textContent('#animal-history-out');
+    t.ok(await v.page.locator('#animal-lookup, #hist-q').count() === 0, 'the separate Look up an animal card is gone — one search box, same as the staff page');
     t.ok(txt.includes('doxycycline 5 days') && txt.includes('recheck Friday'), 'vets lookup shows treatment and plan');
     await v.page.click('#faq-btn');
     t.ok(await v.page.isVisible('#faq-panel'), 'vets FAQ button opens the panel');
