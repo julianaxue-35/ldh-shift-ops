@@ -89,9 +89,16 @@ const t = require('./check')('flag-form');
   await page.click('#req-submit');
   await page.waitForTimeout(300);
   const nrs = (await db()).nurse_requests.filter(r => r.animal_id === 'FOS-1');
-  t.ok(nrs.length === 2 && nrs.map(r => r.kind).sort().join() === 'microchip,uv' && nrs.every(r => r.animal_count === 1 && r.due_window === '24_48h' && r.location === 'Pathway' && r.species === 'cat'),
-    'ticking microchip + UV creates two single-animal nurse requests with the chosen 24-48 h window at the foster location');
+  t.ok(nrs.length === 1 && nrs[0].kind === 'microchip_uv' && nrs[0].animal_count === 1 && nrs[0].due_window === '24_48h' && nrs[0].location === 'Pathway' && nrs[0].species === 'cat',
+    'ticking microchip + UV creates ONE combined single-animal nurse request with the chosen 24-48 h window at the foster location');
   t.ok(!(await page.isVisible('#req-nurse-extras')), 'extras reset after submit');
+  await page.selectOption('#req-type', 'foster');
+  await page.fill('#req-title', 'FOS-2');
+  await page.check('#req-x-uv');
+  await page.click('#req-submit');
+  await page.waitForTimeout(300);
+  const one = (await db()).nurse_requests.filter(r => r.animal_id === 'FOS-2');
+  t.ok(one.length === 1 && one[0].kind === 'uv', 'only UV ticked still creates a plain UV request');
   await page.selectOption('#req-type', 'rescue');
   await page.fill('#req-title', 'RES-1');
   await page.click('#req-submit');
