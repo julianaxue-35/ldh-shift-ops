@@ -21,6 +21,7 @@
 <title>LDH Shift Ops — Vets</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
+<script src="lib/animal-history-view.js"></script>
 <script src="lib/ops-core.js"></script>
 <style>
   :root {
@@ -206,7 +207,10 @@
         <h1>Vets</h1>
         <p>Pick up, complete and hand off cases; request treatments and nurse tasks; start a shift.</p>
       </div>
-      <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
+        <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
+      </div>
     </div>
 
     <section class="card" id="start-shift-card">
@@ -262,6 +266,13 @@
       </div>
     </section>
 
+    <section class="card" id="animal-lookup">
+      <h2>Look up an animal</h2>
+      <p class="subtle">Type an animal ID to see everything flagged for it in the last 3 months — problem, outcome, treatment and plan.</p>
+      <input id="hist-q" placeholder="Animal ID, e.g. A123456" autocomplete="off" style="max-width:320px;">
+      <div id="hist-out" style="margin-top:10px;"></div>
+    </section>
+
     <section class="card" id="vet-cases">
       <h2>Cases</h2>
       <p class="subtle">Split by tier and request type — pick up as available. Filter to Medication for remote-only cases.</p>
@@ -300,7 +311,9 @@
       </div>
     </section>
 
-    <section class="card faq-card" id="faq">
+    <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
+    <div class="card faq-card faq-modal" id="faq">
+      <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
       <h2>FAQ — vets</h2>
       <p class="subtle">Quick answers for picking up cases, handing work to the nurses and handling results.</p>
       <h3 class="faq-group">Cases</h3>
@@ -314,7 +327,8 @@
       <details><summary>What is being tracked and why does it matter to me?</summary><div><p>Shelter staff pick a <b>Suspected condition</b> when they flag an animal. The eight reported signs are counted per space against its cages over the last 3 days (Disease watch on the staff page, full board on Stats). The aim is to spot a cluster in one space early, before a diagnosis, so you can act on isolation, cleaning and vaccination decisions sooner.</p></div></details>
       <details><summary>Should I correct the suspected condition?</summary><div><p>The count reflects what staff noticed, not your diagnosis, so there is no need to edit it. Diagnoses such as Giardia are deliberately kept out of the sign list. Please make sure animals are flagged with some condition — blank ones are not counted.</p></div></details>
       <details><summary>What is the baseline?</summary><div><p>Snapshots are taken nightly for a full year because disease changes with the season. After that, each period is compared with the same time last year. Until then rates are shown as they are, with no "high" line.</p></div></details>
-    </section>
+    </div>
+    </div>
   </main>
 </div>
 
@@ -984,6 +998,8 @@
     if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
     fillMiscSelects();
   }
+
+  AnimalHistoryView.attach({ sb: () => sb, input: document.getElementById('hist-q'), out: document.getElementById('hist-out') });
 
   function refreshTimers() { renderCases(); renderCompleted(); }
   setInterval(refreshTimers, 60000);

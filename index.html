@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/ops-core.js"></script>
 <script src="lib/surveillance-view.js"></script>
+<script src="lib/animal-history-view.js"></script>
 <link rel="stylesheet" href="lib/surveillance.css">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
@@ -212,7 +213,10 @@
         <h1>Shift dashboard</h1>
         <p>All open tasks across Processing, Sick &amp; Injured, and Surgery.</p>
       </div>
-      <input id="search-box" placeholder="Search animal ID...">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input id="search-box" placeholder="Search animal ID...">
+        <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
+      </div>
     </div>
 
     <section class="card" id="new-request-form">
@@ -310,6 +314,11 @@
       <div id="shift-progress-row" style="display:contents;"></div>
     </div>
 
+    <section class="card" id="animal-history" style="display:none;">
+      <h2>Animal history — last 3 months</h2>
+      <div id="animal-history-out"></div>
+    </section>
+
     <section class="card" id="cases-list">
       <h2>Cases</h2>
       <p class="subtle">Every case from flagged to completed, across all shifts.</p>
@@ -338,7 +347,9 @@
       <div id="period-totals-grid" class="totals-grid"></div>
     </section>
 
-    <section class="card faq-card" id="faq">
+    <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
+    <div class="card faq-card faq-modal" id="faq">
+      <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
       <h2>FAQ — shelter staff</h2>
       <p class="subtle">Quick answers for logging requests and following a case.</p>
       <h3 class="faq-group">Logging requests</h3>
@@ -354,7 +365,8 @@
       <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and pick a <b>Suspected condition</b>, that sign is counted. We track eight <b>reported signs</b>: cat flu (URI), kennel cough, diarrhoea / GI upset, vomiting, eye condition, skin condition, wounds / injury and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 3 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
       <details><summary>Why do we track it?</summary><div><ul><li><b>Catch clusters early.</b> Several animals with the same sign in one space is the first clue to an outbreak, often before anyone has diagnosed anything.</li><li><b>Back decisions with numbers.</b> Moving animals, tightening cleaning or biosecurity, or isolating a room is easier to justify with a count.</li><li><b>Learn our own seasonal pattern.</b> A baseline is being collected for a full year because disease varies with the season. Once it is complete, each period is compared with the same time last year. Until then there is no "high" line.</li></ul></div></details>
       <details><summary>What do I need to do so the tracking is accurate?</summary><div><ul><li>Choose a <b>Suspected condition</b> every time you flag an animal. If you leave it blank the animal is flagged but is <b>not</b> counted in disease tracking.</li><li>Pick the right <b>space</b> and pen — counts are per space.</li><li>An animal counts once for the same sign, so there is no harm in re-flagging an animal that is still sick.</li><li>Only flagged animals are counted, so the rate reads lower than a full vet-exam prevalence. Compare it with our own baseline, not with older prevalence figures.</li></ul></div></details>
-    </section>
+    </div>
+    </div>
   </main>
 </div>
 
@@ -499,6 +511,8 @@
   });
 
   document.getElementById('search-box').addEventListener('input', renderCases);
+  // 2026-10-17: typing an ID also looks up its past flags (last 3 months) — the Cases table only shows open + the last 24 h.
+  AnimalHistoryView.attach({ sb: () => sb, input: document.getElementById('search-box'), out: document.getElementById('animal-history-out'), card: document.getElementById('animal-history') });
 
   /* ---------- render ---------- */
   function renderCompletion() {
