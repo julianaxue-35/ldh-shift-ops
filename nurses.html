@@ -252,7 +252,7 @@
       <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
-      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the sidebar — they are recorded when you pick up or tick something off. Turn on the alert sound (tap the button at the top) and leave the page open: a banner, sound and flashing tab tell you when something new arrives.</p></div></details>
+      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the sidebar — they are recorded when you pick up or tick something off. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
       <details><summary>How do I pick up, share or finish a nurse request?</summary><div><p>On a request, <b>Pick up</b> puts your initials on it (press <b>Release</b> to hand it back to the pool). Use <b>+1</b> as each animal is done, or <b>All done</b>. The coloured chip shows time left against the "needed within" time.</p></div></details>
       <details><summary>How do I do a medication label or a treatment dose?</summary><div><p>Medication labels: copy the label text, then mark it done (tick several and enter your initials once). Treatments due: tick each dose as you give it. Overdue doses are listed first.</p></div></details>
       <details><summary>What are miscellaneous tasks?</summary><div><p>Tasks a vet asked for or transferred from a case — bloods, ear swab, FIV test, flu cat needing IVFT and so on. Press <b>Done</b> when finished.</p></div></details>
@@ -401,7 +401,8 @@
     fiv: { label: 'FIV test', toDo: 'for FIV test', doneVerb: 'FIV tested', plusLabel: '+1 FIV tested' },
     blood: { label: 'Blood test', toDo: 'for blood test', doneVerb: 'blood tested', plusLabel: '+1 blood tested' },
     microchip: { toDo: 'to microchip', doneVerb: 'microchipped', plusLabel: '+1 microchipped' },
-    uv: { toDo: 'for UV check', doneVerb: 'UV checked', plusLabel: '+1 UV checked' }
+    uv: { toDo: 'for UV check', doneVerb: 'UV checked', plusLabel: '+1 UV checked' },
+    microchip_uv: { label: 'Microchip + UV', toDo: 'to microchip + UV check', doneVerb: 'microchipped + UV checked', plusLabel: '+1 microchipped + UV checked' }
   };
   // A request raised for one named animal (foster / rescue flag) reads "A123 — Pathway: to microchip";
   // a head-count request reads "FIR Room — 3 cats to vaccinate".
@@ -717,40 +718,8 @@
      fired, and browsers keep such a context SILENT (autoplay policy) unless the person has already tapped the page.
      Now one shared AudioContext is created/resumed on the first tap, click or key press anywhere on the page, and
      reused for every alert. Until that first tap, a "Tap to turn on alert sound" button is shown. */
-  let audioCtx = null;
-  function audioRunning() { return !!audioCtx && audioCtx.state === 'running'; }
-  function updateSoundChip() {
-    const chip = document.getElementById('sound-chip');
-    if (!chip) return;
-    chip.textContent = audioRunning() ? '🔔 Alert sound is on' : '🔕 Tap here to turn on the alert sound';
-    chip.classList.toggle('sound-off', !audioRunning());
-  }
-  function unlockAudio() {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!audioCtx) audioCtx = new Ctx();
-      if (audioCtx.state === 'suspended') audioCtx.resume().then(updateSoundChip, () => {});
-    } catch (e) { /* unsupported — the banner still shows */ }
-    updateSoundChip();
-  }
-  ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
-  function playAlertTone() {
-    try {
-      if (!audioRunning()) return;   // not unlocked yet — the banner + flashing tab title still alert
-      const t0 = audioCtx.currentTime;
-      [[880, 0], [660, 0.22], [880, 0.44]].forEach(([freq, at]) => {   // three clear beeps, louder than before
-        const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-        osc.type = 'square'; osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, t0 + at);
-        gain.gain.exponentialRampToValueAtTime(0.25, t0 + at + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.18);
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(t0 + at); osc.stop(t0 + at + 0.2);
-      });
-    } catch (e) { /* ignore */ }
-  }
-  document.getElementById('sound-chip').addEventListener('click', () => { unlockAudio(); setTimeout(playAlertTone, 80); });
+  const alertSound = OpsCore.createAlertSound('sound-chip');
+  const playAlertTone = () => alertSound.play();
 
   /* ---------- NEW TASK banner: stays up until dismissed (no more 10 s auto-hide), counts add up while it is
      showing, and the browser tab title flashes so it is noticed from another tab. */
@@ -783,10 +752,10 @@
   function showAlertBanner(newReqCount, newMedCount, arrivalWarnCount, newMiscCount) {
     pendingAlert.req += newReqCount || 0; pendingAlert.med += newMedCount || 0;
     pendingAlert.misc += newMiscCount || 0; pendingAlert.arrival += arrivalWarnCount || 0;
+    // 2026-10-17: one summary count, not a list of every kind — "6 new requests sent through".
     const parts = [];
-    if (pendingAlert.req > 0) parts.push(`${pendingAlert.req} new nurse request${pendingAlert.req > 1 ? 's' : ''}`);
-    if (pendingAlert.med > 0) parts.push(`${pendingAlert.med} new medication label${pendingAlert.med > 1 ? 's' : ''}`);
-    if (pendingAlert.misc > 0) parts.push(`${pendingAlert.misc} new miscellaneous task${pendingAlert.misc > 1 ? 's' : ''}`);
+    const total = pendingAlert.req + pendingAlert.med + pendingAlert.misc;
+    if (total > 0) parts.push(`${total} new request${total > 1 ? 's' : ''} sent through`);
     if (pendingAlert.arrival > 0) parts.push(`${pendingAlert.arrival} arrival${pendingAlert.arrival > 1 ? 's' : ''} due in 15 minutes`);
     if (!parts.length) return;
     const isArrivalOnly = !pendingAlert.req && !pendingAlert.med && !pendingAlert.misc;

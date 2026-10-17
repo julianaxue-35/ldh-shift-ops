@@ -54,9 +54,7 @@ const H = 3600 * 1000;
     t.ok(!(await txt('P1')).includes('Flagged before'), 'an animal with no earlier flag shows no history line');
     t.ok(!(await txt('CR1')).includes('9990001 · Flagged before') && (await b.page.locator('[data-case] .hist').count()) === 1, 'only the animal that was flagged before gets the line; its own current flag and other animals\' flags are not counted');
     t.ok(!(await txt('CR1')).includes('Gabapentin'), 'history carries the reason only — no treatment or plan from earlier flags');
-    await b.page.fill('#search-box', 'CZT101');
-    t.ok((await b.page.$$eval('#board .case', els => els.length)) === 1, 'searching an animal ID narrows to that animal');
-    await b.page.fill('#search-box', '');
+    t.ok(await b.page.locator('#search-box').count() === 0, 'no search box on the board — animal lookup lives on the staff and vets pages');
     // live update: a new flag appears without a reload
     await b.page.evaluate(() => window.__db.tasks.push({ id: 'live1', title: '9990099', location: 'Pound 4 / 2', shift: 'sick_injured', type: 'shelter', urgency: 'routine', done: false, created_at: new Date().toISOString(), problem: 'New flag' }));
     await b.page.evaluate(() => loadAll());

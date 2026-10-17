@@ -140,9 +140,6 @@
         <h1>Shelter board</h1>
         <p>Every flagged animal, by room and pen — with the vet's treatment and plan. Updates by itself.</p>
       </div>
-      <div class="head-tools">
-        <input id="search-box" placeholder="Search animal ID...">
-      </div>
     </div>
 
     <div class="legend" id="legend">
@@ -221,9 +218,8 @@
     const errEl = document.getElementById('board-error');
     errEl.style.display = LOAD_ERROR ? '' : 'none';
     errEl.textContent = LOAD_ERROR;
-    const q = document.getElementById('search-box').value.trim().toLowerCase();
     const now = Date.now();
-    const pool = q ? TASKS.filter(t => String(t.title || '').toLowerCase().includes(q)) : TASKS;
+    const pool = TASKS;
     const { open, completed } = LDHLogic.caseList(pool, now);
     // Offline-tool list entries (type check_recheck) aren't flagged cases — caseList already leaves them out.
     const byRoom = {};
@@ -240,7 +236,6 @@
       const items = (byRoom[room.code] || []).slice().sort((a, b) =>
         (a.stage === 'done') - (b.stage === 'done') || (parseInt(a.pen, 10) || 9999) - (parseInt(b.pen, 10) || 9999));
       if (room.code === 'OTHER' && !items.length) return;           // catch-all only appears when needed
-      if (!items.length && q) return;                              // while searching, show only rooms with a match
       if (room.grp !== lastGrp) {
         if (open_) html += '</div>';
         html += `<div class="group-h">${esc(room.grp)}</div><div class="room-grid">`;
@@ -255,11 +250,10 @@
       </section>`;
     });
     if (open_) html += '</div>';
-    if (!html) html = '<section class="card"><p class="empty-state">' + (q ? 'Nothing matches that animal ID.' : 'Nothing flagged right now — all clear.') + '</p></section>';
+    if (!html) html = '<section class="card"><p class="empty-state">' + 'Nothing flagged right now — all clear.' + '</p></section>';
     document.getElementById('board').innerHTML = html;
   }
 
-  document.getElementById('search-box').addEventListener('input', renderBoard);
   setInterval(renderBoard, 60000);   // stage chips / "completed in the last 24 h" roll over without a reload
 
   /* ---------- auth (OpsCore) — same sign-in as the rest of the dashboard ---------- */

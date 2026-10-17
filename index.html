@@ -256,7 +256,7 @@
         <select id="req-birthing-reason" style="margin:0;"></select>
       </div>
       <div id="req-nurse-extras" style="display:none; margin:10px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:12px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Also ask the nurses to (goes to the Processing nurse board)</div>
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Also ask the nurses to (goes to the Processing nurse board — ticking both makes one task)</div>
         <div style="display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;">
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
@@ -286,6 +286,7 @@
           <option value="blood">Blood test</option>
           <option value="microchip">Microchip</option>
           <option value="uv">UV request</option>
+          <option value="microchip_uv">Microchip + UV</option>
         </select></label>
         <label>Space<select id="nr-location"></select></label>
         <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
@@ -486,13 +487,16 @@
     const reqType = document.getElementById('req-type').value;
     if (reqType === 'foster' || reqType === 'rescue') {
       const wanted = [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k);
-      for (const kind of wanted) {
+      // 2026-10-17: both ticked = ONE combined "Microchip + UV" task for the same animal, not two.
+      const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
+      const KIND_NAMES = { microchip: 'microchip', uv: 'UV', microchip_uv: 'microchip + UV' };
+      for (const kind of kinds) {
         const { error: nrErr } = await sb.from('nurse_requests').insert({
           kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
           animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff',
           note: TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '')
         });
-        if (nrErr) alert('The case was flagged, but the ' + (kind === 'uv' ? 'UV' : 'microchip') + ' request for the nurses could not be saved: ' + nrErr.message);
+        if (nrErr) alert('The case was flagged, but the ' + KIND_NAMES[kind] + ' request for the nurses could not be saved: ' + nrErr.message);
       }
     }
     document.getElementById('req-title').value = '';
