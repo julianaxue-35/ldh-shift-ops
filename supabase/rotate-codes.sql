@@ -11,6 +11,7 @@
 --     (Supabase > Edge Functions > Secrets), exactly the same text.
 --   * Vet passcode: extra code for the Vet page only.
 --   * Nurse passcode: extra code for the Nurse page only.
+--   * Admission AA passcode: extra code for the Admission AA page only (run migration 0017 first).
 --
 -- Use a long LDH code (three or more words plus a number), because it is
 -- the only thing protecting the dashboard from the internet.
@@ -30,6 +31,12 @@ update public.role_passcodes
    set code_hash = extensions.crypt('REPLACE_WITH_NURSE_CODE', extensions.gen_salt('bf'))
  where role = 'nurse';
 
+-- 3. Admission AA passcode. Migration 0017 creates this role with a random code nobody knows.
+update public.role_passcodes
+   set code_hash = extensions.crypt('REPLACE_WITH_AA_CODE', extensions.gen_salt('bf'))
+ where role = 'aa';
+
 -- Check: each line below should return true with your new codes.
 -- select public.check_passcode('vet', 'REPLACE_WITH_VET_CODE');
 -- select public.check_passcode('nurse', 'REPLACE_WITH_NURSE_CODE');
+-- select public.check_passcode('aa', 'REPLACE_WITH_AA_CODE');

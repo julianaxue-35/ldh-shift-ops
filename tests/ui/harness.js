@@ -3,13 +3,13 @@ const path = require('path');
 const pageUrl = (name) => 'file://' + path.resolve(__dirname, '../../' + (name || 'index.html'));
 // Node-side mirror of the STUB's own PASSCODES (below) — open() runs outside
 // the page, so it needs its own copy to auto-clear the vets/nurses entry gate.
-const PASSCODES = { nurse: 'nurse', vet: 'vet2026' };
+const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test' };
 
 // In-memory stand-in for the Supabase client. Runs inside the page.
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -27,7 +27,8 @@ const STUB = `
     locations: () => ({}),
     flag_history: () => ({}),
     surveillance_snapshots: () => ({}),
-    noga_requests: () => ({ task: 'other', done: false, created_at: now() })
+    noga_requests: () => ({ task: 'other', done: false, created_at: now() }),
+    aa_items: () => ({ payload: {}, sent_at: now() })
   };
   // Mirrors the tasks_hold_medication trigger (0010_round3.sql): a medication
   // case can't be marked done until the nurse sets med_done_at.
@@ -105,7 +106,7 @@ const STUB = `
     authInit = true;
     authSession = window.__forceLoggedOut ? null : { user: { id: 'u1' } };
   }
-  const PASSCODES = { nurse: 'nurse', vet: 'vet2026' };   // mirrors role_passcodes seed (0010_round3.sql)
+  const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test' };   // mirrors role_passcodes seed (0010_round3.sql)
   window.supabase = { createClient: () => ({
     auth: {
       getSession: async () => { ensureAuthInit(); return { data: { session: authSession } }; },
