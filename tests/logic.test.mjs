@@ -419,3 +419,12 @@ test('BACK_ACTIONS has interpret / upload / other', () => {
 test('stageOf: a put-back case (claim cleared) is flagged again', () => {
   assert.equal(L.stageOf({ done: false, claimed_at: null, put_back_at: '2026-10-16T03:00:00Z' }, NOW), 'flagged');
 });
+
+test('returnedResultCount: counts nurse results on a shelter request, 0 otherwise', () => {
+  const row = L.returnedResultTask({ animalId: 'A1', location: 'Pound 1', taskLabel: 'FIV test', result: 'neg', action: 'upload', window: '2h' });
+  assert.equal(L.returnedResultCount(row), 1);
+  assert.equal(L.returnedResultCount({ type: 'shelter', problem: row.problem + ' — ' + row.problem }), 2);
+  assert.equal(L.returnedResultCount({ type: 'shelter', problem: 'limping' }), 0);
+  assert.equal(L.returnedResultCount({ type: 'check_recheck', problem: row.problem }), 0);
+  assert.equal(L.returnedResultCount({ type: 'shelter' }), 0);
+});

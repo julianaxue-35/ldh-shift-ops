@@ -27,6 +27,29 @@ const H = 3600 * 1000;
     t.ok(v.errors.length === 0, 'no page errors on vets: ' + JSON.stringify(v.errors));
   } finally { await v.browser.close(); }
 
+  /* ---------- Vets: alert when a nurse result arrives ---------- */
+  const rb = await open({ tasks: [
+    { title: 'OLD-RES', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', created_at: ago(1 * H), done: false, problem: 'Result back from nurse — FIV test: neg. Vet to: interpret results.' }
+  ] }, 'vets.html');
+  try {
+    const shown = () => rb.page.evaluate(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none');
+    t.ok(!(await shown()), 'a result already on the board when the page opens does not alert');
+    t.ok(await rb.page.locator('#sound-chip').count() === 1, 'the vets page has the alert-sound button');
+    await rb.page.evaluate(() => sb.from('tasks').insert({ title: 'NEW-RES', location: 'Pound 2', shift: 'sick_injured', type: 'shelter', urgency: 'red_flag', problem: 'Result back from nurse — Blood test: ran. Vet to: interpret results.' }));
+    await rb.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none');
+    t.ok((await rb.page.textContent('#new-item-banner-text')).includes('RESULT BACK FROM NURSE — 1 result'), 'a new nurse result raises the banner');
+    await rb.page.evaluate(() => sb.from('tasks').insert({ title: 'OTHER', location: 'Pound 3', shift: 'sick_injured', type: 'shelter', urgency: 'routine', problem: 'limping' }));
+    await rb.page.waitForTimeout(300);
+    t.ok((await rb.page.textContent('#new-item-banner-text')).includes('1 result'), 'an ordinary new case does not add to the result count');
+    // a second result appended to the already-open case also alerts
+    await rb.page.evaluate(() => { const r = window.__db.tasks.find(x => x.title === 'NEW-RES'); return sb.from('tasks').update({ problem: r.problem + ' — Result back from nurse — FIV test: neg. Vet to: upload results.' }).eq('id', r.id); });
+    await rb.page.waitForFunction(() => document.getElementById('new-item-banner-text').textContent.includes('2 results'));
+    t.ok(true, 'a result added to an open case counts as a new result');
+    await rb.page.click('#new-item-banner-dismiss');
+    t.ok(!(await shown()), 'the banner stays until dismissed, then hides');
+    t.ok(rb.errors.length === 0, 'no page errors on vets alert: ' + JSON.stringify(rb.errors));
+  } finally { await rb.browser.close(); }
+
   /* ---------- Nurses: Send back to vet (miscellaneous task, 2 h) ---------- */
   const n = await open({
     noga_requests: [{ animal_id: 'FIV-1', location: 'Cat Room 1 / 4', task: 'fiv_test', done: false }],
