@@ -9,7 +9,7 @@ const t = require('./check')('nurse-requests');
   try {
     t.ok(await page.locator('#nr-list').count() === 0, 'the nurse-requests list is gone from the shelter staff page');
     t.ok(await page.isVisible('#nr-form'), 'the vaccination request form stays on the shelter staff page');
-    t.ok((await page.textContent('#nurse-requests')).includes('Request nurse vaccination'), 'the form has its own small card heading');
+    t.ok((await page.textContent('#nurse-requests')).includes('Nurse request'), 'the form has its own small card heading');
 
     t.ok((await page.inputValue('#nr-location')) === 'FIR Room', 'cats default to FIR Room');
     await page.selectOption('#nr-species', 'dog');

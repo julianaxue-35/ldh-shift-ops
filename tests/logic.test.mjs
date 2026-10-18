@@ -75,19 +75,19 @@ test('slotLabel and doseLevel', () => {
   assert.equal(L.doseLevel({ due_date: '2026-09-19', done_at: 'x' }, '2026-09-20'), 'done');
 });
 
-test('vaccStatus: 2 h from arrival', () => {
+test('nurseRequestStatus: 2 h from arrival', () => {
   const req = (agoMs, done = 0) => ({ arrived_at: new Date(NOW - agoMs).toISOString(), animal_count: 8, done_count: done });
-  assert.equal(L.vaccStatus(req(1 * H), NOW).level, 'ok');
-  assert.equal(L.vaccStatus(req(1.75 * H), NOW).level, 'amber');
-  assert.equal(L.vaccStatus(req(2 * H + M), NOW).level, 'red');
-  assert.equal(L.vaccStatus(req(5 * H, 8), NOW).level, 'done');
-  assert.match(L.vaccStatus(req(3 * H), NOW).label, /^overdue 1h/);
+  assert.equal(L.nurseRequestStatus(req(1 * H), NOW).level, 'ok');
+  assert.equal(L.nurseRequestStatus(req(1.75 * H), NOW).level, 'amber');
+  assert.equal(L.nurseRequestStatus(req(2 * H + M), NOW).level, 'red');
+  assert.equal(L.nurseRequestStatus(req(5 * H, 8), NOW).level, 'done');
+  assert.match(L.nurseRequestStatus(req(3 * H), NOW).label, /^overdue 1h/);
 });
 
 test('arrivalStatus: countdown to a scheduled (not-yet-arrived) request, then overdue', () => {
   const sched = (inMs) => ({ arrived_at: null, expected_at: new Date(NOW + inMs).toISOString() });
   assert.equal(L.arrivalStatus({ arrived_at: new Date(NOW).toISOString(), expected_at: null }, NOW), null,
-    'null once arrived_at is set — vaccStatus takes over, not arrivalStatus');
+    'null once arrived_at is set — nurseRequestStatus takes over, not arrivalStatus');
   assert.equal(L.arrivalStatus(sched(45 * M), NOW).level, 'ok');
   assert.equal(L.arrivalStatus(sched(10 * M), NOW).level, 'amber', 'within the 15-minute warning window');
   assert.match(L.arrivalStatus(sched(10 * M), NOW).label, /^arriving in/);
