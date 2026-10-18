@@ -131,6 +131,14 @@ function validateAaCheck(c) {
 }
 // aa-validate-end
 
+// Completed Admission AA cards are removed within 24 hours (the AA also empties the list daily). Best effort.
+async function purgeCompletedAa(supabase) {
+  try {
+    await supabase.from('aa_items').delete().not('completed_at', 'is', null)
+      .lt('completed_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+  } catch (_e) { /* never block a send over housekeeping */ }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -159,9 +167,10 @@ Deno.serve(async (req) => {
   if (body.aa_check && typeof body.aa_check === 'object') {
     const v = validateAaCheck(body.aa_check);
     if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    await purgeCompletedAa(supabase);
     const pending: string[] = [];
     for (const p of v.pairs) {
-      const { data, error } = await supabase.from('aa_items').select('id').eq('kind', p.kind).contains('animal_ids', [p.id]).limit(1);
+      const { data, error } = await supabase.from('aa_items').select('id').eq('kind', p.kind).contains('animal_ids', [p.id]).is('completed_at', null).limit(1);
       if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
       if (data && data.length) pending.push(p.kind + '|' + p.id);
     }
@@ -173,6 +182,7 @@ Deno.serve(async (req) => {
   if (body.aa && typeof body.aa === 'object') {
     const v = validateAaShare(body.aa);
     if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    await purgeCompletedAa(supabase);
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(new Date());
     const key = aaSourceKey(v.row.kind, day, v.row.animal_ids[0]);
     // Update the live card if there is one; otherwise insert. Never reply ok unless a row was really written:
@@ -180,7 +190,7 @@ Deno.serve(async (req) => {
     const updateCard = async () => {
       const { data, error } = await supabase.from('aa_items')
         .update({ payload: v.row.payload, sent_by: v.row.sent_by, updated_at: new Date().toISOString() })
-        .eq('source_key', key).select('id');
+        .eq('source_key', key).is('completed_at', null).select('id');
       return { n: data ? data.length : 0, error };
     };
     let u = await updateCard();
