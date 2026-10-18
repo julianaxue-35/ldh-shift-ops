@@ -540,3 +540,17 @@ test('aaSortItems: overdue first (most overdue first), then oldest first', () =>
   const out = L.aaSortItems([mk('new', 1), mk('late', 26), mk('old', 10), mk('later', 30)], NOW).map(i => i.id);
   assert.deepEqual(out, ['later', 'late', 'old', 'new']);
 });
+
+test('AA_KINDS and aaSummary cover the note and chart cards', () => {
+  assert.equal(L.AA_KINDS.processing_note, 'Processing notes');
+  assert.equal(L.AA_KINDS.si_note, 'Sick & injured notes');
+  assert.equal(L.AA_KINDS.med_chart, 'Medication chart');
+  assert.equal(L.aaSummary({ kind: 'processing_note', animal_ids: ['T-100'], payload: { text: 'Line one\nLine two' } }), 'Notes to enter in ShelterMate (2 lines)');
+  assert.equal(L.aaSummary({ kind: 'si_note', animal_ids: ['T-100'], payload: { text: 'One line' } }), 'Notes to enter in ShelterMate (1 line)');
+  assert.equal(L.aaSummary({ kind: 'med_chart', animal_ids: ['T-100'], payload: { lines: ['a', 'b'] } }), 'Medication chart (2 medications)');
+  assert.equal(L.aaSummary({ kind: 'processing_note', animal_ids: ['T-100'], payload: null }), 'Notes to enter in ShelterMate (0 lines)');
+});
+test('aaChangeKey changes when a card is updated', () => {
+  assert.notEqual(L.aaChangeKey({ id: 'a', updated_at: null }), L.aaChangeKey({ id: 'a', updated_at: '2026-10-18T01:00:00Z' }));
+  assert.equal(L.aaChangeKey({ id: 'a' }), L.aaChangeKey({ id: 'a', updated_at: null }));
+});
