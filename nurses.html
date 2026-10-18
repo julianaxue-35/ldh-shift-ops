@@ -22,6 +22,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/ops-core.js"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="lib/report7.js"></script>
 <style>
   :root {
     --bg: #F4F6FB;
@@ -249,9 +251,24 @@
       <div id="nr-list"></div>
     </section>
 
+    <section class="card" id="vacc-report-section">
+      <h2>Vaccinations due (Report 7)</h2>
+      <p class="subtle">Upload the <b>Vet Treatments Due</b> report (Excel) from ShelterMate. The animals are grouped by shelter location. Tick the ones you have vaccinated, then send them to the Admission AA to enter in ShelterMate.</p>
+      <input type="file" id="vacc-file" accept=".xlsx" style="margin-bottom:8px;">
+      <p id="vacc-error" class="oc-modal-error" style="display:none;"></p>
+      <div id="vacc-bar" style="display:none; margin:8px 0; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:0.85rem; font-weight:700; flex:1;" id="vacc-count"></span>
+          <button type="button" id="vacc-send">Send ticked to Admission AA</button>
+          <button type="button" class="secondary" id="vacc-clear">Clear list</button>
+        </div>
+      </div>
+      <div id="vacc-list"></div>
+    </section>
+
     <section class="card" id="proc-misc-section" style="display:none;">
-      <h2>Microchip &amp; UV tasks from the vets</h2>
-      <p class="subtle">Tasks a vet asked for or transferred — microchip and UV checks are done by the Processing nurse.</p>
+      <h2>Microchip, UV &amp; treatment tasks</h2>
+      <p class="subtle">Tasks staff or a vet asked for — microchip, UV and treatment checks are done by the Processing nurse.</p>
       <div id="proc-misc-list"></div>
     </section>
 
@@ -677,7 +694,7 @@
      ============================================================ */
   const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
   // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
-  const PROCESSING_MISC_KINDS = ['microchip', 'uv'];
+  const PROCESSING_MISC_KINDS = ['microchip', 'uv', 'treatment'];
   const AA_PREFILL_KIND = { fiv_test: 'fiv', microchip: 'microchip', uv: 'uv' };   // misc task -> Send-to-AA type
   function miscRowHtml(r) {
     return `
@@ -1013,6 +1030,78 @@
     const ok = document.getElementById('aa-sent'); ok.style.display = ''; setTimeout(() => { ok.style.display = 'none'; }, 4000);
   });
   syncAaFields();
+
+  /* ---- Vaccinations due (Report 7): upload, group by location, tick what was given, send to the Admission AA ----
+     Only ID, location, kennel, treatment, due date and weight are kept (names and microchips never leave the file),
+     in this browser for the rest of today. */
+  const VACC_KEY = 'ldh_vacc_report_v1';
+  let VACC = { day: '', animals: [], sent: [] };   // animals still to vaccinate; sent = IDs already passed to the AA today
+  const vaccPicked = new Set();                    // 'ID|treatment'
+  const vaccKey = a => a.id + '|' + a.treatment;
+  function vaccToday() { return LDHLogic.localISO(new Date()); }
+  function vaccLoad() {
+    try { const o = JSON.parse(localStorage.getItem(VACC_KEY) || '{}'); VACC = o.day === vaccToday() ? { day: o.day, animals: o.animals || [], sent: o.sent || [] } : { day: vaccToday(), animals: [], sent: [] }; }
+    catch (e) { VACC = { day: vaccToday(), animals: [], sent: [] }; }
+  }
+  function vaccSave() { try { localStorage.setItem(VACC_KEY, JSON.stringify(VACC)); } catch (e) { /* a convenience only */ } }
+  function renderVacc() {
+    const list = document.getElementById('vacc-list');
+    const groups = Report7.groupByLocation(VACC.animals, LDHLogic.LOCATIONS);
+    const today = vaccToday();
+    list.innerHTML = groups.map(g => `<div class="vr-group" data-location="${esc(g.location)}" style="margin-top:12px;">
+        <label style="display:flex; gap:8px; align-items:center; font-weight:700;"><input type="checkbox" class="vr-all" data-location="${esc(g.location)}" style="width:18px; height:18px;"> ${esc(g.location)} <span class="ameta">(${g.animals.length})</span></label>
+        ${g.animals.map(a => `<label class="vr-row" style="display:flex; gap:8px; align-items:center; padding:4px 0 4px 26px; border-top:1px solid var(--border);">
+          <input type="checkbox" class="vr-pick" data-key="${esc(vaccKey(a))}" data-location="${esc(g.location)}" ${vaccPicked.has(vaccKey(a)) ? 'checked' : ''} style="width:18px; height:18px;">
+          <span><b>${esc(a.id)}</b>${a.kennel ? ' · kennel ' + esc(a.kennel) : ''} · ${esc(a.treatment)}${a.weight ? ' · ' + esc(a.weight) + ' kg' : ''}${a.due ? ' · due ' + esc(a.due) : ''}${a.due && a.due < today ? ' <b style="color:#c0392b;">overdue</b>' : ''}</span></label>`).join('')}
+      </div>`).join('') || '<p class="empty-state">No report loaded.</p>';
+    const bar = document.getElementById('vacc-bar');
+    bar.style.display = VACC.animals.length ? '' : 'none';
+    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due \u00b7 ' + vaccPicked.size + ' ticked' + (VACC.sent.length ? ' \u00b7 ' + VACC.sent.length + ' already sent today' : '');
+  }
+  document.getElementById('vacc-file').addEventListener('change', async (e) => {
+    const err = document.getElementById('vacc-error'); err.style.display = 'none';
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const res = await Report7.parse(await file.arrayBuffer(), JSZip);
+    e.target.value = '';
+    if (res.error) { err.textContent = res.error; err.style.display = 'block'; return; }
+    const sent = new Set(VACC.sent);
+    const fresh = res.animals.filter(a => !sent.has(a.id + '|' + a.treatment));
+    VACC = { day: vaccToday(), animals: fresh, sent: VACC.sent };
+    vaccPicked.clear(); vaccSave(); renderVacc();
+    if (res.animals.length !== fresh.length) { err.textContent = (res.animals.length - fresh.length) + ' animal(s) in this report were already sent to the Admission AA today and have been left out.'; err.style.display = 'block'; }
+  });
+  document.getElementById('vacc-list').addEventListener('change', (e) => {
+    const all = e.target.closest('.vr-all'), one = e.target.closest('.vr-pick');
+    if (all) document.querySelectorAll('.vr-pick').forEach(c => { if (c.dataset.location === all.dataset.location) { c.checked = all.checked; if (all.checked) vaccPicked.add(c.dataset.key); else vaccPicked.delete(c.dataset.key); } });
+    if (one) { if (one.checked) vaccPicked.add(one.dataset.key); else vaccPicked.delete(one.dataset.key); }
+    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due \u00b7 ' + vaccPicked.size + ' ticked' + (VACC.sent.length ? ' \u00b7 ' + VACC.sent.length + ' already sent today' : '');
+  });
+  document.getElementById('vacc-clear').addEventListener('click', () => {
+    if (VACC.animals.length && !confirm('Clear this list? Animals you have not sent to the Admission AA will need the report uploaded again.')) return;
+    VACC = { day: vaccToday(), animals: [], sent: VACC.sent }; vaccPicked.clear(); vaccSave(); renderVacc();
+  });
+  document.getElementById('vacc-send').addEventListener('click', async () => {
+    const err = document.getElementById('vacc-error'), btn = document.getElementById('vacc-send');
+    err.style.display = 'none';
+    const chosen = VACC.animals.filter(a => vaccPicked.has(vaccKey(a)));
+    if (!chosen.length) { err.textContent = 'Tick the animals you have vaccinated first.'; err.style.display = 'block'; return; }
+    const initials = myInitials('processing');
+    if (!initials) { err.textContent = 'Enter your initials first.'; err.style.display = 'block'; return; }
+    // one card per vaccine, listing every ticked animal (the Admission AA ticks them off one at a time)
+    const byVaccine = new Map();
+    chosen.forEach(a => { if (!byVaccine.has(a.treatment)) byVaccine.set(a.treatment, []); byVaccine.get(a.treatment).push(a.id); });
+    const rows = Array.from(byVaccine.entries()).map(([vaccine, ids]) => ({ kind: 'vaccination', animal_ids: ids, payload: { vaccine, date: vaccToday() }, sent_by: initials }));
+    btn.disabled = true;
+    const { error } = await sb.from('aa_items').insert(rows);
+    btn.disabled = false;
+    if (error) { err.textContent = 'Could not send: ' + error.message; err.style.display = 'block'; return; }
+    const gone = new Set(chosen.map(vaccKey));
+    VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
+    VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));
+    vaccPicked.clear(); vaccSave(); renderVacc();
+    const ok = document.getElementById('vacc-count'); ok.textContent = 'Sent ' + chosen.length + ' to the Admission AA \u2713 \u00b7 ' + VACC.animals.length + ' still due';
+  });
+  vaccLoad(); renderVacc();
 
   /* ---- What the nurse team has done: today's ring + the daily average for the week / month / quarter / year ---- */
   let NURSE_COUNTS = null;   // null = the database function is not there yet

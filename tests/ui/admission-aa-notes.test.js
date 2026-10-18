@@ -36,6 +36,7 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(!/updated/i.test(n1), 'a never-updated card does not');
     await a.page.click('.aa-card[data-id="n2"] .aa-view');
     t.ok(await a.page.evaluate(() => window.__pwned === undefined), 'hostile note text is shown as text, not executed');
+    t.ok((await a.page.textContent('.aa-card[data-id="m1"] .aa-done')).trim() === 'Done ✓' && /Entered in ShelterMate/.test(await a.page.textContent('.aa-card[data-id="n1"] .aa-done')), 'a medication chart is marked Done; notes are marked Entered in ShelterMate');
     const m1 = await a.page.textContent('.aa-card[data-id="m1"]');
     t.ok(/Drug A 1 tablet BID x 5 days/.test(m1) && /Drug B 0.5 mL SID x 3 days/.test(m1), 'medication chart lines are listed on the card');
 
@@ -55,6 +56,10 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(xs[0][1] > xs[1][1] * 1.7 && Math.abs(xs[1][1] - xs[2][1]) < 4, 'notes take half the width, the other two a quarter each: ' + JSON.stringify(xs));
     t.ok(await a.page.isVisible('[data-col="tasks"] .col-empty'), 'an empty column says so');
 
+    const asked = []; a.page.on('dialog', d => asked.push(d.message()));
+    await a.page.click('.aa-card[data-id="m2"] .aa-done');
+    await a.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="m2"]'));
+    t.ok(asked.some(m => /printed the medication chart for T-301/.test(m)) && !asked.some(m => /ShelterMate/.test(m)), 'the chart question asks about printing, not ShelterMate: ' + asked.join(' | ').slice(0, 120));
     t.ok(await a.page.isHidden('#new-item-banner'), 'no banner for what was already there on load');
     await a.page.evaluate(() => sb.from('aa_items').update({ updated_at: new Date().toISOString(), payload: { text: 'Exam normal.\nWeight 12.5 kg.' } }).eq('id', 'n1'));
     await a.page.waitForSelector('#new-item-banner', { state: 'visible', timeout: 5000 });

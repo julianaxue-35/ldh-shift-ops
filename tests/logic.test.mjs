@@ -368,7 +368,7 @@ test('birthing reasons are Red-flag signs with readable labels; misc task labels
   assert.deepEqual(L.BIRTHING_SIGNS.map(b => b.key), ['birth_neonates', 'birth_discharge', 'birth_mum_distress']);
   L.BIRTHING_SIGNS.forEach(b => { assert.equal(L.signLabel(b.key), b.label); assert.equal(L.tierFromFlags([b.key]), 'red_flag'); });
   assert.ok(!L.EMERGENCY_SIGNS.some(s => s.key.startsWith('birth_')), 'birthing reasons are not general tick-boxes');
-  assert.deepEqual(Object.keys(L.MISC_TASK_LABELS).sort(), ['blood', 'ear_swab', 'fiv_test', 'ivft', 'microchip', 'other', 'uv']);
+  assert.deepEqual(Object.keys(L.MISC_TASK_LABELS).sort(), ['blood', 'ear_swab', 'fiv_test', 'ivft', 'microchip', 'other', 'treatment', 'uv']);
 });
 
 test('todayTasks: only today\'s checks — old open rows are carried over, duplicates count once per animal per shift', () => {
@@ -642,4 +642,21 @@ test('surgeryBreakdown: species x routine / non-routine across the periods', () 
   assert.equal(b.year.total, 7);
   assert.equal(b.year.routine, 4);
   assert.equal(b.year.nonRoutine, 3);
+});
+
+test('expandAnimalIds: litter ranges and shorthand', () => {
+  assert.deepEqual(L.expandAnimalIds('1170123 - 1170130').ids, ['1170123', '1170124', '1170125', '1170126', '1170127', '1170128', '1170129', '1170130']);
+  assert.deepEqual(L.expandAnimalIds('1170123,124,126 - 130').ids, ['1170123', '1170124', '1170126', '1170127', '1170128', '1170129', '1170130']);
+  assert.deepEqual(L.expandAnimalIds('1170123-130').ids, ['1170123', '1170124', '1170125', '1170126', '1170127', '1170128', '1170129', '1170130']);
+  assert.deepEqual(L.expandAnimalIds('1170123 1170125').ids, ['1170123', '1170125'], 'two full numbers are just two animals');
+  assert.deepEqual(L.expandAnimalIds('1170123, 1170123, 1170124').ids, ['1170123', '1170124'], 'duplicates collapse');
+  assert.deepEqual(L.expandAnimalIds('T-100').ids, ['T-100'], 'a hyphenated ID is one ID, not a range');
+  assert.deepEqual(L.expandAnimalIds('t-100, a2 a3').ids, ['T-100', 'A2', 'A3']);
+  assert.deepEqual(L.expandAnimalIds('A98-101').ids, ['A98', 'A99', 'A100', 'A101'], 'a range may cross a digit boundary');
+  assert.deepEqual(L.expandAnimalIds('1170129-1170132').ids, ['1170129', '1170130', '1170131', '1170132']);
+  assert.match(L.expandAnimalIds('1170130 - 1170123').error, /backwards/);
+  assert.match(L.expandAnimalIds('1170123 - 1179999').error, /more than 40/);
+  assert.deepEqual(L.expandAnimalIds('').ids, []);
+  assert.deepEqual(L.parseAnimalIds('1170123 - 1170125'), ['1170123', '1170124', '1170125'], 'the AA / nurse forms understand litters too');
+  assert.match(L.aaBuildItem({ kind: 'vaccination', idsText: '1170130 - 1170123', vaccine: 'F3', initials: 'ab' }).error, /backwards/);
 });
