@@ -211,6 +211,14 @@
     <section class="card" id="noga-section">
       <h2>Miscellaneous tasks</h2>
       <p class="subtle">Requested by the vets — bloods, ear swabs, FIV tests, flu cats needing IVFT and other tasks.</p>
+      <div id="bulk-bar-welfare" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:0.85rem; font-weight:700; flex:1;" id="bulk-count-welfare"></span>
+          <button type="button" id="bulk-done-welfare">Mark selected done</button>
+          <button type="button" class="secondary" id="bulk-clear-welfare">Clear</button>
+        </div>
+        <p id="bulk-error-welfare" class="oc-modal-error" style="display:none;"></p>
+      </div>
       <div id="noga-list"></div>
     </section>
     </div>
@@ -221,15 +229,22 @@
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
-      <div id="uv-bulk-bar" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
-        <div style="font-size:0.85rem; font-weight:700;" id="uv-bulk-count"></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px;">
-          <input id="uv-bulk-result" placeholder="One UV result for all, e.g. UV negative" style="flex:1; min-width:200px; margin:0;">
-          <button type="button" class="secondary" id="uv-bulk-negative">UV negative</button>
-          <button type="button" id="uv-bulk-send">Send to Admission AA &amp; mark done</button>
-          <button type="button" class="secondary" id="uv-bulk-clear">Clear</button>
+      <div id="bulk-bar-processing" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <span style="font-size:0.85rem; font-weight:700; flex:1;" id="bulk-count-processing"></span>
+          <button type="button" id="bulk-done-processing">Mark selected done</button>
+          <button type="button" class="secondary" id="bulk-clear-processing">Clear</button>
         </div>
-        <p id="uv-bulk-error" class="oc-modal-error" style="display:none;"></p>
+        <div id="uv-bulk-controls" style="display:none; margin-top:8px;">
+          <div style="font-size:0.78rem; margin-bottom:4px;">All UV checks: send one result to the Admission AA and mark them done.</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input id="uv-bulk-result" placeholder="One UV result for all, e.g. UV negative" style="flex:1; min-width:200px; margin:0;">
+            <button type="button" class="secondary" id="uv-bulk-negative">UV negative</button>
+            <button type="button" id="uv-bulk-send">Send to Admission AA &amp; mark done</button>
+          </div>
+          <p id="uv-bulk-error" class="oc-modal-error" style="display:none;"></p>
+        </div>
+        <p id="bulk-error-processing" class="oc-modal-error" style="display:none;"></p>
       </div>
       <div id="nr-list"></div>
     </section>
@@ -494,44 +509,73 @@
     const st = LDHLogic.nurseRequestStatus(r, Date.now());
     const k = nurseReqKind(r);
     return `<div class="attn-item nr-item">
-      <div style="display:flex; gap:8px; align-items:flex-start;">${uvPickBox('nr', r, r.kind === 'uv' && r.animal_id)}<div><div class="aname">${nurseReqTitle(r)}</div>
+      <div style="display:flex; gap:8px; align-items:flex-start;">${rowPickBox('nr', r, 'processing', r.kind === 'uv' && !!r.animal_id)}<div><div class="aname">${nurseReqTitle(r)}</div>
         <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div></div>
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
-        ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}">Send to AA</button>` : ''}
+        ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}" data-src="nr" data-rid="${esc(r.id)}">Send to AA</button>` : ''}
         ${r.kind === 'fiv' || r.kind === 'blood' ? `<button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>` : ''}
         <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
         <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
   }
-  /* ---- Bulk UV: tick several UV-only checks, give ONE result, one card to the Admission AA ---- */
-  const uvSel = new Map();   // 'nr:<id>' | 'misc:<id>' -> animal ID (survives the live refreshes)
-  function uvPickBox(src, r, show) {
-    if (!show) return '';
-    return `<input type="checkbox" class="uv-pick" data-src="${src}" data-id="${esc(r.id)}" data-animal="${esc(r.animal_id)}" ${uvSel.has(src + ':' + r.id) ? 'checked' : ''} aria-label="Select ${esc(r.animal_id)} for a bulk UV result" style="width:18px; height:18px; margin:3px 0 0; flex:none;">`;
+  /* ---- Pick several tasks and mark them done together; UV-only picks can also send one result to the AA ---- */
+  const picked = new Map();   // 'nr:<id>' | 'misc:<id>' -> {src, id, animal, col, uv}   (survives the live refreshes)
+  function rowPickBox(src, r, col, uv) {
+    return `<input type="checkbox" class="row-pick" data-src="${src}" data-id="${esc(r.id)}" data-animal="${esc(r.animal_id || '')}" data-col="${col}" data-uv="${uv ? '1' : ''}" ${picked.has(src + ':' + r.id) ? 'checked' : ''} aria-label="Select ${esc(r.animal_id || 'this task')}" style="width:18px; height:18px; margin:3px 0 0; flex:none;">`;
   }
-  function renderUvBar() {
+  function renderPickBars() {
     // drop selections whose task has gone (done elsewhere, refreshed away)
-    const live = new Set(Array.from(document.querySelectorAll('.uv-pick')).map(c => c.dataset.src + ':' + c.dataset.id));
-    Array.from(uvSel.keys()).forEach(k => { if (!live.has(k)) uvSel.delete(k); });
-    const bar = document.getElementById('uv-bulk-bar');
-    bar.style.display = uvSel.size ? '' : 'none';
-    document.getElementById('uv-bulk-count').textContent = uvSel.size + ' UV check' + (uvSel.size === 1 ? '' : 's') + ' selected';
+    const live = new Set(Array.from(document.querySelectorAll('.row-pick')).map(c => c.dataset.src + ':' + c.dataset.id));
+    Array.from(picked.keys()).forEach(k => { if (!live.has(k)) picked.delete(k); });
+    ['welfare', 'processing'].forEach(col => {
+      const mine = Array.from(picked.values()).filter(p => p.col === col);
+      document.getElementById('bulk-bar-' + col).style.display = mine.length ? '' : 'none';
+      document.getElementById('bulk-count-' + col).textContent = mine.length + ' task' + (mine.length === 1 ? '' : 's') + ' selected';
+    });
+    const proc = Array.from(picked.values()).filter(p => p.col === 'processing');
+    document.getElementById('uv-bulk-controls').style.display = proc.length && proc.every(p => p.uv && p.animal) ? '' : 'none';
   }
   document.addEventListener('change', (e) => {
-    const c = e.target.closest('.uv-pick'); if (!c) return;
+    const c = e.target.closest('.row-pick'); if (!c) return;
     const k = c.dataset.src + ':' + c.dataset.id;
-    if (c.checked) uvSel.set(k, c.dataset.animal); else uvSel.delete(k);
-    renderUvBar();
+    if (c.checked) picked.set(k, { src: c.dataset.src, id: c.dataset.id, animal: c.dataset.animal, col: c.dataset.col, uv: !!c.dataset.uv });
+    else picked.delete(k);
+    renderPickBars();
+  });
+  // Marks one task done the way its own Done button would. Returns an error message or ''.
+  async function markTaskDone(p, initials, nowISO) {
+    const res = p.src === 'nr'
+      ? await sb.from('nurse_requests').update({ done_count: (NURSE_REQUESTS.find(x => x.id === p.id) || {}).animal_count || 1, completed_at: nowISO }).eq('id', p.id)
+      : await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: nowISO }).eq('id', p.id);
+    return res.error ? res.error.message : '';
+  }
+  ['welfare', 'processing'].forEach(col => {
+    document.getElementById('bulk-clear-' + col).addEventListener('click', () => {
+      Array.from(picked.entries()).forEach(([k, p]) => { if (p.col === col) picked.delete(k); });
+      document.querySelectorAll('.row-pick').forEach(c => { if (c.dataset.col === col) c.checked = false; });
+      renderPickBars();
+    });
+    document.getElementById('bulk-done-' + col).addEventListener('click', async () => {
+      const mine = Array.from(picked.values()).filter(p => p.col === col);
+      if (!mine.length) return;
+      const initials = myInitials(col);
+      if (!initials) { const er = document.getElementById('bulk-error-' + col); er.textContent = 'Enter your initials first.'; er.style.display = 'block'; return; }
+      document.getElementById('bulk-error-' + col).style.display = 'none';
+      const now = new Date().toISOString(), problems = [];
+      for (const p of mine) { const m = await markTaskDone(p, initials, now); if (m) problems.push(m); else picked.delete(p.src + ':' + p.id); }
+      if (problems.length) alert(problems.length + ' task(s) could not be marked done: ' + problems[0]);
+      loadAll();
+    });
   });
   document.getElementById('uv-bulk-negative').addEventListener('click', () => { document.getElementById('uv-bulk-result').value = 'UV negative'; });
-  document.getElementById('uv-bulk-clear').addEventListener('click', () => { uvSel.clear(); document.querySelectorAll('.uv-pick').forEach(c => { c.checked = false; }); document.getElementById('uv-bulk-error').style.display = 'none'; renderUvBar(); });
   document.getElementById('uv-bulk-send').addEventListener('click', async () => {
     const err = document.getElementById('uv-bulk-error'), btn = document.getElementById('uv-bulk-send');
     err.style.display = 'none';
     const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
-    const ids = Array.from(new Set(Array.from(uvSel.values())));
+    const mine = Array.from(picked.values()).filter(p => p.col === 'processing' && p.uv && p.animal);
+    const ids = Array.from(new Set(mine.map(p => p.animal)));
     if (!ids.length) return fail('Tick the animals first.');
     const initials = myInitials('processing');
     const built = LDHLogic.aaBuildItem({ kind: 'uv', idsText: ids.join(', '), result: document.getElementById('uv-bulk-result').value, initials });
@@ -541,15 +585,9 @@
     if (error) { btn.disabled = false; return fail('Could not send: ' + error.message); }
     // the card is with the Admission AA; now mark each ticked task done
     const now = new Date().toISOString(), problems = [];
-    for (const [k] of Array.from(uvSel.entries())) {
-      const [src, id] = k.split(':');
-      const res = src === 'nr'
-        ? await sb.from('nurse_requests').update({ done_count: (NURSE_REQUESTS.find(x => x.id === id) || {}).animal_count || 1, completed_at: now }).eq('id', id)
-        : await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: now }).eq('id', id);
-      if (res.error) problems.push(res.error.message);
-    }
+    for (const p of mine) { const m = await markTaskDone(p, initials, now); if (m) problems.push(m); else picked.delete(p.src + ':' + p.id); }
     btn.disabled = false;
-    uvSel.clear(); document.getElementById('uv-bulk-result').value = '';
+    document.getElementById('uv-bulk-result').value = '';
     if (problems.length) alert('The result was sent to the Admission AA, but ' + problems.length + ' task(s) could not be marked done here: ' + problems[0] + '. Tick them off yourself.');
     loadAll();
   });
@@ -558,7 +596,7 @@
     const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
     document.getElementById('nr-list').innerHTML = open.map(r => r.arrived_at ? arrivedRowHtml(r) : scheduledRowHtml(r)).join('')
       || '<p class="empty-state">No nurse requests open.</p>';
-    renderUvBar();
+    renderPickBars();
   }
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
@@ -638,9 +676,9 @@
   function miscRowHtml(r) {
     return `
       <div class="attn-item noga-item">
-        <div style="display:flex; gap:8px; align-items:flex-start;">${uvPickBox('misc', r, r.task === 'uv' && !r.done)}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
+        <div style="display:flex; gap:8px; align-items:flex-start;">${r.done ? '' : rowPickBox('misc', r, isProcessingMisc(r) ? 'processing' : 'welfare', r.task === 'uv')}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
           <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div></div></div>
-        ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
+        ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
   function renderNoga() {
@@ -655,7 +693,7 @@
     document.getElementById('noga-list').innerHTML = welfare.map(miscRowHtml).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
     document.getElementById('proc-misc-list').innerHTML = processing.map(miscRowHtml).join('');
     document.getElementById('proc-misc-section').style.display = processing.length ? '' : 'none';
-    renderUvBar();
+    renderPickBars();
   }
   function isProcessingMisc(r) { return PROCESSING_MISC_KINDS.includes(r.task); }
   async function miscDoneClick(e) {
@@ -926,7 +964,11 @@
     if (kind === 'vaccination' && !document.getElementById('aa-vdate').value) document.getElementById('aa-vdate').value = LDHLogic.localISO(new Date());
   }
   document.getElementById('aa-kind').addEventListener('change', syncAaFields);
-  function prefillAaSend(kind, ids) {
+  // The task the Send-to-AA form was filled from: once its result is sent, that task is marked done (the form must
+  // still be about that same animal: if the nurse types a different ID the task is left open).
+  let aaSource = null;
+  function prefillAaSend(kind, ids, src) {
+    aaSource = src ? { src: src.src, id: src.id, animal: ids } : null;
     document.getElementById('aa-kind').value = kind;
     document.getElementById('aa-ids').value = ids;
     // a half-typed result from the previous animal must never ride along onto this one
@@ -935,7 +977,7 @@
     document.getElementById('aa-send-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
   document.addEventListener('click', (e) => {
-    const b = e.target.closest('.aa-prefill'); if (b) prefillAaSend(b.dataset.kind, b.dataset.ids);
+    const b = e.target.closest('.aa-prefill'); if (b) prefillAaSend(b.dataset.kind, b.dataset.ids, b.dataset.src ? { src: b.dataset.src, id: b.dataset.rid } : null);
   });
   document.getElementById('aa-send').addEventListener('click', async () => {
     const err = document.getElementById('aa-error'), btn = document.getElementById('aa-send');
@@ -950,6 +992,17 @@
     const { error } = await sb.from('aa_items').insert(built.row);
     btn.disabled = false;
     if (error) { err.textContent = 'Could not send: ' + error.message; err.style.display = 'block'; return; }
+    if (aaSource && built.row.animal_ids.length === 1 && built.row.animal_ids[0].toUpperCase() === String(aaSource.animal).trim().toUpperCase()) {
+      const task = aaSource.src === 'nr' ? NURSE_REQUESTS.find(x => x.id === aaSource.id) : NOGA_REQUESTS.find(x => x.id === aaSource.id);
+      if (task) {
+        const col = aaSource.src === 'nr' || isProcessingMisc(task) ? 'processing' : 'welfare';
+        const who = myInitials(col);
+        const m = await markTaskDone({ src: aaSource.src, id: aaSource.id }, who, new Date().toISOString());
+        if (m) alert('The result was sent to the Admission AA, but the task could not be marked done here: ' + m + '. Tick it off yourself.');
+        loadAll();
+      }
+    }
+    aaSource = null;
     ['aa-ids', 'aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
     const ok = document.getElementById('aa-sent'); ok.style.display = ''; setTimeout(() => { ok.style.display = 'none'; }, 4000);
   });
