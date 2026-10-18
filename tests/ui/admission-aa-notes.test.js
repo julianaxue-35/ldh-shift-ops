@@ -9,7 +9,8 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
   const seed = { aa_items: [
     { id: 'n1', kind: 'processing_note', animal_ids: ['T-100'], sent_by: 'AB', sent_at: ago(2 * H), payload: { text: 'Exam normal.\nWeight 12 kg.', docx_b64: DOCX, location: 'Pound 1' } },
     { id: 'n2', kind: 'processing_note', animal_ids: ['T-200'], sent_by: 'AB', sent_at: ago(3 * H), updated_at: ago(10 * 60 * 1000), payload: { text: '<img src=x onerror=window.__pwned=1>' } },
-    { id: 'm1', kind: 'med_chart', animal_ids: ['T-300'], sent_by: 'CD', sent_at: ago(1 * H), payload: { lines: ['Drug A 1 tablet BID x 5 days', 'Drug B 0.5 mL SID x 3 days'] } }
+    { id: 'm1', kind: 'med_chart', animal_ids: ['T-300'], sent_by: 'CD', sent_at: ago(1 * H), payload: { lines: ['Drug A 1 tablet BID x 5 days', 'Drug B 0.5 mL SID x 3 days'], xlsx_b64: DOCX } },
+    { id: 'm2', kind: 'med_chart', animal_ids: ['T-301'], sent_by: 'CD', sent_at: ago(1 * H), payload: { lines: ['Drug C'] } }
   ] };
   const a = await open(seed, 'admission-aa.html');
   try {
@@ -37,6 +38,13 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(await a.page.evaluate(() => window.__pwned === undefined), 'hostile note text is shown as text, not executed');
     const m1 = await a.page.textContent('.aa-card[data-id="m1"]');
     t.ok(/Drug A 1 tablet BID x 5 days/.test(m1) && /Drug B 0.5 mL SID x 3 days/.test(m1), 'medication chart lines are listed on the card');
+
+    t.ok(await a.page.locator('.aa-card[data-id="m2"] .aa-xlsx').count() === 0, 'no Download Excel button when no Excel was sent');
+    const dlx = a.page.waitForEvent('download');
+    await a.page.click('.aa-card[data-id="m1"] .aa-xlsx');
+    const dx = await dlx;
+    t.ok(dx.suggestedFilename() === 'T-300_medication_chart.xlsx', 'Excel download is named after the animal: ' + dx.suggestedFilename());
+    t.ok(require('fs').readFileSync(await dx.path()).toString() === 'PK-fake-docx-bytes', 'downloaded bytes are the decoded Excel file');
 
     t.ok(await a.page.isHidden('#new-item-banner'), 'no banner for what was already there on load');
     await a.page.evaluate(() => sb.from('aa_items').update({ updated_at: new Date().toISOString(), payload: { text: 'Exam normal.\nWeight 12.5 kg.' } }).eq('id', 'n1'));

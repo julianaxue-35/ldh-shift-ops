@@ -33,6 +33,13 @@ test('med_chart needs lines instead of text', () => {
   assert.deepEqual(r.row.payload.lines, ['Drug A 1 tablet BID x 5 days']);
   assert.match(validateAaShare({ kind: 'med_chart', animal_id: 'T-100', payload: { lines: [] } }).error, /lines/i);
 });
+test('med_chart keeps a valid Excel file and refuses a bad or oversize one', () => {
+  const mc = (x) => ({ kind: 'med_chart', animal_id: 'T-100', payload: Object.assign({ lines: ['Drug A'] }, x) });
+  assert.equal(validateAaShare(mc({ xlsx_b64: 'UEsDBA==' })).row.payload.xlsx_b64, 'UEsDBA==');
+  assert.equal(validateAaShare(mc({})).row.payload.xlsx_b64, undefined);
+  assert.match(validateAaShare(mc({ xlsx_b64: 'A'.repeat(1200001) })).error, /too large/i);
+  assert.match(validateAaShare(mc({ xlsx_b64: '<script>' })).error, /base64/i);
+});
 test('sent_by is trimmed, upper-cased and limited to 4 characters; hostile text is kept as plain data', () => {
   assert.equal(validateAaShare(ok({ sent_by: ' abcdef ' })).row.sent_by, 'ABCD');
   assert.equal(validateAaShare(ok({ payload: { text: '<script>alert(1)</script>' } })).row.payload.text, '<script>alert(1)</script>');

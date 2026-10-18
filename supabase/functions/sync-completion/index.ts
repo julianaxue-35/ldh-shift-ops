@@ -94,6 +94,11 @@ function validateAaShare(a) {
     const lines = Array.isArray(p.lines) ? p.lines.filter((l) => typeof l === 'string' && l.trim()).map((l) => l.trim().slice(0, 500)).slice(0, 20) : [];
     if (!lines.length) return { error: 'The medication chart has no lines.' };
     payload = { lines: lines };
+    if (p.xlsx_b64 != null && p.xlsx_b64 !== '') {
+      if (typeof p.xlsx_b64 !== 'string' || p.xlsx_b64.length > 1200000) return { error: 'The Excel chart is too large to send.' };
+      if (!/^[A-Za-z0-9+\/=]+$/.test(p.xlsx_b64)) return { error: 'The Excel chart is not valid base64.' };
+      payload.xlsx_b64 = p.xlsx_b64;
+    }
   } else {
     const text = typeof p.text === 'string' ? p.text.trim() : '';
     if (!text) return { error: 'The note text is empty.' };

@@ -213,7 +213,7 @@
           ${p.docx_b64 ? `<button type="button" class="secondary aa-docx" data-id="${esc(it.id)}">Download Word</button>` : ''}
         </div><pre class="aa-notes" data-id="${esc(it.id)}">${esc(p.text || '')}</pre>`;
     }
-    if (it.kind === 'med_chart') return `<ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
+    if (it.kind === 'med_chart') return `<ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul>${p.xlsx_b64 ? `<div class="aa-extra"><button type="button" class="secondary aa-xlsx" data-id="${esc(it.id)}">Download Excel chart</button></div>` : ''}`;
     return '';
   }
   function cardHtml(it, now) {
@@ -234,18 +234,20 @@
     try { await navigator.clipboard.writeText(text); }
     catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) { /* nothing more to try */ } ta.remove(); }
   }
-  function downloadDocx(it) {
+  function downloadFile(it, field, mime, suffix, what) {
     let bin;
-    try { bin = atob((it.payload || {}).docx_b64 || ''); }
-    catch (e) { alert('That Word file could not be opened. Use View notes or Copy instead.'); return; }
+    try { bin = atob((it.payload || {})[field] || ''); }
+    catch (e) { alert('That ' + what + ' file could not be opened.'); return; }
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
-    a.download = (it.animal_ids[0] || 'notes') + '_notes.docx';
+    a.href = URL.createObjectURL(new Blob([bytes], { type: mime }));
+    a.download = (it.animal_ids[0] || 'animal') + suffix;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
+  const downloadDocx = it => downloadFile(it, 'docx_b64', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '_notes.docx', 'Word');
+  const downloadXlsx = it => downloadFile(it, 'xlsx_b64', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '_medication_chart.xlsx', 'Excel');
   function render() {
     const now = Date.now();
     const sorted = LDHLogic.aaSortItems(ITEMS, now);
@@ -265,6 +267,8 @@
     if (copy) { const it = ITEMS.find(x => x.id === copy.dataset.id); if (it) copyText((it.payload || {}).text || ''); return; }
     const dx = e.target.closest('.aa-docx');
     if (dx) { const it = ITEMS.find(x => x.id === dx.dataset.id); if (it) downloadDocx(it); return; }
+    const xl = e.target.closest('.aa-xlsx');
+    if (xl) { const it = ITEMS.find(x => x.id === xl.dataset.id); if (it) downloadXlsx(it); return; }
     const btn = e.target.closest('.aa-done'); if (!btn) return;
     if (!confirm('Have you entered this in ShelterMate? Ticking removes it from here for good.')) return;
     btn.disabled = true;
