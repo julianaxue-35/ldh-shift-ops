@@ -98,7 +98,8 @@
   /* Top KPI row — completion donut and the 3 shift cards as 4 equal,
      same-weight columns, instead of the donut sitting alone in its own
      full-width row above them. */
-  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  @media (max-width: 1250px) { .kpi-row { grid-template-columns: repeat(3, 1fr); } }
   .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .totals-period { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
   .totals-period h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
@@ -328,6 +329,14 @@
         <div class="completion-side">
           <b id="completion-fraction">–</b>
           tasks completed today, across all shifts.
+        </div>
+      </section>
+      <section class="card completion-card" id="request-card">
+        <div class="completion-donut" id="request-donut"></div>
+        <div class="completion-side">
+          <b id="request-fraction">–</b>
+          shelter check requests completed today.
+          <span id="request-older" style="display:block; margin-top:2px;"></span>
         </div>
       </section>
       <div id="shift-progress-row" style="display:contents;"></div>
@@ -579,6 +588,21 @@
   AnimalHistoryView.attach({ sb: () => sb, input: document.getElementById('search-box'), out: document.getElementById('animal-history-out'), card: document.getElementById('animal-history') });
 
   /* ---------- render ---------- */
+  // Second ring: the checks shelter staff ask the vets for (flagged requests), done vs raised today.
+  function renderRequestRing() {
+    const r = LDHLogic.requestRing(TASKS, Date.now());
+    const pct = r.total ? Math.round((r.done / r.total) * 100) : 0;
+    const rad = 46, stroke = 12, c = 2 * Math.PI * rad;
+    document.getElementById('request-donut').innerHTML = `
+      <svg viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="${rad}" fill="var(--neutral-100)" stroke="var(--donut-track)" stroke-width="${stroke}"/>
+        <circle cx="60" cy="60" r="${rad}" fill="none" stroke="var(--violet, #7c5cbf)" stroke-width="${stroke}"
+          stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - pct / 100)).toFixed(1)}"/>
+      </svg>
+      <span class="val">${pct}%</span><span class="lbl">REQUESTS</span>`;
+    document.getElementById('request-fraction').textContent = `${r.done} of ${r.total}`;
+    document.getElementById('request-older').textContent = r.older ? `+ ${r.older} older still open` : '';
+  }
   function renderCompletion() {
     const today = LDHLogic.todayTasks(TASKS, Date.now());
     const total = today.length || 1;
@@ -725,7 +749,7 @@
   }
 
   function renderAll() {
-    renderCompletion();
+    renderCompletion(); renderRequestRing();
     renderShiftProgress();
     renderCases();
     renderDiseaseWatch();
