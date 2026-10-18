@@ -205,6 +205,7 @@
       </div>
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
+    <div id="aa-on-duty" style="margin:14px 0 0; font-size:0.9rem;"></div>
     <div id="aa-overdue-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#c0392b; color:#fff; font-weight:700;"></div>
     <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
     <section class="card" id="aa-completed" style="margin-top:18px;"></section>
@@ -214,6 +215,7 @@
   let sb = null;
   const esc = OpsCore.esc;
   let ITEMS = [];
+  let ON_DUTY = [];                      // today's nurse initials, set on the Nurses page
   let DONE = [];                         // completed cards (kept at most 24 h, newest first)
   let doneThisSession = 0;               // a count only; no patient data is kept in the browser
 
@@ -301,6 +303,9 @@
           return `<div class="aa-col" data-col="${c.key}"><h3>${c.title} <span class="box-count">${mine.length}</span>${late ? `<span class="box-overdue">${late} overdue</span>` : ''}</h3>${mine.map(i => cardHtml(i, now)).join('') || `<p class="col-empty">${c.empty}</p>`}</div>`;
         }).join('') + '</div>';
     document.getElementById('aa-completed').innerHTML = completedHtml();
+    const who = role => (ON_DUTY.find(r => r.role === role) || {}).initials;
+    document.getElementById('aa-on-duty').innerHTML = '<b>Nurses on today:</b> Welfare nurse ' + (who('welfare') ? '<b>' + esc(who('welfare')) + '</b>' : '<span style="opacity:.6">not set yet</span>') +
+      ' \u00b7 Processing nurse ' + (who('processing') ? '<b>' + esc(who('processing')) + '</b>' : '<span style="opacity:.6">not set yet</span>');
     openNotes.forEach(id => { const el = document.querySelector('.aa-notes[data-id="' + CSS.escape(id) + '"]'); if (el) el.classList.add('open'); });
     const late = sorted.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
     const el = document.getElementById('aa-overdue-count');
@@ -407,6 +412,8 @@
   }
 
   async function loadAll() {
+    // who is on today (initials from the Nurses page); if that table is not there yet the strip just says "not set yet"
+    sb.from('nurse_on_duty').select('*').eq('day', new Date().toLocaleDateString('en-CA')).then(r => { ON_DUTY = (r && !r.error && r.data) || []; render(); }, () => {});
     const { data, error } = await sb.from('aa_items').select('*').order('sent_at', { ascending: true });
     const warn = document.getElementById('aa-load-error');
     if (error) {                                  // keep what is on screen; never show "Nothing waiting" for a failed load
@@ -432,7 +439,7 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['aa_items'], loadAll);
+    OpsCore.subscribe(['aa_items', 'nurse_on_duty'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
   })();
 </script>

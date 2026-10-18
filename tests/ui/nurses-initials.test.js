@@ -31,6 +31,16 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     t.ok(db.noga_requests.find(r => r.animal_id === 'CH-1').done_by === 'CD', 'a microchip task (processing column) is stamped with the Processing initials');
     t.ok((await a.page.evaluate(() => window.__prompts.length)) === 0, 'no initials prompt appeared: they are set once for the day');
 
+    /* shared with the Admission AA page: who is on today */
+    await a.page.waitForTimeout(900);
+    const duty = (await a.db()).nurse_on_duty;
+    t.ok(duty.length === 2 && duty.find(r => r.role === 'welfare').initials === 'AB' && duty.find(r => r.role === 'processing').initials === 'CD', 'the two initials are shared for the AA page: ' + JSON.stringify(duty.map(r => r.role + ':' + r.initials)));
+    await a.page.fill('#initials-processing', '');
+    await a.page.waitForTimeout(900);
+    t.ok(!(await a.db()).nurse_on_duty.some(r => r.role === 'processing'), 'clearing a box removes it from the AA page');
+    await a.page.fill('#initials-processing', 'cd');
+    await a.page.waitForTimeout(900);
+
     /* remembered for the day */
     await a.page.reload();
     await a.page.waitForSelector('#initials-welfare');
