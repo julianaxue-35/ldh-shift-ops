@@ -91,6 +91,7 @@ const t = require('./check')('flag-form');
   const nrs = (await db()).nurse_requests.filter(r => r.animal_id === 'FOS-1');
   t.ok(nrs.length === 1 && nrs[0].kind === 'microchip_uv' && nrs[0].animal_count === 1 && nrs[0].due_window === '24_48h' && nrs[0].location === 'Pathway' && nrs[0].species === 'cat',
     'ticking microchip + UV creates ONE combined single-animal nurse request with the chosen 24-48 h window at the foster location');
+  t.ok((await db()).tasks.filter(x => x.title === 'FOS-1').length === 0, 'microchip/UV foster request goes straight to the nurse: nothing on the vet board');
   t.ok(!(await page.isVisible('#req-nurse-extras')), 'extras reset after submit');
   await page.selectOption('#req-type', 'foster');
   await page.fill('#req-title', 'FOS-2');
@@ -99,11 +100,14 @@ const t = require('./check')('flag-form');
   await page.waitForTimeout(300);
   const one = (await db()).nurse_requests.filter(r => r.animal_id === 'FOS-2');
   t.ok(one.length === 1 && one[0].kind === 'uv', 'only UV ticked still creates a plain UV request');
+  t.ok((await db()).tasks.filter(x => x.title === 'FOS-2').length === 0, 'UV-only foster request is not on the vet board either');
+  t.ok(/vet board/i.test(await page.evaluate(() => document.getElementById('req-nurse-extras').textContent)), 'the options box says it skips the vet board');
   await page.selectOption('#req-type', 'rescue');
   await page.fill('#req-title', 'RES-1');
   await page.click('#req-submit');
   await page.waitForTimeout(200);
   t.ok((await db()).nurse_requests.filter(r => r.animal_id === 'RES-1').length === 0, 'no boxes ticked creates no nurse requests');
+  t.ok((await db()).tasks.filter(x => x.title === 'RES-1').length === 1, 'a rescue request with nothing ticked still goes to the vet board');
 
   t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   await browser.close();

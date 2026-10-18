@@ -256,7 +256,7 @@
         <select id="req-birthing-reason" style="margin:0;"></select>
       </div>
       <div id="req-nurse-extras" style="display:none; margin:10px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:12px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Also ask the nurses to (goes to the Processing nurse board — ticking both makes one task)</div>
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Microchip / UV — send straight to the Processing nurse (skips the vet board; ticking both makes one task)</div>
         <div style="display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;">
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
@@ -464,31 +464,37 @@
       condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
       done: false,
     };
-    let { error } = await sb.from('tasks').insert(row);
-    /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
-       (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
-       flag_history, so the earlier flag is remembered); if it is still open, say so rather than failing. */
-    if (error && error.code === '23505') {
-      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
-      const old = found && found[0];
-      if (old && !old.done) { btn.disabled = false; alert(title + ' is already flagged in that pen and still open — it is on the board.'); return; }
-      if (old) {
-        ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
-          created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
-          claimed_by: null, claimed_at: null, vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null,
-          note: null, treatment: null, plan: null,
-        })).eq('id', old.id));
+    /* 2026-10-18: a Foster / Rescue request that ticks Microchip and/or UV goes STRAIGHT to the Processing nurse and
+       is not put on the vet board (vets had cards that gave no reason). With neither ticked it goes to the vets as before. */
+    const reqType = document.getElementById('req-type').value;
+    const wanted = (reqType === 'foster' || reqType === 'rescue')
+      ? [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k) : [];
+    // both ticked = ONE combined "Microchip + UV" task for the same animal, not two
+    const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
+    let error = null;
+    if (!kinds.length) {
+      ({ error } = await sb.from('tasks').insert(row));
+      /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
+         (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
+         flag_history, so the earlier flag is remembered); if it is still open, say so rather than failing. */
+      if (error && error.code === '23505') {
+        const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+        const old = found && found[0];
+        if (old && !old.done) { btn.disabled = false; alert(title + ' is already flagged in that pen and still open — it is on the board.'); return; }
+        if (old) {
+          ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
+            created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
+            claimed_by: null, claimed_at: null, vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null,
+            note: null, treatment: null, plan: null,
+          })).eq('id', old.id));
+        }
       }
     }
     btn.disabled = false;
     if (error) { alert('Could not submit: ' + error.message); return; }
     /* Foster / rescue requests can also ask the nurses for a microchip and/or a UV check — one nurse request per
        ticked task, for this named animal, due today, shown on the Processing nurse board. */
-    const reqType = document.getElementById('req-type').value;
-    if (reqType === 'foster' || reqType === 'rescue') {
-      const wanted = [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k);
-      // 2026-10-17: both ticked = ONE combined "Microchip + UV" task for the same animal, not two.
-      const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
+    if (kinds.length) {
       const KIND_NAMES = { microchip: 'microchip', uv: 'UV', microchip_uv: 'microchip + UV' };
       for (const kind of kinds) {
         const { error: nrErr } = await sb.from('nurse_requests').insert({
