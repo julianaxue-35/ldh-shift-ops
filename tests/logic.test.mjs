@@ -571,3 +571,24 @@ test('aaBuildItem: a UV result may list several animals; FIV and microchip still
   assert.match(L.aaBuildItem({ kind: 'fiv', idsText: 'a1, a2', result: 'neg', initials: 'cd' }).error, /one animal at a time/i);
   assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'a1, a2', chipNumber: '985112000123456', initials: 'cd' }).error, /one animal at a time/i);
 });
+
+test('reasonsOf lists the first reason then each extra; mergeReason adds one, unions signs and only raises urgency', () => {
+  const task = { created_at: '2026-10-19T08:00:00Z', urgency: 'routine', condition: 'vomiting', problem: 'twice since breakfast', red_flags: [], extra_reasons: [] };
+  const r1 = L.reasonsOf(task);
+  assert.equal(r1.length, 1);
+  assert.equal(r1[0].text, 'Vomiting — twice since breakfast');
+  assert.equal(r1[0].extra, false);
+  const patch = L.mergeReason(task, { at: '2026-10-19T09:00:00Z', by: 'Shelter Staff', condition: 'diarrhoea', problem: 'watery', red_flags: ['collapse'], urgency: 'routine' });
+  assert.equal(patch.extra_reasons.length, 1);
+  assert.deepEqual(patch.red_flags, ['collapse']);
+  assert.equal(patch.urgency, 'red_flag');
+  const merged = Object.assign({}, task, patch);
+  const r2 = L.reasonsOf(merged);
+  assert.equal(r2.length, 2);
+  assert.match(r2[1].text, /Diarrhoea/i);
+  assert.equal(r2[1].extra, true);
+  const p2 = L.mergeReason({ urgency: 'urgent', red_flags: [], extra_reasons: [{ at: 'x' }] }, { condition: 'other', urgency: 'routine', red_flags: [] });
+  assert.equal(p2.urgency, 'urgent', 'a later routine comment never lowers an urgent case');
+  assert.equal(p2.extra_reasons.length, 2);
+  assert.equal(L.reasonsOf({ created_at: 'x' })[0].text, '');
+});
