@@ -205,6 +205,7 @@
       </div>
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
+    <div id="aa-overdue-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#c0392b; color:#fff; font-weight:700;"></div>
     <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
     <section class="card" id="aa-completed" style="margin-top:18px;"></section>
   </main>
@@ -305,6 +306,9 @@
     const el = document.getElementById('aa-overdue-count');
     el.style.display = late ? '' : 'none';
     el.textContent = late + ' overdue';
+    const ob = document.getElementById('aa-overdue-banner');
+    ob.style.display = late ? 'block' : 'none';
+    ob.textContent = late ? '\u26a0 ' + late + ' card' + (late > 1 ? 's are' : ' is') + ' overdue (waiting over 24 hours). Please enter ' + (late > 1 ? 'these' : 'this') + ' in ShelterMate ASAP.' : '';
     document.getElementById('aa-session-count').textContent = doneThisSession ? 'Done this session: ' + doneThisSession : '';
   }
   document.getElementById('aa-list').addEventListener('click', async (e) => {
