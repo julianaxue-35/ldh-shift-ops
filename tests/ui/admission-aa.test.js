@@ -31,6 +31,9 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
   ] };
   const a = await open(seed, 'admission-aa.html');
   try {
+    t.ok((await a.page.textContent('[data-col="tasks"] .box-overdue')).trim() === '1 overdue', 'the nurse-tasks box shows its own overdue count');
+    t.ok(await a.page.locator('[data-col="notes"] .box-overdue').count() === 0, 'a box with nothing overdue shows no overdue label');
+    t.ok(await a.page.evaluate(() => ['notes', 'charts', 'tasks'].every(k => { const s = getComputedStyle(document.querySelector('[data-col="' + k + '"]')); return parseFloat(s.borderTopWidth) >= 1 && parseFloat(s.borderRadius) >= 8 && parseFloat(s.paddingTop) >= 10; })), 'each of the three is a defined, padded, rounded box');
     const order = await a.page.$$eval('.aa-card', els => els.map(e => e.dataset.id));
     t.ok(order[0] === 'late', 'the overdue card is first: ' + order.join(','));
     t.ok(order.indexOf('vacc') < order.indexOf('fresh'), 'oldest first among the on-time cards');

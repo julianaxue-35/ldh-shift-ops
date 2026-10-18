@@ -170,10 +170,15 @@
   .aa-notes.open { display: block; }
   .aa-extra { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .aa-lines { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; }
-  .aa-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; align-items: start; }
-  .aa-col { min-width: 0; }
-  .aa-col > h3 { margin: 0 0 8px; font-size: 14px; }
-  .aa-col .col-empty { color: var(--ink-soft, #6b7280); font-size: 13px; margin: 6px 0; }
+  .aa-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; align-items: start; }
+  .aa-col { min-width: 0; background: var(--card-bg); border: 1px solid var(--border); border-top-width: 4px; border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px 14px 10px; }
+  .aa-col[data-col="notes"] { border-top-color: #3b6ea5; }
+  .aa-col[data-col="charts"] { border-top-color: #2f8f5b; }
+  .aa-col[data-col="tasks"] { border-top-color: #c98a1a; }
+  .aa-col > h3 { margin: 0 0 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .aa-col > h3 .box-count { font-size: 12px; font-weight: 600; background: rgba(128,128,128,.18); border-radius: 999px; padding: 1px 9px; }
+  .aa-col > h3 .box-overdue { font-size: 12px; font-weight: 700; color: #fff; background: #c0392b; border-radius: 999px; padding: 1px 9px; }
+  .aa-col .col-empty { color: var(--ink-soft, #6b7280); font-size: 13px; margin: 6px 0 4px; }
   .aa-col .aa-card { margin-bottom: 8px; }
   @media (max-width: 900px) { .aa-cols { grid-template-columns: 1fr; } }
 </style>
@@ -200,7 +205,7 @@
       </div>
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
-    <section class="card"><h2>To enter in ShelterMate</h2><div id="aa-list"></div></section>
+    <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
   </main>
 </div>
 <script>
@@ -263,12 +268,12 @@
       { key: 'charts', title: 'Medication charts to print', has: i => i.kind === 'med_chart', empty: 'No charts waiting.' },
       { key: 'tasks', title: 'Tasks from nurses', has: i => i.kind !== 'processing_note' && i.kind !== 'si_note' && i.kind !== 'med_chart', empty: 'No tasks waiting.' }
     ];
-    document.getElementById('aa-list').innerHTML = sorted.length
-      ? '<div class="aa-cols">' + COLS.map(c => {
+    document.getElementById('aa-list').innerHTML = (sorted.length ? '' : '<p class="empty-state">Nothing waiting. New items from the nurses will appear here with a sound.</p>')
+      + '<div class="aa-cols">' + COLS.map(c => {
           const mine = sorted.filter(c.has);
-          return `<div class="aa-col" data-col="${c.key}"><h3>${c.title} (${mine.length})</h3>${mine.map(i => cardHtml(i, now)).join('') || `<p class="col-empty">${c.empty}</p>`}</div>`;
-        }).join('') + '</div>'
-      : '<p class="empty-state">Nothing waiting. New items from the nurses will appear here with a sound.</p>';
+          const late = mine.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
+          return `<div class="aa-col" data-col="${c.key}"><h3>${c.title} <span class="box-count">${mine.length}</span>${late ? `<span class="box-overdue">${late} overdue</span>` : ''}</h3>${mine.map(i => cardHtml(i, now)).join('') || `<p class="col-empty">${c.empty}</p>`}</div>`;
+        }).join('') + '</div>';
     openNotes.forEach(id => { const el = document.querySelector('.aa-notes[data-id="' + CSS.escape(id) + '"]'); if (el) el.classList.add('open'); });
     const late = sorted.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
     const el = document.getElementById('aa-overdue-count');
