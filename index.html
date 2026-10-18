@@ -256,7 +256,7 @@
         <select id="req-birthing-reason" style="margin:0;"></select>
       </div>
       <div id="req-nurse-extras" style="display:none; margin:10px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:12px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Send straight to the nurses (skips the vet board): Microchip / UV go to the Processing nurse (ticking both makes one task); a Treatment check / due goes to the Welfare nurse</div>
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Send straight to the Processing nurse (skips the vet board): Microchip / UV (ticking both makes one task) and Treatment check / due, so one person checks the animal in one visit</div>
         <div style="display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;">
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
@@ -485,7 +485,7 @@
     const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
     const wantTreatment = fr && document.getElementById('req-x-treatment').checked;
     const KIND_NAMES = { microchip: 'microchip', uv: 'UV check', microchip_uv: 'microchip + UV check' };
-    const asked = kinds.map(k => KIND_NAMES[k]).concat(wantTreatment ? ['treatment check/due'] : []);
+    const asked = kinds.map(k => KIND_NAMES[k]);   // what decides vet vs nurse routing; a treatment check never needs a vet
     const baseRow = {
       location: isOffsite ? room : (pen ? `${room} / ${pen}` : room),
       location_detail: isOffsite ? (detail || null) : null,
@@ -498,7 +498,7 @@
       condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
       done: false,
     };
-    const needsVet = !asked.length || allFlags().length > 0 || !!baseRow.condition || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
+    const needsVet = (!asked.length && !wantTreatment) || allFlags().length > 0 || !!baseRow.condition || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
 
     async function submitOne(title) {
       const row = Object.assign({}, baseRow, { title, sm_number: needsMed ? title : null });
@@ -533,8 +533,8 @@
         }
       }
       if (error) { alert('Could not submit ' + title + ': ' + error.message); return false; }
+      const note = TYPE_LABELS[reqType] + (isOffsite && detail ? ' \u2014 ' + detail : '');
       if (asked.length && !needsVet) {
-        const note = TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '');
         for (const kind of kinds) {
           const { error: nrErr } = await sb.from('nurse_requests').insert({
             kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
@@ -542,12 +542,14 @@
           });
           if (nrErr) alert('The ' + KIND_NAMES[kind] + ' request for ' + title + ' could not be saved: ' + nrErr.message);
         }
-        if (wantTreatment) {
-          const { error: trErr } = await sb.from('noga_requests').insert({
-            animal_id: title, location: baseRow.location, location_detail: baseRow.location_detail, task: 'treatment', note, added_by: 'Shelter Staff'
-          });
-          if (trErr) alert('The treatment check for ' + title + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
-        }
+      }
+      // a treatment check / due always goes to the Processing nurse (same person, same visit as the microchip / UV),
+      // whether or not the rest of the request also needs a vet
+      if (wantTreatment) {
+        const { error: trErr } = await sb.from('noga_requests').insert({
+          animal_id: title, location: baseRow.location, location_detail: baseRow.location_detail, task: 'treatment', note, added_by: 'Shelter Staff'
+        });
+        if (trErr) alert('The treatment check for ' + title + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
       }
       return true;
     }

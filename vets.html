@@ -936,7 +936,7 @@
       <div class="oc-modal-overlay transfer-modal-overlay" data-id="${esc(t.id)}">
         <div class="oc-modal done-modal">
           <h3 class="done-modal-title">Transfer to nurse — ${esc(t.title)}</h3>
-          <p style="font-size:0.85rem; margin:0 0 10px;">The Welfare nurse gets this under Miscellaneous tasks (microchip and UV checks go to the Processing nurse), and the case leaves the vet board.</p>
+          <p style="font-size:0.85rem; margin:0 0 10px;">The Welfare nurse gets this under Miscellaneous tasks (microchip, UV and treatment checks go to the Processing nurse), and the case leaves the vet board.</p>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the nurse</label>
           <select class="transfer-task">${Object.keys(LDHLogic.MISC_TASK_LABELS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('')}</select>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Note for the nurse (optional)</label>

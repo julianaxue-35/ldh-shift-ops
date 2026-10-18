@@ -73,3 +73,11 @@ test('0022: a treatment misc task is accepted, junk kinds still refused', async 
   try { await d.exec(`insert into public.noga_requests (animal_id, location, task) values ('T2', 'Pathway', 'bogus')`); } catch (e) { err = String(e.message); }
   assert.match(err, /check/i);
 });
+
+test('0023: a done treatment task counts for the Processing nurse', async () => {
+  const d = await db('0023_nurse_counts_treatment_processing.sql');
+  await d.exec(`insert into public.noga_requests (animal_id, location, task, done, done_at) values
+    ('T1', 'P', 'treatment', true, '2026-11-18 03:00:00+00'), ('B1', 'P', 'blood', true, '2026-11-18 03:00:00+00')`);
+  const rows = (await d.query(`select role, n::int from public.nurse_daily_counts('2026-11-01') order by role`)).rows;
+  assert.deepEqual(rows, [{ role: 'processing', n: 1 }, { role: 'welfare', n: 1 }]);
+});

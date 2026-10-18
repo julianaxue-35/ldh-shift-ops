@@ -267,8 +267,8 @@
     </section>
 
     <section class="card" id="proc-misc-section" style="display:none;">
-      <h2>Microchip &amp; UV tasks from the vets</h2>
-      <p class="subtle">Tasks a vet asked for or transferred — microchip and UV checks are done by the Processing nurse.</p>
+      <h2>Microchip, UV &amp; treatment tasks</h2>
+      <p class="subtle">Tasks staff or a vet asked for — microchip, UV and treatment checks are done by the Processing nurse.</p>
       <div id="proc-misc-list"></div>
     </section>
 
@@ -694,7 +694,7 @@
      ============================================================ */
   const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
   // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
-  const PROCESSING_MISC_KINDS = ['microchip', 'uv'];
+  const PROCESSING_MISC_KINDS = ['microchip', 'uv', 'treatment'];
   const AA_PREFILL_KIND = { fiv_test: 'fiv', microchip: 'microchip', uv: 'uv' };   // misc task -> Send-to-AA type
   function miscRowHtml(r) {
     return `
