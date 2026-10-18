@@ -20,6 +20,8 @@
 //
 //   8. { aa_check: {items:[{kind,animal_id}]} } — (2026-10-19) read-only: which Admission AA cards are still waiting?
 //
+//   9. { surgery_log: {source_id,species,surg_type,surg_type2,registered} } — (2026-10-19) a registered surgery, for the stats
+//
 //   5. { status: {shift, items:[{title,location}]} } — read-back: which of
 //      these were already completed today by another device? Answers only
 //      about the pairs sent; never lists other animals.
@@ -131,6 +133,24 @@ function validateAaCheck(c) {
 }
 // aa-validate-end
 
+// surgery-validate-start
+// Surgery stats: the Surgery tool reports each registered surgery (species + procedure only). Routine = spey / castrate.
+const SURGERY_ROUTINE_TYPES = ['spey', 'spey-flank', 'preg1', 'preg2', 'preg3', 'castrate', 'cryptorchid'];
+function validateSurgeryLog(s) {
+  if (!s || typeof s !== 'object') return { error: 'Bad request.' };
+  const id = typeof s.source_id === 'string' ? s.source_id.trim() : '';
+  if (!id || id.length > 80) return { error: 'A source id is required.' };
+  if (s.registered === false) return { remove: id };
+  const sp = String(s.species || '').toLowerCase();
+  const species = ['cat', 'dog', 'rabbit'].indexOf(sp) !== -1 ? sp : 'other';
+  const t1 = String(s.surg_type || '').trim().slice(0, 40);
+  const t2 = String(s.surg_type2 || '').trim().slice(0, 40);
+  if (!t1) return { error: 'The surgery type is required.' };
+  const routine = [t1, t2].filter(Boolean).every((t) => SURGERY_ROUTINE_TYPES.indexOf(t) !== -1);
+  return { row: { id: id, species: species, procedure: t1, procedure2: t2 || null, routine: routine } };
+}
+// surgery-validate-end
+
 // Completed Admission AA cards are removed within 24 hours (the AA also empties the list daily). Best effort.
 async function purgeCompletedAa(supabase) {
   try {
@@ -162,6 +182,17 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(PROJECT_URL, SERVICE_KEY);
 
+  // Shape 9 (2026-10-19): { surgery_log: {source_id, species, surg_type, surg_type2, registered} } — the Surgery tool
+  // reports a registered surgery (or an un-registered one: registered:false removes it) for the dashboard stats.
+  if (body.surgery_log && typeof body.surgery_log === 'object') {
+    const v = validateSurgeryLog(body.surgery_log);
+    if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    const res = v.remove
+      ? await supabase.from('surgery_log').delete().eq('id', v.remove)
+      : await supabase.from('surgery_log').upsert(v.row, { onConflict: 'id' });
+    if (res.error) return new Response(JSON.stringify({ error: res.error.message }), { status: 500, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: CORS_HEADERS });
+  }
   // Shape 8 (2026-10-19): { aa_check: { items: [{kind, animal_id}] } } — read-back for the shift tools: which of the
   // cards they sent are still waiting? Replies {ok:true, pending:["kind|ANIMAL", ...]}; a card that is gone was ticked.
   if (body.aa_check && typeof body.aa_check === 'object') {

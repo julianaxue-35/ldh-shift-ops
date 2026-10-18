@@ -9,7 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test' };
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -28,6 +28,7 @@ const STUB = `
     flag_history: () => ({}),
     surveillance_snapshots: () => ({}),
     noga_requests: () => ({ task: 'other', done: false, created_at: now() }),
+    surgery_log: () => ({}),
     aa_items: () => ({ payload: {}, sent_at: now(), done_ids: [], completed_at: null })
   };
   // Mirrors the tasks_hold_medication trigger (0010_round3.sql): a medication
@@ -129,6 +130,7 @@ const STUB = `
         const expected = PASSCODES[args && args.p_role];
         return { data: expected != null && expected === (args && args.p_code), error: null };
       }
+      if (fn === 'nurse_daily_counts') return { data: window.__nurseCounts || [], error: null };
       return { data: [], error: null };
     },
     channel: () => ({ on(_e, f, cb) { listeners.push({ table: f.table, cb }); return this; }, subscribe() { return this; } })
