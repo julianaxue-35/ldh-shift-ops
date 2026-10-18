@@ -18,6 +18,8 @@
 //      medication case, or not on the dashboard at all) this is a no-op —
 //      it must never create a stray task row out of a chart record alone.
 //
+//   8. { aa_check: {items:[{kind,animal_id}]} } — (2026-10-19) read-only: which Admission AA cards are still waiting?
+//
 //   5. { status: {shift, items:[{title,location}]} } — read-back: which of
 //      these were already completed today by another device? Answers only
 //      about the pairs sent; never lists other animals.
@@ -114,6 +116,19 @@ function validateAaShare(a) {
   if (location) payload.location = location;
   return { row: { kind: a.kind, animal_ids: [id], payload: payload, sent_by: sentBy } };
 }
+// Shape 8 request: which of these cards are still waiting for the Admission AA? (anything no longer there was ticked)
+function validateAaCheck(c) {
+  if (!c || typeof c !== 'object' || !Array.isArray(c.items)) return { error: 'Bad request.' };
+  if (!c.items.length || c.items.length > 100) return { error: 'Send between 1 and 100 items.' };
+  const pairs = [];
+  for (const it of c.items) {
+    if (!it || AA_NOTE_KINDS.indexOf(it.kind) === -1) return { error: 'Unknown kind.' };
+    const id = typeof it.animal_id === 'string' ? it.animal_id.trim().toUpperCase() : '';
+    if (!id || id.length > 40) return { error: 'Each item needs an animal ID.' };
+    pairs.push({ kind: it.kind, id: id });
+  }
+  return { pairs: pairs };
+}
 // aa-validate-end
 
 Deno.serve(async (req) => {
@@ -139,6 +154,19 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(PROJECT_URL, SERVICE_KEY);
 
+  // Shape 8 (2026-10-19): { aa_check: { items: [{kind, animal_id}] } } — read-back for the shift tools: which of the
+  // cards they sent are still waiting? Replies {ok:true, pending:["kind|ANIMAL", ...]}; a card that is gone was ticked.
+  if (body.aa_check && typeof body.aa_check === 'object') {
+    const v = validateAaCheck(body.aa_check);
+    if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    const pending: string[] = [];
+    for (const p of v.pairs) {
+      const { data, error } = await supabase.from('aa_items').select('id').eq('kind', p.kind).contains('animal_ids', [p.id]).limit(1);
+      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+      if (data && data.length) pending.push(p.kind + '|' + p.id);
+    }
+    return new Response(JSON.stringify({ ok: true, pending: pending }), { status: 200, headers: CORS_HEADERS });
+  }
   // Shape 7 (2026-10-18): { aa: { kind, animal_id, location, sent_by, payload } } — a vet's shift tool shares a
   // finished note with the Admission AA page. One live card per kind + Melbourne day + animal: a resend UPDATES it.
   // Replies {ok:true} only once the row is saved — the tool treats anything else as NOT SENT.
