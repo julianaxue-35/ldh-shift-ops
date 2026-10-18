@@ -142,16 +142,23 @@ Deno.serve(async (req) => {
     if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(new Date());
     const key = aaSourceKey(v.row.kind, day, v.row.animal_ids[0]);
-    const { data: found, error: fe } = await supabase.from('aa_items').select('id').eq('source_key', key).limit(1);
-    if (fe) return new Response(JSON.stringify({ error: fe.message }), { status: 500, headers: CORS_HEADERS });
-    if (found && found.length) {
-      const { error } = await supabase.from('aa_items')
-        .update({ payload: v.row.payload, sent_by: v.row.sent_by, updated_at: new Date().toISOString() }).eq('id', found[0].id);
-      if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
-      return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
+    // Update the live card if there is one; otherwise insert. Never reply ok unless a row was really written:
+    // the card may have been ticked (deleted) between steps, and two sends can race on the unique key.
+    const updateCard = async () => {
+      const { data, error } = await supabase.from('aa_items')
+        .update({ payload: v.row.payload, sent_by: v.row.sent_by, updated_at: new Date().toISOString() })
+        .eq('source_key', key).select('id');
+      return { n: data ? data.length : 0, error };
+    };
+    let u = await updateCard();
+    if (u.error) return new Response(JSON.stringify({ error: u.error.message }), { status: 500, headers: CORS_HEADERS });
+    if (u.n > 0) return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
+    const ins = await supabase.from('aa_items').insert(Object.assign({}, v.row, { source_key: key }));
+    if (ins.error && ins.error.code === '23505') {            // someone else inserted first: update theirs instead
+      u = await updateCard();
+      if (!u.error && u.n > 0) return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
     }
-    const { error } = await supabase.from('aa_items').insert(Object.assign({}, v.row, { source_key: key }));
-    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    if (ins.error) return new Response(JSON.stringify({ error: ins.error.message }), { status: 500, headers: CORS_HEADERS });
     return new Response(JSON.stringify({ ok: true, updated: false }), { status: 200, headers: CORS_HEADERS });
   }
 

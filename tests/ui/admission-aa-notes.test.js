@@ -44,5 +44,20 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(/1 new item/.test(await a.page.textContent('#new-item-banner-text')), 'an updated card raises the banner');
     t.ok(a.errors.length === 0, 'no page errors: ' + a.errors.join('; '));
   } finally { await a.browser.close(); }
+  /* Review fix: a card updated after the AA read it must not be deleted by her tick (the correction would be lost). */
+  const u = await open({ aa_items: [{ id: 'u1', kind: 'processing_note', animal_ids: ['T-900'], sent_by: 'AB', sent_at: ago(1 * H), payload: { text: 'First version' } }] }, 'admission-aa.html');
+  try {
+    const alerts = []; u.page.on('dialog', d => { if (d.type() === 'alert') alerts.push(d.message()); });
+    await u.page.evaluate(() => { window.__db.aa_items[0].updated_at = new Date().toISOString(); window.__db.aa_items[0].payload = { text: 'Corrected version' }; });
+    await u.page.click('.aa-card[data-id="u1"] .aa-done');
+    await u.page.waitForTimeout(500);
+    t.ok((await u.db()).aa_items.length === 1, 'a card updated since she read it is NOT deleted by her tick');
+    t.ok(alerts.some(m => /changed|updated/i.test(m)), 'she is told the card changed: ' + alerts.join(' | '));
+    t.ok(/Corrected version/.test(await u.page.evaluate(() => document.querySelector('.aa-card[data-id="u1"]').textContent + document.querySelector('.aa-card[data-id="u1"] .aa-notes').textContent)), 'the page refreshed to the corrected note');
+    // second tick now matches the new version and deletes
+    await u.page.click('.aa-card[data-id="u1"] .aa-done');
+    await u.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="u1"]'));
+    t.ok((await u.db()).aa_items.length === 0, 'ticking the refreshed card deletes it');
+  } finally { await u.browser.close(); }
   t.done();
 })();

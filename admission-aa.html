@@ -235,7 +235,9 @@
     catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) { /* nothing more to try */ } ta.remove(); }
   }
   function downloadDocx(it) {
-    const bin = atob((it.payload || {}).docx_b64 || '');
+    let bin;
+    try { bin = atob((it.payload || {}).docx_b64 || ''); }
+    catch (e) { alert('That Word file could not be opened. Use View notes or Copy instead.'); return; }
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     const a = document.createElement('a');
@@ -266,8 +268,17 @@
     const btn = e.target.closest('.aa-done'); if (!btn) return;
     if (!confirm('Have you entered this in ShelterMate? Ticking removes it from here for good.')) return;
     btn.disabled = true;
-    const { error } = await sb.from('aa_items').delete().eq('id', btn.dataset.id);   // already gone elsewhere = 0 rows, not an error
+    const it = ITEMS.find(x => x.id === btn.dataset.id);
+    // Delete only the version she read: if the vet updated the card since, her tick must not throw the correction away.
+    let q = sb.from('aa_items').delete().eq('id', btn.dataset.id);
+    q = (it && it.updated_at) ? q.eq('updated_at', it.updated_at) : q.is('updated_at', null);
+    const { data: gone, error } = await q.select('id');
     if (error) { btn.disabled = false; alert('Could not tick this off: ' + error.message); return; }
+    if (!gone || !gone.length) {                 // nothing deleted: ticked on another device, or updated since she read it
+      await loadAll();
+      if (ITEMS.some(x => x.id === btn.dataset.id)) alert('This card was just updated by the vet. It has been refreshed: check the new version, then tick it again.');
+      return;
+    }
     doneThisSession++;
     loadAll();
   });
