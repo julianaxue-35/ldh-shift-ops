@@ -592,3 +592,54 @@ test('reasonsOf lists the first reason then each extra; mergeReason adds one, un
   assert.equal(p2.extra_reasons.length, 2);
   assert.equal(L.reasonsOf({ created_at: 'x' })[0].text, '');
 });
+
+test('nurseStats: per-role totals and the average per working day for week / month / quarter / year', () => {
+  const NOW2 = new Date('2026-11-18T12:00:00').getTime();   // a Wednesday
+  const rows = [
+    { day: '2026-11-18', role: 'welfare', n: 10 },
+    { day: '2026-11-17', role: 'welfare', n: 20 },
+    { day: '2026-11-16', role: 'welfare', n: 30 },     // Monday: still this week
+    { day: '2026-11-15', role: 'welfare', n: 40 },     // Sunday: last week, still this month
+    { day: '2026-10-05', role: 'welfare', n: 60 },     // last month, same quarter (Q4)
+    { day: '2026-07-01', role: 'welfare', n: 100 },    // Q3: this year only
+    { day: '2026-11-18', role: 'processing', n: 6 },
+    { day: '2026-11-17', role: 'processing', n: 0 },   // a zero day is not a working day
+    { day: '2026-11-19', role: 'processing', n: 99 }   // the future is ignored
+  ];
+  const s = L.nurseStats(rows, NOW2);
+  assert.equal(s.welfare.today, 10);
+  assert.deepEqual(s.welfare.week, { total: 60, days: 3, avg: 20 });
+  assert.deepEqual(s.welfare.month, { total: 100, days: 4, avg: 25 });
+  assert.deepEqual(s.welfare.quarter, { total: 160, days: 5, avg: 32 });
+  assert.deepEqual(s.welfare.year, { total: 260, days: 6, avg: 43.3 });
+  assert.equal(s.processing.today, 6);
+  assert.deepEqual(s.processing.week, { total: 6, days: 1, avg: 6 });
+  assert.deepEqual(L.nurseStats([], NOW2).welfare.week, { total: 0, days: 0, avg: 0 });
+});
+
+test('surgeryBreakdown: species x routine / non-routine across the periods', () => {
+  const NOW2 = new Date('2026-11-18T12:00:00').getTime();
+  const at = (s) => new Date(s).toISOString();
+  const rows = [
+    { done_at: at('2026-11-18T09:00:00'), species: 'cat', routine: true },
+    { done_at: at('2026-11-17T09:00:00'), species: 'dog', routine: true },
+    { done_at: at('2026-11-17T10:00:00'), species: 'dog', routine: false },
+    { done_at: at('2026-11-02T09:00:00'), species: 'rabbit', routine: true },   // this month, not this week
+    { done_at: at('2026-10-10T09:00:00'), species: 'cat', routine: false },     // this quarter, not this month
+    { done_at: at('2026-02-10T09:00:00'), species: 'cat', routine: true },      // this year only
+    { done_at: at('2026-11-18T09:30:00'), species: 'guinea pig', routine: false }
+  ];
+  const b = L.surgeryBreakdown(rows, NOW2);
+  assert.deepEqual(b.week.cat, { routine: 1, other: 0 });
+  assert.deepEqual(b.week.dog, { routine: 1, other: 1 });
+  assert.deepEqual(b.week.other, { routine: 0, other: 1 });
+  assert.equal(b.week.total, 4);
+  assert.equal(b.month.rabbit.routine, 1);
+  assert.equal(b.month.total, 5);
+  assert.equal(b.quarter.cat.other, 1);
+  assert.equal(b.quarter.total, 6);
+  assert.equal(b.year.cat.routine, 2);
+  assert.equal(b.year.total, 7);
+  assert.equal(b.year.routine, 4);
+  assert.equal(b.year.nonRoutine, 3);
+});

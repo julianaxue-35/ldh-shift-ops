@@ -301,6 +301,12 @@
       <div id="period-totals-grid" class="totals-grid"></div>
     </section>
 
+    <section class="card" id="surgery-breakdown">
+      <h2>Surgery — what we've done</h2>
+      <p class="subtle">Cats, dogs and rabbits. <b>Routine</b> = spey and castrate; <b>non-routine</b> = everything else (dental, amputation and so on). Counted when a surgery is registered in the Surgery tool.</p>
+      <div id="surgery-breakdown-grid" class="totals-grid"></div>
+    </section>
+
     <section class="card" id="trends-section">
       <h2>Annual &amp; monthly progress</h2>
       <p class="subtle">Each category tracked on its own — cumulative, so the line only ever climbs.</p>
@@ -335,6 +341,32 @@
   let DAY_LABELS = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
 
   function cumulative(arr) { let t = 0; return arr.map(v => t += v); }
+
+  /* ---- Surgery breakdown (2026-10-19): species x routine / non-routine from surgery_log ---- */
+  let SURGERY_ROWS = null;   // null = the table is not there yet
+  async function loadSurgeryLog() {
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+    const { data, error } = await sb.from('surgery_log').select('done_at, species, routine').gte('done_at', yearStart.toISOString());
+    SURGERY_ROWS = error ? null : (data || []);
+  }
+  function renderSurgeryBreakdown() {
+    const grid = document.getElementById('surgery-breakdown-grid');
+    if (!SURGERY_ROWS) { grid.innerHTML = '<p class="subtle">The surgery numbers will appear here once the latest database update has been run.</p>'; return; }
+    const b = LDHLogic.surgeryBreakdown(SURGERY_ROWS, Date.now());
+    const LABELS = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
+    const SPECIES = [['cat', 'Cats'], ['dog', 'Dogs'], ['rabbit', 'Rabbits'], ['other', 'Other species']];
+    grid.innerHTML = ['week', 'month', 'quarter', 'year'].map(k => {
+      const t = b[k];
+      return `<div class="totals-period" data-period="${k}">
+        <h3>${LABELS[k]}</h3>
+        ${SPECIES.filter(([s]) => s !== 'other' || t.other.routine + t.other.other > 0).map(([s, label]) =>
+          `<div class="row" data-species="${s}"><span>${label}</span><b>${t[s].routine} routine \u00b7 ${t[s].other} non-routine</b></div>`).join('')}
+        <div class="row"><span>Routine (spey / castrate)</span><b>${t.routine}</b></div>
+        <div class="row"><span>Non-routine</span><b>${t.nonRoutine}</b></div>
+        <div class="row grand"><span>Total surgeries</span><b>${t.total}</b></div>
+      </div>`;
+    }).join('');
+  }
 
   async function loadTrends() {
     const now = new Date();
@@ -601,6 +633,8 @@
     document.getElementById('app-root').style.display = 'grid';
     await loadTrends();
     await loadResponseRates();
+    await loadSurgeryLog();
+    renderSurgeryBreakdown();
     renderTrends();
     renderPeriodTotals();
     renderResponseRateChart();

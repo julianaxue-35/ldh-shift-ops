@@ -292,6 +292,12 @@
       </div>
     </section>
 
+    <section class="card" id="nurse-stats">
+      <h2>What the nurse team has done</h2>
+      <p class="subtle">Tasks completed, and the average per working day: a look back at how much gets done. Counts start from the first day the dashboard was used for real.</p>
+      <div class="ns-roles" id="nurse-stats-body"></div>
+    </section>
+
     <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
     <div class="card faq-card faq-modal" id="faq">
       <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
@@ -841,7 +847,7 @@
   /* ============================================================
      Load / render / init
      ============================================================ */
-  function renderAll() { renderMedLabels(); renderNurseRequests(); renderNurseDoses(); renderNoga(); renderMemos(); }
+  function renderAll() { renderMedLabels(); renderNurseRequests(); renderNurseDoses(); renderNoga(); renderMemos(); renderNurseStats(); }
 
   // Time-based UI (the 2h vaccination clock, the overdue/today dose split,
   // and the NO-GA 24h-hide window) needs to move even with no realtime
@@ -1008,6 +1014,46 @@
   });
   syncAaFields();
 
+  /* ---- What the nurse team has done: today's ring + the daily average for the week / month / quarter / year ---- */
+  let NURSE_COUNTS = null;   // null = the database function is not there yet
+  async function loadNurseCounts() {
+    try {
+      const since = LDHLogic.localISO(new Date(new Date().getFullYear(), 0, 1));
+      const { data, error } = await sb.rpc('nurse_daily_counts', { p_since: since });
+      NURSE_COUNTS = error ? null : (data || []).map(r => ({ day: String(r.day).slice(0, 10), role: r.role, n: Number(r.n) }));
+    } catch (e) { NURSE_COUNTS = null; }
+  }
+  function ringSvg(today, typical) {
+    const r = 46, stroke = 12, c = 2 * Math.PI * r;
+    const frac = typical > 0 ? Math.min(today / typical, 1) : (today > 0 ? 1 : 0);
+    return `<svg viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="${today} tasks done today">
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="rgba(128,128,128,.25)" stroke-width="${stroke}"/>
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="var(--ns-ring, #2f8f5b)" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(1)}" transform="rotate(-90 60 60)"/>
+      <text x="60" y="58" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor">${today}</text>
+      <text x="60" y="78" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">TODAY</text>
+    </svg>`;
+  }
+  function renderNurseStats() {
+    const el = document.getElementById('nurse-stats-body');
+    if (!NURSE_COUNTS) { el.innerHTML = '<p class="empty-state">The nurse totals will appear here once the latest database update has been run.</p>'; return; }
+    const s = LDHLogic.nurseStats(NURSE_COUNTS, Date.now());
+    const PERIODS = [['week', 'This week'], ['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']];
+    el.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px;';
+    el.innerHTML = [['welfare', 'Welfare nurse'], ['processing', 'Processing nurse']].map(([role, title]) => {
+      const o = s[role], typical = o.month.avg || o.week.avg || o.year.avg;
+      return `<div data-role="${role}" style="border:1px solid var(--border); border-radius:14px; padding:14px;">
+        <h3 style="margin:0 0 6px; font-size:0.95rem;">${title}</h3>
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          ${ringSvg(o.today, typical)}
+          <div style="font-size:0.8rem; opacity:.8; max-width:170px;">The ring fills as today gets close to a usual working day (${typical || 0} tasks).</div>
+        </div>
+        <table style="width:100%; margin-top:10px; font-size:0.85rem; border-collapse:collapse;">
+          <tr style="opacity:.7;"><th style="text-align:left;">&nbsp;</th><th style="text-align:right;">Done</th><th style="text-align:right;">Avg / working day</th></tr>
+          ${PERIODS.map(([k, label]) => `<tr data-period="${k}"><td>${label}</td><td style="text-align:right;"><b>${o[k].total}</b></td><td style="text-align:right;"><b>${o[k].avg}</b></td></tr>`).join('')}
+        </table>
+      </div>`;
+    }).join('');
+  }
   async function loadAll() {
     const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
@@ -1019,6 +1065,7 @@
     ]);
     TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || []; NOGA_REQUESTS = ngRes.data || []; MEMOS = memosRes.data || [];
+    await loadNurseCounts();
     checkForNewItems();
     renderAll();
   }
