@@ -166,6 +166,10 @@
     .layout { grid-template-columns: 1fr; }
   }
   .aa-card .aa-done { background: var(--green); color: #fff; }
+  .aa-notes { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 0.85rem; margin: 8px 0 0; display: none; }
+  .aa-notes.open { display: block; }
+  .aa-extra { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .aa-lines { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; }
 </style>
 </head>
 <body>
@@ -199,23 +203,55 @@
   let ITEMS = [];
   let doneThisSession = 0;               // a count only; no patient data is kept in the browser
 
+  const openNotes = new Set();           // which note cards are expanded (ids only; survives re-renders)
+  function extraHtml(it) {
+    const p = it.payload || {};
+    if (it.kind === 'processing_note' || it.kind === 'si_note') {
+      return `<div class="aa-extra">
+          <button type="button" class="secondary aa-view" data-id="${esc(it.id)}">View notes</button>
+          <button type="button" class="secondary aa-copy" data-id="${esc(it.id)}">Copy</button>
+          ${p.docx_b64 ? `<button type="button" class="secondary aa-docx" data-id="${esc(it.id)}">Download Word</button>` : ''}
+        </div><pre class="aa-notes" data-id="${esc(it.id)}">${esc(p.text || '')}</pre>`;
+    }
+    if (it.kind === 'med_chart') return `<ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul>`;
+    return '';
+  }
   function cardHtml(it, now) {
     const c = LDHLogic.aaCountdown(it, now);
+    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     return `<div class="attn-item aa-card" data-id="${esc(it.id)}">
       <div>
         <div class="aname">${esc(it.animal_ids.join(', '))} <span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span></div>
-        <div class="ameta">${esc(LDHLogic.aaSummary(it))} · sent ${esc(new Date(it.sent_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}${it.sent_by ? ' by ' + esc(it.sent_by) : ''}</div>
+        <div class="ameta">${esc(LDHLogic.aaSummary(it))}${it.payload && it.payload.location ? ' · ' + esc(it.payload.location) : ''} · sent ${esc(hm(it.sent_at))}${it.sent_by ? ' by ' + esc(it.sent_by) : ''}${it.updated_at ? ' · <b class="aa-updated">updated ' + esc(hm(it.updated_at)) + '</b>' : ''}</div>
+        ${extraHtml(it)}
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(c.level)}">${esc(c.label)}</span>
         <button type="button" class="aa-done" data-id="${esc(it.id)}">Entered in ShelterMate ✓</button>
       </div></div>`;
   }
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); }
+    catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) { /* nothing more to try */ } ta.remove(); }
+  }
+  function downloadDocx(it) {
+    let bin;
+    try { bin = atob((it.payload || {}).docx_b64 || ''); }
+    catch (e) { alert('That Word file could not be opened. Use View notes or Copy instead.'); return; }
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    a.download = (it.animal_ids[0] || 'notes') + '_notes.docx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
   function render() {
     const now = Date.now();
     const sorted = LDHLogic.aaSortItems(ITEMS, now);
     document.getElementById('aa-list').innerHTML = sorted.map(i => cardHtml(i, now)).join('')
       || '<p class="empty-state">Nothing waiting. New items from the nurses will appear here with a sound.</p>';
+    openNotes.forEach(id => { const el = document.querySelector('.aa-notes[data-id="' + CSS.escape(id) + '"]'); if (el) el.classList.add('open'); });
     const late = sorted.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
     const el = document.getElementById('aa-overdue-count');
     el.style.display = late ? '' : 'none';
@@ -223,11 +259,26 @@
     document.getElementById('aa-session-count').textContent = doneThisSession ? 'Done this session: ' + doneThisSession : '';
   }
   document.getElementById('aa-list').addEventListener('click', async (e) => {
+    const view = e.target.closest('.aa-view');
+    if (view) { const id = view.dataset.id; if (openNotes.has(id)) openNotes.delete(id); else openNotes.add(id); render(); return; }
+    const copy = e.target.closest('.aa-copy');
+    if (copy) { const it = ITEMS.find(x => x.id === copy.dataset.id); if (it) copyText((it.payload || {}).text || ''); return; }
+    const dx = e.target.closest('.aa-docx');
+    if (dx) { const it = ITEMS.find(x => x.id === dx.dataset.id); if (it) downloadDocx(it); return; }
     const btn = e.target.closest('.aa-done'); if (!btn) return;
     if (!confirm('Have you entered this in ShelterMate? Ticking removes it from here for good.')) return;
     btn.disabled = true;
-    const { error } = await sb.from('aa_items').delete().eq('id', btn.dataset.id);   // already gone elsewhere = 0 rows, not an error
+    const it = ITEMS.find(x => x.id === btn.dataset.id);
+    // Delete only the version she read: if the vet updated the card since, her tick must not throw the correction away.
+    let q = sb.from('aa_items').delete().eq('id', btn.dataset.id);
+    q = (it && it.updated_at) ? q.eq('updated_at', it.updated_at) : q.is('updated_at', null);
+    const { data: gone, error } = await q.select('id');
     if (error) { btn.disabled = false; alert('Could not tick this off: ' + error.message); return; }
+    if (!gone || !gone.length) {                 // nothing deleted: ticked on another device, or updated since she read it
+      await loadAll();
+      if (ITEMS.some(x => x.id === btn.dataset.id)) alert('This card was just updated by the vet. It has been refreshed: check the new version, then tick it again.');
+      return;
+    }
     doneThisSession++;
     loadAll();
   });
@@ -244,8 +295,8 @@
   }
   document.getElementById('new-item-banner-dismiss').addEventListener('click', hideBanner);
   function checkForNewItems() {
-    const fresh = ITEMS.filter(i => !seen.has(i.id));
-    ITEMS.forEach(i => seen.add(i.id));
+    const fresh = ITEMS.filter(i => !seen.has(LDHLogic.aaChangeKey(i)));
+    ITEMS.forEach(i => seen.add(LDHLogic.aaChangeKey(i)));
     if (!seenInitialised) { seenInitialised = true; return; }     // nothing already open alerts on page load
     if (!fresh.length) return;
     pendingNew += fresh.length;
