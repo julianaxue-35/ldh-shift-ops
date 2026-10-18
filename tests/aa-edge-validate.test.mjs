@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const src = fs.readFileSync(path.resolve(import.meta.dirname, '../supabase/functions/sync-completion/index.ts'), 'utf8');
 const block = src.split('// aa-validate-start')[1].split('// aa-validate-end')[0];
-const { validateAaShare, aaSourceKey } = new Function(block + '\nreturn { validateAaShare, aaSourceKey };')();
+const { validateAaShare, validateAaCheck, aaSourceKey } = new Function(block + '\nreturn { validateAaShare, validateAaCheck, aaSourceKey };')();
 
 const ok = (over = {}) => ({ kind: 'processing_note', animal_id: 't-100', location: 'Pound 1', sent_by: 'ab', payload: { text: 'Exam normal.' }, ...over });
 
@@ -46,4 +46,14 @@ test('sent_by is trimmed, upper-cased and limited to 4 characters; hostile text 
 });
 test('aaSourceKey is kind|date|ANIMAL', () => {
   assert.equal(aaSourceKey('processing_note', '2026-10-18', 'T-100'), 'processing_note|2026-10-18|T-100');
+});
+
+test('aa_check: accepts 1-100 kind/animal pairs, upper-cases IDs, refuses junk', () => {
+  assert.deepEqual(validateAaCheck({ items: [{ kind: 'processing_note', animal_id: ' a1 ' }, { kind: 'med_chart', animal_id: 'b2' }] }).pairs,
+    [{ kind: 'processing_note', id: 'A1' }, { kind: 'med_chart', id: 'B2' }]);
+  assert.match(validateAaCheck({ items: [] }).error, /between 1 and 100/);
+  assert.match(validateAaCheck({ items: Array.from({ length: 101 }, () => ({ kind: 'si_note', animal_id: 'x' })) }).error, /between 1 and 100/);
+  assert.match(validateAaCheck({ items: [{ kind: 'fiv', animal_id: 'x' }] }).error, /kind/i);
+  assert.match(validateAaCheck({ items: [{ kind: 'si_note', animal_id: '' }] }).error, /animal ID/i);
+  assert.match(validateAaCheck({}).error, /Bad request/);
 });
