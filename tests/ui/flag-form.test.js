@@ -148,6 +148,35 @@ const t = require('./check')('flag-form');
   await page.waitForTimeout(300);
   t.ok((await db()).tasks.filter(x => x.title === 'MED-1').length === 1, 'medication requests are never redirected to the nurses');
 
+  /* ---------- litters + treatment check / due ---------- */
+  await page.selectOption('#req-type', 'foster');
+  await page.fill('#req-title', '1170123,124,126 - 128');
+  await page.check('#req-x-treatment');
+  await page.click('#req-submit');
+  await page.waitForTimeout(500);
+  d = await db();
+  const litter = ['1170123', '1170124', '1170126', '1170127', '1170128'];
+  t.ok(litter.every(id => d.noga_requests.filter(r => r.animal_id === id && r.task === 'treatment').length === 1) && d.noga_requests.filter(r => r.task === 'treatment').length === 5,
+    'a litter range gives each animal its own treatment task for the nurses: ' + d.noga_requests.filter(r => r.task === 'treatment').map(r => r.animal_id).join());
+  t.ok(d.tasks.filter(x => litter.includes(x.title)).length === 0, 'treatment-only goes to the nurses, nothing on the vet board');
+  t.ok((await page.inputValue('#req-title')) === '', 'the form is cleared after a litter');
+  await page.selectOption('#req-type', 'rescue');
+  await page.fill('#req-title', '1180001 - 1180002');
+  await page.check('#req-x-microchip'); await page.check('#req-x-treatment');
+  await page.fill('#req-problem', 'sneezing, check on the way');
+  await page.click('#req-submit');
+  await page.waitForTimeout(500);
+  d = await db();
+  t.ok(d.tasks.filter(x => ['1180001', '1180002'].includes(x.title)).length === 2 && d.nurse_requests.filter(r => ['1180001', '1180002'].includes(r.animal_id)).length === 0, 'with notes typed the litter goes to the vet board only');
+  t.ok(d.tasks.find(x => x.title === '1180001').problem === 'Needs microchip + treatment check/due — sneezing, check on the way', 'vet card says what was asked for: ' + d.tasks.find(x => x.title === '1180001').problem);
+  await page.selectOption('#req-type', 'foster');
+  await page.fill('#req-title', '1190010 - 1190001');
+  const dlg = []; page.once('dialog', dd => dlg.push(dd.message()));
+  await page.click('#req-submit');
+  await page.waitForTimeout(300);
+  t.ok(dlg.some(m => /backwards/.test(m)) && !(await db()).tasks.some(x => /^1190/.test(x.title)), 'a backwards range is refused with a message and nothing is created');
+  await page.fill('#req-title', '');
+
   t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   await browser.close();
   t.done();

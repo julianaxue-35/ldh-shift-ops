@@ -223,7 +223,7 @@
       <h2>New task request</h2>
       <p class="subtle">Logged under Sick &amp; Injured, today's list.</p>
       <div class="req-grid3">
-        <input id="req-title" placeholder="Animal ID" style="margin:0;">
+        <input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)" style="margin:0;">
         <div style="display:flex; gap:6px;">
           <select id="req-location" style="margin:0; flex:2;"></select>
           <input id="req-pen" placeholder="Pen #" style="margin:0; flex:1; min-width:0;">
@@ -256,10 +256,11 @@
         <select id="req-birthing-reason" style="margin:0;"></select>
       </div>
       <div id="req-nurse-extras" style="display:none; margin:10px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:12px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Microchip / UV — send straight to the Processing nurse (skips the vet board; ticking both makes one task)</div>
+        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Send straight to the nurses (skips the vet board): Microchip / UV go to the Processing nurse (ticking both makes one task); a Treatment check / due goes to the Welfare nurse</div>
         <div style="display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;">
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
           <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-treatment" style="width:auto; margin:0;"> Treatment check / due</label>
           <select id="req-x-species" style="margin:0; width:auto;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select>
           <select id="req-x-window" style="margin:0; width:auto;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select>
         </div>
@@ -451,8 +452,13 @@
   }
 
   document.getElementById('req-submit').addEventListener('click', async () => {
-    const title = document.getElementById('req-title').value.trim();
-    if (!title) return;
+    // 2026-10-19: a litter can be typed as a range ("1170123 - 1170130" or "1170123,124,126 - 130"): every animal
+    // in it gets its own request, so nurses and vets see individual numbers.
+    const expanded = LDHLogic.expandAnimalIds(document.getElementById('req-title').value);
+    if (expanded.error) { alert(expanded.error); return; }
+    const ids = expanded.ids;
+    if (!ids.length) return;
+    if (ids.length > 1 && !confirm(ids.length + ' animals: ' + ids.join(', ') + '.\n\nCreate a separate request for each one?')) return;
     // The Animal ID she types IS the SM number at LDH — there's no separate
     // number to enter (2026-09-26: she found the extra box redundant/
     // confusing next to the ID field right above it).
@@ -468,8 +474,19 @@
     const isOffsite = LDHLogic.OFFSITE_NAMES.includes(room);
     const pen = document.getElementById('req-pen').value.trim();
     const detail = document.getElementById('req-location-detail').value.trim();
-    const row = {
-      title,
+    /* Foster / Rescue requests can ask the nurses for a Microchip and/or UV check (one Processing-nurse task, or ONE
+       combined "Microchip + UV" if both) and/or a Treatment check / due (a Welfare-nurse task). If that is ALL the
+       request asks for, it goes straight to the nurse. Anything else on it (emergency sign, suspected condition, notes,
+       raised urgency) means a vet must see it: it goes to the vet board ONLY, saying what was asked for, and the vet
+       can use Transfer to nurse. */
+    const reqType = document.getElementById('req-type').value;
+    const fr = reqType === 'foster' || reqType === 'rescue';
+    const wanted = fr ? [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k) : [];
+    const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
+    const wantTreatment = fr && document.getElementById('req-x-treatment').checked;
+    const KIND_NAMES = { microchip: 'microchip', uv: 'UV check', microchip_uv: 'microchip + UV check' };
+    const asked = kinds.map(k => KIND_NAMES[k]).concat(wantTreatment ? ['treatment check/due'] : []);
+    const baseRow = {
       location: isOffsite ? room : (pen ? `${room} / ${pen}` : room),
       location_detail: isOffsite ? (detail || null) : null,
       shift: 'sick_injured',
@@ -477,70 +494,68 @@
       urgency: LDHLogic.pickTier(document.getElementById('req-urgency-pick').value, allFlags()),
       red_flags: allFlags(),
       needs_medication: needsMed,
-      sm_number: needsMed ? title : null,
       problem: [isBirthing ? 'Cat birthing — ' + LDHLogic.signLabel(birthingReason()) : '', document.getElementById('req-problem').value.trim()].filter(Boolean).join(' — ') || null,
       condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
       done: false,
     };
-    /* 2026-10-18: a Foster / Rescue request that ticks Microchip and/or UV goes STRAIGHT to the Processing nurse and
-       is not put on the vet board (vets had cards that gave no reason). With neither ticked it goes to the vets as before. */
-    const reqType = document.getElementById('req-type').value;
-    const wanted = (reqType === 'foster' || reqType === 'rescue')
-      ? [['req-x-microchip', 'microchip'], ['req-x-uv', 'uv']].filter(([id]) => document.getElementById(id).checked).map(([, k]) => k) : [];
-    // both ticked = ONE combined "Microchip + UV" task for the same animal, not two
-    const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
-    let error = null;
-    // only the microchip/UV part goes to the nurses: emergency signs or a suspected condition still reach the vets
-    // Microchip/UV ONLY goes straight to the nurse. Anything else on the request (emergency sign, suspected condition,
-    // notes typed, or a raised urgency) means a vet needs to see it: it goes to the vet board ONLY, saying what was
-    // asked for, and the vet can transfer the microchip / UV part to the nurses (Transfer to nurse).
-    const KIND_NAMES = { microchip: 'microchip', uv: 'UV check', microchip_uv: 'microchip + UV check' };
-    const needsVet = !kinds.length || allFlags().length > 0 || !!row.condition || !!row.problem || document.getElementById('req-urgency-pick').value !== 'routine';
-    if (kinds.length && needsVet) row.problem = ['Needs ' + KIND_NAMES[kinds[0]], row.problem].filter(Boolean).join(' — ');
-    if (needsVet) {
-      ({ error } = await sb.from('tasks').insert(row));
-      /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
-         (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
-         flag_history, so the earlier flag is remembered); if it is still open, say so rather than failing. */
-      if (error && error.code === '23505') {
-        const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
-        const old = found && found[0];
-        if (old && !old.done) {
-        // Already open in this pen: add this person's reason to the SAME case rather than refusing or duplicating it.
-        const entry = { at: new Date().toISOString(), by: 'Shelter Staff', condition: row.condition, problem: row.problem, red_flags: row.red_flags, urgency: row.urgency };
-        const had = LDHLogic.reasonsOf(old).map(r => r.text).filter(Boolean).join(' · ') || 'no reason given';
-        if (!entry.condition && !entry.problem && !entry.red_flags.length) {
-          btn.disabled = false;
-          alert(title + ' is already flagged in that pen (' + had + ').\n\nTo add another reason, choose a sign or type what is wrong, then submit again.');
-          return;
-        }
-        if (!confirm(title + ' is already flagged in that pen for: ' + had + '.\n\nAdd your reason to the same case?')) { btn.disabled = false; return; }
-        ({ error } = await sb.from('tasks').update(LDHLogic.mergeReason(old, entry)).eq('id', old.id));
-        if (error && /extra_reasons/.test(error.message || '')) error = { message: 'The database needs migration 0019 (extra reasons) run first.' };
-      } else
-        if (old) {
-          ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
-            created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
-            claimed_by: null, claimed_at: null, vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null,
-            note: null, treatment: null, plan: null,
-          })).eq('id', old.id));
+    const needsVet = !asked.length || allFlags().length > 0 || !!baseRow.condition || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
+
+    async function submitOne(title) {
+      const row = Object.assign({}, baseRow, { title, sm_number: needsMed ? title : null });
+      if (asked.length && needsVet) row.problem = ['Needs ' + asked.join(' + '), row.problem].filter(Boolean).join(' — ');
+      let error = null;
+      if (needsVet) {
+        ({ error } = await sb.from('tasks').insert(row));
+        /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
+           (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
+           flag_history, so the earlier flag is remembered); if it is still open, add the new reason to it. */
+        if (error && error.code === '23505') {
+          const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+          const old = found && found[0];
+          if (old && !old.done) {
+            // Already open in this pen: add this person's reason to the SAME case rather than refusing or duplicating it.
+            const entry = { at: new Date().toISOString(), by: 'Shelter Staff', condition: row.condition, problem: row.problem, red_flags: row.red_flags, urgency: row.urgency };
+            const had = LDHLogic.reasonsOf(old).map(r => r.text).filter(Boolean).join(' · ') || 'no reason given';
+            if (!entry.condition && !entry.problem && !entry.red_flags.length) {
+              alert(title + ' is already flagged in that pen (' + had + ').\n\nTo add another reason, choose a sign or type what is wrong, then submit again.');
+              return false;
+            }
+            if (!confirm(title + ' is already flagged in that pen for: ' + had + '.\n\nAdd your reason to the same case?')) return false;
+            ({ error } = await sb.from('tasks').update(LDHLogic.mergeReason(old, entry)).eq('id', old.id));
+            if (error && /extra_reasons/.test(error.message || '')) error = { message: 'The database needs migration 0019 (extra reasons) run first.' };
+          } else if (old) {
+            ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
+              created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
+              claimed_by: null, claimed_at: null, vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null,
+              note: null, treatment: null, plan: null,
+            })).eq('id', old.id));
+          }
         }
       }
+      if (error) { alert('Could not submit ' + title + ': ' + error.message); return false; }
+      if (asked.length && !needsVet) {
+        const note = TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '');
+        for (const kind of kinds) {
+          const { error: nrErr } = await sb.from('nurse_requests').insert({
+            kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
+            animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff', note
+          });
+          if (nrErr) alert('The ' + KIND_NAMES[kind] + ' request for ' + title + ' could not be saved: ' + nrErr.message);
+        }
+        if (wantTreatment) {
+          const { error: trErr } = await sb.from('noga_requests').insert({
+            animal_id: title, location: baseRow.location, location_detail: baseRow.location_detail, task: 'treatment', note, added_by: 'Shelter Staff'
+          });
+          if (trErr) alert('The treatment check for ' + title + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
+        }
+      }
+      return true;
     }
+
+    let allOk = true;
+    for (const title of ids) { if (!(await submitOne(title))) allOk = false; }
     btn.disabled = false;
-    if (error) { alert('Could not submit: ' + error.message); return; }
-    /* Foster / rescue requests can also ask the nurses for a microchip and/or a UV check — one nurse request per
-       ticked task, for this named animal, due today, shown on the Processing nurse board. */
-    if (kinds.length && !needsVet) {
-      for (const kind of kinds) {
-        const { error: nrErr } = await sb.from('nurse_requests').insert({
-          kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
-          animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff',
-          note: TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '')
-        });
-        if (nrErr) alert('The ' + KIND_NAMES[kind] + ' request for the nurses could not be saved: ' + nrErr.message);
-      }
-    }
+    if (!allOk) return;
     document.getElementById('req-title').value = '';
     document.getElementById('req-pen').value = '';
     document.getElementById('req-location-detail').value = '';
@@ -549,7 +564,7 @@
     document.getElementById('req-urgency-pick').value = 'routine';
     document.getElementById('req-type').value = 'shelter';
     document.getElementById('req-nurse-extras').style.display = 'none';
-    ['req-x-microchip', 'req-x-uv'].forEach(id => { document.getElementById(id).checked = false; });
+    ['req-x-microchip', 'req-x-uv', 'req-x-treatment'].forEach(id => { document.getElementById(id).checked = false; });
     document.getElementById('req-x-window').value = '2h';
     document.getElementById('req-birthing-wrap').style.display = 'none';
     document.getElementById('req-birthing-reason').value = '';

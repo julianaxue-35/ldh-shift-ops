@@ -949,8 +949,8 @@
       </div>`;
     document.body.appendChild(wrap.firstElementChild);
     // a request that asked for a microchip / UV check opens with that task already chosen
-    const need = (/^Needs (microchip|UV)/i.exec(t.problem || '') || [])[1];
-    if (need) document.querySelector('.transfer-modal-overlay .transfer-task').value = /microchip/i.test(need) ? 'microchip' : 'uv';
+    const need = (/^Needs (microchip|UV|treatment)/i.exec(t.problem || '') || [])[1];
+    if (need) document.querySelector('.transfer-modal-overlay .transfer-task').value = /microchip/i.test(need) ? 'microchip' : /treatment/i.test(need) ? 'treatment' : 'uv';
   }
   document.addEventListener('click', async (e) => {
     const trBtn = e.target.closest('.transfer-btn');

@@ -64,3 +64,12 @@ test('0021: nurse_daily_counts counts each role per Melbourne day; surgery_log k
   try { await d.exec(`insert into public.surgery_log (id, species, routine) values ('s1', 'hamster', true)`); } catch (e) { err = String(e.message); }
   assert.match(err, /check/i, 'only cat / dog / rabbit / other');
 });
+
+test('0022: a treatment misc task is accepted, junk kinds still refused', async () => {
+  const d = await db('0022_treatment_task_kind.sql');
+  await d.exec(`insert into public.noga_requests (animal_id, location, task) values ('T1', 'Pathway', 'treatment')`);
+  assert.equal((await d.query(`select count(*)::int n from public.noga_requests where task = 'treatment'`)).rows[0].n, 1);
+  let err = '';
+  try { await d.exec(`insert into public.noga_requests (animal_id, location, task) values ('T2', 'Pathway', 'bogus')`); } catch (e) { err = String(e.message); }
+  assert.match(err, /check/i);
+});

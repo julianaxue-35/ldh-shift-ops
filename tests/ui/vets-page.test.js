@@ -451,7 +451,7 @@ const H = 3600 * 1000;
   const m = await open(seedM, 'vets.html');
   try {
     t.ok(await m.page.locator('#nurse-misc').count() === 1, 'vets page has a Request a nurse task card');
-    t.ok((await m.page.$$eval('#mt-task option', os => os.map(o => o.value))).join() === 'blood,ear_swab,fiv_test,ivft,microchip,uv,other', 'task list: bloods, ear swab, FIV, flu cat IVFT, microchip, UV, other');
+    t.ok((await m.page.$$eval('#mt-task option', os => os.map(o => o.value))).join() === 'blood,ear_swab,fiv_test,ivft,microchip,uv,treatment,other', 'task list: bloods, ear swab, FIV, flu cat IVFT, microchip, UV, treatment check, other');
     await m.page.fill('#mt-animal', 'CAT-12');
     await m.page.selectOption('#mt-location', 'Cat Room 2');
     await m.page.selectOption('#mt-task', 'ear_swab');

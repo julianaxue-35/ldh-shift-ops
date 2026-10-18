@@ -241,7 +241,7 @@
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(c.level)}">${esc(c.label)}</span>
-        ${it.animal_ids.length > 1 ? '' : `<button type="button" class="aa-done" data-id="${esc(it.id)}">Entered in ShelterMate ✓</button>`}
+        ${it.animal_ids.length > 1 ? '' : `<button type="button" class="aa-done" data-id="${esc(it.id)}">${it.kind === 'med_chart' ? 'Done ✓' : 'Entered in ShelterMate ✓'}</button>`}
       </div>
       ${it.animal_ids.length > 1 ? checklistHtml(it) : ''}</div>`;
   }
@@ -323,7 +323,10 @@
     const btn = e.target.closest('.aa-done'); if (!btn) return;
     const it = ITEMS.find(x => x.id === btn.dataset.id);
     if (!it) return;
-    if (!confirm('Have you entered ' + it.animal_ids.join(', ') + ' in ShelterMate?\n\nIt moves to the Completed list below, where you can put it back.')) return;
+    const question = it.kind === 'med_chart'
+      ? 'Have you printed the medication chart for ' + it.animal_ids.join(', ') + '?'
+      : 'Have you entered ' + it.animal_ids.join(', ') + ' in ShelterMate?';
+    if (!confirm(question + '\n\nIt moves to the Completed list below, where you can put it back.')) return;
     btn.disabled = true;
     if (await saveDone(it, it.animal_ids.slice())) doneThisSession++;
     else btn.disabled = false;
