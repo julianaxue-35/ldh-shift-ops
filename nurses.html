@@ -355,6 +355,7 @@
       const o = { day: dayKey() };
       Object.keys(INITIAL_BOXES).forEach(k => { o[k] = cleanInitials(document.getElementById(INITIAL_BOXES[k]).value); });
       localStorage.setItem(INITIALS_KEY, JSON.stringify(o));
+      scheduleOnDutySync();
     } catch (e) { /* remembering is a convenience only */ }
   }
   (function restoreInitials() {
@@ -374,6 +375,22 @@
     document.getElementById('aa-initials').addEventListener('input', (e) => { e.target.dataset.touched = '1'; });
     if (!document.getElementById('aa-initials').value) fillAaInitials();
   })();
+  // Who is on today: the two nurse columns' initials are shared (initials only) so the Admission AA page can show them.
+  let onDutyTimer = null;
+  function scheduleOnDutySync() { clearTimeout(onDutyTimer); onDutyTimer = setTimeout(syncOnDuty, 600); }
+  async function syncOnDuty() {
+    if (typeof sb === 'undefined' || !sb) return;
+    try {
+      for (const role of ['welfare', 'processing']) {
+        const v = cleanInitials(document.getElementById(INITIAL_BOXES[role]).value);
+        const res = v
+          ? await sb.from('nurse_on_duty').upsert({ day: dayKey(), role, initials: v, updated_at: new Date().toISOString() }, { onConflict: 'day,role' })
+          : await sb.from('nurse_on_duty').delete().eq('day', dayKey()).eq('role', role);
+        void res;   // if the table is not there yet, nothing else on this page is affected
+      }
+      sb.from('nurse_on_duty').delete().lt('day', LDHLogic.addDaysISO(dayKey(), -3)).then(() => {}, () => {});
+    } catch (e) { /* the roster strip on the AA page is a convenience */ }
+  }
   // col: 'welfare' | 'processing'. Uses that column's saved initials with no prompt; asks only if the box is empty.
   function myInitials(col) {
     const el = document.getElementById(INITIAL_BOXES[col || 'welfare']);
@@ -1155,6 +1172,7 @@
     TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || []; NOGA_REQUESTS = ngRes.data || []; MEMOS = memosRes.data || [];
     await loadNurseCounts();
+    if (!window.__onDutySynced) { window.__onDutySynced = true; syncOnDuty(); }
     checkForNewItems();
     renderAll();
   }

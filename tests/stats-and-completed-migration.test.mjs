@@ -81,3 +81,16 @@ test('0023: a done treatment task counts for the Processing nurse', async () => 
   const rows = (await d.query(`select role, n::int from public.nurse_daily_counts('2026-11-01') order by role`)).rows;
   assert.deepEqual(rows, [{ role: 'processing', n: 1 }, { role: 'welfare', n: 1 }]);
 });
+
+test('0024: nurse_on_duty holds one row per day and role, initials 1-4 characters', async () => {
+  const d = await db('0024_nurse_on_duty.sql');
+  await d.exec(`insert into public.nurse_on_duty (day, role, initials) values ('2026-11-18', 'welfare', 'AB'), ('2026-11-18', 'processing', 'CD')`);
+  await d.exec(`insert into public.nurse_on_duty (day, role, initials) values ('2026-11-18', 'welfare', 'XY') on conflict (day, role) do update set initials = excluded.initials`);
+  assert.deepEqual((await d.query(`select role, initials from public.nurse_on_duty order by role`)).rows, [{ role: 'processing', initials: 'CD' }, { role: 'welfare', initials: 'XY' }]);
+  let err = '';
+  try { await d.exec(`insert into public.nurse_on_duty (day, role, initials) values ('2026-11-19', 'welfare', 'TOOLONG')`); } catch (e) { err = String(e.message); }
+  assert.match(err, /check/i);
+  err = '';
+  try { await d.exec(`insert into public.nurse_on_duty (day, role, initials) values ('2026-11-19', 'vet', 'AB')`); } catch (e) { err = String(e.message); }
+  assert.match(err, /check/i);
+});
