@@ -472,7 +472,9 @@
     // both ticked = ONE combined "Microchip + UV" task for the same animal, not two
     const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
     let error = null;
-    if (!kinds.length) {
+    // only the microchip/UV part goes to the nurses: emergency signs or a suspected condition still reach the vets
+    const needsVet = !kinds.length || allFlags().length > 0 || !!row.condition;
+    if (needsVet) {
       ({ error } = await sb.from('tasks').insert(row));
       /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
          (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in

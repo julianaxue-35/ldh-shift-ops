@@ -108,6 +108,20 @@ const t = require('./check')('flag-form');
   await page.waitForTimeout(200);
   t.ok((await db()).nurse_requests.filter(r => r.animal_id === 'RES-1').length === 0, 'no boxes ticked creates no nurse requests');
   t.ok((await db()).tasks.filter(x => x.title === 'RES-1').length === 1, 'a rescue request with nothing ticked still goes to the vet board');
+  /* only the microchip/UV part goes to the nurses: a request that also carries a clinical flag still reaches the vets */
+  await page.selectOption('#req-type', 'rescue');
+  await page.fill('#req-title', 'RES-2');
+  await page.check('#req-x-microchip');
+  await page.check('input.req-flag[value="bleeding_wound"]');
+  await page.click('#req-submit');
+  await page.waitForTimeout(300);
+  t.ok((await db()).nurse_requests.filter(r => r.animal_id === 'RES-2' && r.kind === 'microchip').length === 1 && (await db()).tasks.filter(x => x.title === 'RES-2').length === 1,
+    'microchip + an emergency sign: the chip goes to the nurse AND the case stays on the vet board');
+  await page.selectOption('#req-type', 'medication');
+  await page.fill('#req-title', 'MED-1');
+  await page.click('#req-submit');
+  await page.waitForTimeout(300);
+  t.ok((await db()).tasks.filter(x => x.title === 'MED-1').length === 1, 'medication requests are never redirected to the nurses');
 
   t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
   await browser.close();
