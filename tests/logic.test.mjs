@@ -660,3 +660,18 @@ test('expandAnimalIds: litter ranges and shorthand', () => {
   assert.deepEqual(L.parseAnimalIds('1170123 - 1170125'), ['1170123', '1170124', '1170125'], 'the AA / nurse forms understand litters too');
   assert.match(L.aaBuildItem({ kind: 'vaccination', idsText: '1170130 - 1170123', vaccine: 'F3', initials: 'ab' }).error, /backwards/);
 });
+
+test('requestRing: only staff requests count; completed today + open raised today; older open reported separately', () => {
+  const NOW2 = new Date('2026-11-18T12:00:00').getTime();
+  const iso = (s) => new Date(s).toISOString();
+  const tasks = [
+    { id: 1, title: 'A1', shift: 'sick_injured', type: 'shelter', done: true, created_at: iso('2026-11-18T08:00:00'), completed_at: iso('2026-11-18T09:00:00') },
+    { id: 2, title: 'A2', shift: 'sick_injured', type: 'foster', done: true, created_at: iso('2026-11-17T08:00:00'), completed_at: iso('2026-11-18T10:00:00') },
+    { id: 3, title: 'A3', shift: 'sick_injured', type: 'rescue', done: false, created_at: iso('2026-11-18T11:00:00') },
+    { id: 4, title: 'A4', shift: 'sick_injured', type: 'shelter', done: false, created_at: iso('2026-11-15T11:00:00') },
+    { id: 5, title: 'A5', shift: 'processing', type: 'check_recheck', done: true, created_at: iso('2026-11-18T08:00:00'), completed_at: iso('2026-11-18T09:00:00') },
+    { id: 6, title: 'A6', shift: 'sick_injured', type: 'medication', done: false, created_at: iso('2026-11-18T11:30:00') }
+  ];
+  assert.deepEqual(L.requestRing(tasks, NOW2), { done: 2, total: 4, older: 1 });
+  assert.deepEqual(L.requestRing([], NOW2), { done: 0, total: 0, older: 0 });
+});
