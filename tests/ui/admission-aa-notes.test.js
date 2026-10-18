@@ -46,6 +46,15 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(dx.suggestedFilename() === 'T-300_medication_chart.xlsx', 'Excel download is named after the animal: ' + dx.suggestedFilename());
     t.ok(require('fs').readFileSync(await dx.path()).toString() === 'PK-fake-docx-bytes', 'downloaded bytes are the decoded Excel file');
 
+    /* layout: vet notes (left half); medication charts and nurse tasks (right half, side by side) */
+    const col = id => a.page.evaluate(i => { const c = document.querySelector('.aa-card[data-id="' + i + '"]'); const w = c && c.closest('[data-col]'); return w ? w.dataset.col : null; }, id);
+    t.ok(await col('n1') === 'notes' && await col('n2') === 'notes', 'vet notes are in the notes column');
+    t.ok(await col('m1') === 'charts' && await col('m2') === 'charts', 'medication charts are in the charts column');
+    const xs = await a.page.evaluate(() => ['notes', 'charts', 'tasks'].map(k => { const r = document.querySelector('[data-col="' + k + '"]').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; }));
+    t.ok(xs[0][0] < xs[1][0] && xs[1][0] < xs[2][0], 'columns run notes | charts | nurse tasks left to right: ' + JSON.stringify(xs));
+    t.ok(xs[0][1] > xs[1][1] * 1.7 && Math.abs(xs[1][1] - xs[2][1]) < 4, 'notes take half the width, the other two a quarter each: ' + JSON.stringify(xs));
+    t.ok(await a.page.isVisible('[data-col="tasks"] .col-empty'), 'an empty column says so');
+
     t.ok(await a.page.isHidden('#new-item-banner'), 'no banner for what was already there on load');
     await a.page.evaluate(() => sb.from('aa_items').update({ updated_at: new Date().toISOString(), payload: { text: 'Exam normal.\nWeight 12.5 kg.' } }).eq('id', 'n1'));
     await a.page.waitForSelector('#new-item-banner', { state: 'visible', timeout: 5000 });
