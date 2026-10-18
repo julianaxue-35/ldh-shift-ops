@@ -82,7 +82,7 @@ const H = 3600 * 1000;
         window.__db.tasks.push({ id: 'old1', title: '9990050', location: 'Cat Room 1 / 3', shift: 'sick_injured', type: 'shelter', urgency: 'routine', done: true, completed_at: new Date(Date.now() - 3600e3).toISOString(), created_at: new Date(Date.now() - 5 * 3600e3).toISOString(), problem: 'Sneezing', treatment: 'x', plan: 'y', note: 'n' });
         window.__db.flag_history.push({ id: 'h0', task_id: 'old1', title: '9990050', flagged_at: new Date(Date.now() - 5 * 3600e3).toISOString(), location: 'Cat Room 1 / 3', reason: 'Sneezing' });
       });
-      const msgs = []; idx.page.on('dialog', d => msgs.push(d.message()));
+      const msgs = []; idx.page.on('dialog', d => msgs.push(d.message()));   // the harness already accepts dialogs
       const flagIt = async (problem) => {
         await idx.page.fill('#req-title', '9990050'); await idx.page.selectOption('#req-location', 'Cat Room 1'); await idx.page.fill('#req-pen', '3');
         await idx.page.fill('#req-problem', problem); await idx.page.click('#req-submit'); await idx.page.waitForTimeout(400);
@@ -93,8 +93,27 @@ const H = 3600 * 1000;
       const hist = await idx.page.evaluate(() => window.__db.flag_history.filter(h => h.title === '9990050').map(h => h.reason));
       t.ok(hist.join('|') === 'Sneezing|Vomiting now', 'both flags are in the history (got ' + hist.join('|') + ')');
       t.ok(!msgs.some(m => /Could not submit/.test(m)), 'no "duplicate key" error shown to staff');
-      await flagIt('Again while still open');
-      t.ok(msgs.some(m => /already flagged in that pen and still open/.test(m)), 'flagging an animal that is still open says so instead of failing');
+      // still open: a second person adds a different reason to the SAME case
+      await idx.page.fill('#req-title', '9990050'); await idx.page.selectOption('#req-location', 'Cat Room 1'); await idx.page.fill('#req-pen', '3');
+      await idx.page.click('#req-submit'); await idx.page.waitForTimeout(300);
+      t.ok(msgs.some(m => /already flagged in that pen \(Vomiting now\)/.test(m) && /another reason/i.test(m)), 're-flagging with nothing to add says how to add a reason: ' + msgs.join(' | ').slice(0, 200));
+      await flagIt('Diarrhoea since lunch');
+      t.ok(msgs.some(m => /already flagged in that pen for: Vomiting now/.test(m) && /Add your reason/.test(m)), 'the person is shown why it was first flagged and asked to add theirs');
+      let one = await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050'));
+      t.ok(one.length === 1 && one[0].problem === 'Vomiting now' && one[0].extra_reasons.length === 1 && one[0].extra_reasons[0].problem === 'Diarrhoea since lunch', 'still ONE case, with the second reason added (got ' + JSON.stringify(one.map(r => r.extra_reasons)) + ')');
+      await idx.page.evaluate(() => loadAll());
+      const tbody = await idx.page.textContent('#cases-open-tbody');
+      t.ok(/Vomiting now/.test(tbody) && /Diarrhoea since lunch/.test(tbody), 'the staff Cases table lists BOTH reasons');
+      await idx.page.evaluate(() => { window.__realConfirm = window.confirm; window.confirm = () => false; });
+      await flagIt('Cancelled comment');
+      await idx.page.evaluate(() => { window.confirm = window.__realConfirm; });
+      one = await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050'));
+      t.ok(one[0].extra_reasons.length === 1, 'saying no to the prompt adds nothing');
+      // a serious sign added later raises the case
+      await idx.page.fill('#req-title', '9990050'); await idx.page.selectOption('#req-location', 'Cat Room 1'); await idx.page.fill('#req-pen', '3');
+      await idx.page.check('input.req-flag[value="bleeding_wound"]'); await idx.page.click('#req-submit'); await idx.page.waitForTimeout(400);
+      one = await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050'));
+      t.ok(one[0].urgency === 'red_flag' && one[0].red_flags.includes('bleeding_wound') && one[0].extra_reasons.length === 2, 'an emergency sign added later raises the case to Emergency');
       t.ok((await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050').length)) === 1, 'still just one case');
       // the earlier flag shows on the main Cases table too
       await idx.page.evaluate(() => loadAll());

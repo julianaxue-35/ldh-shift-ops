@@ -510,7 +510,9 @@
       esc(locationText(t)),
       TYPE_LABELS[t.type] || t.type
     ];
+    if (t.condition) metaBits.push(esc(LDHLogic.CONDITION_LABELS[t.condition] || t.condition));
     if (t.problem) metaBits.push(esc(t.problem));
+    LDHLogic.reasonsOf(t).filter(r => r.extra).forEach(r => metaBits.push('<b>also flagged ' + esc(fmtTime(r.at)) + (r.by ? ' by ' + esc(r.by) : '') + ':</b> ' + (r.text ? esc(r.text) : 'no detail')));
     if (t.red_flags && t.red_flags.length) metaBits.push('signs: ' + t.red_flags.map(k => esc(LDHLogic.signLabel(k))).join(', '));
     if (stage === 'waiting_medication') metaBits.push('Vet check done — waiting on medication');
     else if (stage === 'picked_up') metaBits.push('Picked up ' + esc(fmtTime(t.claimed_at)));

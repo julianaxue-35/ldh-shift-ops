@@ -341,7 +341,7 @@
       <h2>Cases</h2>
       <p class="subtle">Every case from flagged to completed, across all shifts.</p>
       <div class="table-scroll"><table class="queue-table">
-        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Tier</th><th>Stage</th><th>Flagged</th><th>Time left</th><th>Plan</th></tr></thead>
+        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Tier</th><th>Stage</th><th>Reason</th><th>Flagged</th><th>Time left</th><th>Plan</th></tr></thead>
         <tbody id="cases-open-tbody"></tbody>
       </table></div>
       <h3 style="font-size:0.85rem; margin:18px 0 8px;">Completed (last 24 h)</h3>
@@ -505,7 +505,19 @@
       if (error && error.code === '23505') {
         const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
         const old = found && found[0];
-        if (old && !old.done) { btn.disabled = false; alert(title + ' is already flagged in that pen and still open — it is on the board.'); return; }
+        if (old && !old.done) {
+        // Already open in this pen: add this person's reason to the SAME case rather than refusing or duplicating it.
+        const entry = { at: new Date().toISOString(), by: 'Shelter Staff', condition: row.condition, problem: row.problem, red_flags: row.red_flags, urgency: row.urgency };
+        const had = LDHLogic.reasonsOf(old).map(r => r.text).filter(Boolean).join(' · ') || 'no reason given';
+        if (!entry.condition && !entry.problem && !entry.red_flags.length) {
+          btn.disabled = false;
+          alert(title + ' is already flagged in that pen (' + had + ').\n\nTo add another reason, choose a sign or type what is wrong, then submit again.');
+          return;
+        }
+        if (!confirm(title + ' is already flagged in that pen for: ' + had + '.\n\nAdd your reason to the same case?')) { btn.disabled = false; return; }
+        ({ error } = await sb.from('tasks').update(LDHLogic.mergeReason(old, entry)).eq('id', old.id));
+        if (error && /extra_reasons/.test(error.message || '')) error = { message: 'The database needs migration 0019 (extra reasons) run first.' };
+      } else
         if (old) {
           ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
             created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
@@ -658,6 +670,13 @@
     const txt = LDHLogic.flagHistoryText(LDHLogic.flagsBefore(HISTORY, t, Date.now()));
     return txt ? `<div style="font-size:0.72rem; font-weight:600; color:#9a5b00; margin-top:3px;">${esc(txt)}</div>` : '';
   }
+  // Why the animal was flagged: the first reason, then anything other staff added later.
+  function reasonCellHtml(t) {
+    const rs = LDHLogic.reasonsOf(t);
+    return rs.map(r => r.extra
+      ? `<div class="reason-extra" style="font-size:0.78rem; color:#9a5b00; margin-top:3px;">+ ${esc(fmtTime(r.at))}${r.by ? ' ' + esc(r.by) : ''}: ${r.text ? esc(r.text) : '<i>no detail</i>'}</div>`
+      : `<div class="reason-first">${r.text ? esc(r.text) : '<i style="color:var(--muted)">No reason given</i>'}</div>`).join('');
+  }
   function caseRowHtml(t, isCompleted) {
     const tier = LDHLogic.normTier(t.urgency);
     const stage = LDHLogic.stageOf(t, Date.now());
@@ -669,6 +688,7 @@
         <td data-label="Type">${TYPE_LABELS[t.type] || t.type}</td>
         <td data-label="Tier"><span class="status-pill ${tier}">${esc(LDHLogic.TIER_LABELS[tier])}</span></td>
         <td data-label="Stage">${esc(STAGE_LABELS[stage] || stage)}${stage === 'completed' && t.needs_medication && t.med_done_by ? ' — meds by ' + esc(t.med_done_by) : ''}</td>
+        <td data-label="Reason">${reasonCellHtml(t)}</td>
         <td data-label="Flagged">${esc(fmtFlagged(t.created_at))}</td>
         <td data-label="Time left">${isCompleted ? '—' : statusChipHtml(t)}</td>
         <td data-label="Plan">${t.note ? esc(t.note) : ''}</td>
@@ -681,10 +701,10 @@
     const { open, completed } = LDHLogic.caseList(pool, Date.now());
     const openBody = document.getElementById('cases-open-tbody');
     openBody.innerHTML = open.length ? open.map(t => caseRowHtml(t, false)).join('')
-      : `<tr><td colspan="9"><p class="empty-state">Nothing matches.</p></td></tr>`;
+      : `<tr><td colspan="10"><p class="empty-state">Nothing matches.</p></td></tr>`;
     const doneBody = document.getElementById('cases-completed-tbody');
     doneBody.innerHTML = completed.length ? completed.map(t => caseRowHtml(t, true)).join('')
-      : `<tr><td colspan="9"><p class="empty-state">Nothing completed in the last 24 hours.</p></td></tr>`;
+      : `<tr><td colspan="10"><p class="empty-state">Nothing completed in the last 24 hours.</p></td></tr>`;
   }
 
   function renderAll() {
