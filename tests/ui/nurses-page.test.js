@@ -96,7 +96,7 @@ const todayISO = LDHLogic.localISO(new Date());
     // falls back to window.prompt() when empty; override it to simulate the nurse
     // leaving that prompt blank/cancelled.
     await a.page.evaluate(() => { window.prompt = () => null; });
-    t.ok((await a.page.inputValue('#initials-input')) === '', 'initials box starts empty');
+    t.ok((await a.page.inputValue('#initials-welfare')) === '', 'welfare initials box starts empty on a new day');
     await med1Card.locator('.med-done-btn').click();
     await a.page.waitForTimeout(200);
     t.ok(await a.page.locator('.oc-modal-overlay').count() === 0, 'Done runs with no passcode prompt');
@@ -105,8 +105,8 @@ const todayISO = LDHLogic.localISO(new Date());
     t.ok(await a.page.locator('.med-label-card', { hasText: 'MED-1' }).count() === 1, 'MED-1 still on the medication-labels list');
 
     /* ---------- Done: with initials typed in, completes the case ---------- */
-    await a.page.fill('#initials-input', 'jx');
-    t.ok((await a.page.inputValue('#initials-input')) === 'JX', 'initials are cleaned/uppercased');
+    await a.page.fill('#initials-welfare', 'jx');
+    t.ok((await a.page.inputValue('#initials-welfare')) === 'JX', 'initials are cleaned/uppercased');
     await med1Card.locator('.med-done-btn').click();
     await a.page.waitForTimeout(200);
     dbTasks = (await a.db()).tasks;
@@ -121,6 +121,7 @@ const todayISO = LDHLogic.localISO(new Date());
     /* ---------- Vaccination requests: pick-up claims, +1 increments ---------- */
     const nrItem = a.page.locator('.attn-item.nr-item', { hasText: 'Cat Room 1' });
     t.ok((await nrItem.textContent()).includes('1 of 3 vaccinated'), 'vaccination request shows progress');
+    await a.page.fill('#initials-processing', 'jx');
     await nrItem.locator('.nr-claim').click();
     await a.page.waitForTimeout(200);
     let nurseRequests = (await a.db()).nurse_requests;
@@ -314,7 +315,7 @@ const todayISO = LDHLogic.localISO(new Date());
     let dbTasks = (await eTab.db()).tasks;
     t.ok(!dbTasks.find(x => x.title === 'BMED-1').done, 'batch Done is blocked with no initials (same rule as single Done)');
 
-    await eTab.page.fill('#initials-input', 'cd');
+    await eTab.page.fill('#initials-welfare', 'cd');
     await eTab.page.click('#med-batch-done-btn');
     await eTab.page.waitForTimeout(200);
     dbTasks = (await eTab.db()).tasks;

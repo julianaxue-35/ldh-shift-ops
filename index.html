@@ -264,6 +264,23 @@
           <select id="req-x-window" style="margin:0; width:auto;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select>
         </div>
       </div>
+      <div style="margin:12px 0 4px;">
+        <label for="req-urgency-pick" style="font-size:0.78rem; font-weight:700;">How urgent is it?</label>
+        <select id="req-urgency-pick" style="margin:0;">
+          <option value="routine">Request check — within 24–48 h</option>
+          <option value="urgent">Urgent — within 12–24 h</option>
+          <option value="red_flag">Emergency — within 2 h (radio the vet now)</option>
+        </select>
+        <details id="triage-levels" style="margin-top:6px; font-size:0.82rem;">
+          <summary style="cursor:pointer; font-weight:700;">What do the levels mean?</summary>
+          <div style="padding:6px 2px;">
+            <p style="margin:4px 0;"><b>Request check (24–48 h) — green.</b> Can wait. Old-age changes, stable arthritis, overgrown nails, mild skin disease, mild cat flu and still eating.</p>
+            <p style="margin:4px 0;"><b>Urgent (12–24 h) — yellow / orange.</b> Needs a vet look that day or the next. One vomit or loose stool but bright, limping but weight-bearing, not eating (cat 24 h+, dog 48 h+), a wound that may need stitches, repeated vomiting, anything you think is painful.</p>
+            <p style="margin:4px 0;"><b>Emergency (within 2 h) — red. Radio the vet team now; don't wait for this board.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
+            <p style="margin:4px 0; color:var(--muted);">From the draft triage guide (not yet approved). It does not replace common sense and gut instinct.</p>
+          </div>
+        </details>
+      </div>
       <div id="req-redflags-wrap" style="margin:12px 0 4px;">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Emergency signs — tick any that apply</div>
         <div id="req-redflags" style="display:flex; flex-wrap:wrap; gap:8px 18px;"></div>
@@ -417,6 +434,7 @@
     updateTierPreview();
   });
   document.getElementById('req-birthing-reason').addEventListener('change', () => updateTierPreview());
+  document.getElementById('req-urgency-pick').addEventListener('change', () => updateTierPreview());
   // Foster requests default to the Pathway "room" (2026-10-09) — still changeable.
   document.getElementById('req-type').addEventListener('change', () => {
     const tv = document.getElementById('req-type').value;
@@ -456,7 +474,7 @@
       location_detail: isOffsite ? (detail || null) : null,
       shift: 'sick_injured',
       type: document.getElementById('req-type').value,
-      urgency: LDHLogic.tierFromFlags(allFlags()),
+      urgency: LDHLogic.pickTier(document.getElementById('req-urgency-pick').value, allFlags()),
       red_flags: allFlags(),
       needs_medication: needsMed,
       sm_number: needsMed ? title : null,
@@ -473,7 +491,12 @@
     const kinds = wanted.length === 2 ? ['microchip_uv'] : wanted;
     let error = null;
     // only the microchip/UV part goes to the nurses: emergency signs or a suspected condition still reach the vets
-    const needsVet = !kinds.length || allFlags().length > 0 || !!row.condition;
+    // Microchip/UV ONLY goes straight to the nurse. Anything else on the request (emergency sign, suspected condition,
+    // notes typed, or a raised urgency) means a vet needs to see it: it goes to the vet board ONLY, saying what was
+    // asked for, and the vet can transfer the microchip / UV part to the nurses (Transfer to nurse).
+    const KIND_NAMES = { microchip: 'microchip', uv: 'UV check', microchip_uv: 'microchip + UV check' };
+    const needsVet = !kinds.length || allFlags().length > 0 || !!row.condition || !!row.problem || document.getElementById('req-urgency-pick').value !== 'routine';
+    if (kinds.length && needsVet) row.problem = ['Needs ' + KIND_NAMES[kinds[0]], row.problem].filter(Boolean).join(' — ');
     if (needsVet) {
       ({ error } = await sb.from('tasks').insert(row));
       /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
@@ -496,15 +519,14 @@
     if (error) { alert('Could not submit: ' + error.message); return; }
     /* Foster / rescue requests can also ask the nurses for a microchip and/or a UV check — one nurse request per
        ticked task, for this named animal, due today, shown on the Processing nurse board. */
-    if (kinds.length) {
-      const KIND_NAMES = { microchip: 'microchip', uv: 'UV', microchip_uv: 'microchip + UV' };
+    if (kinds.length && !needsVet) {
       for (const kind of kinds) {
         const { error: nrErr } = await sb.from('nurse_requests').insert({
           kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
           animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff',
           note: TYPE_LABELS[reqType] + (isOffsite && detail ? ' — ' + detail : '')
         });
-        if (nrErr) alert('The case was flagged, but the ' + KIND_NAMES[kind] + ' request for the nurses could not be saved: ' + nrErr.message);
+        if (nrErr) alert('The ' + KIND_NAMES[kind] + ' request for the nurses could not be saved: ' + nrErr.message);
       }
     }
     document.getElementById('req-title').value = '';
@@ -512,6 +534,7 @@
     document.getElementById('req-location-detail').value = '';
     document.getElementById('req-problem').value = '';
     document.getElementById('req-condition').value = '';
+    document.getElementById('req-urgency-pick').value = 'routine';
     document.getElementById('req-type').value = 'shelter';
     document.getElementById('req-nurse-extras').style.display = 'none';
     ['req-x-microchip', 'req-x-uv'].forEach(id => { document.getElementById(id).checked = false; });
@@ -708,7 +731,7 @@
   }
   function allFlags() { const r = birthingReason(); return selectedFlags().concat(r ? [r] : []); }
   function updateTierPreview() {
-    const tier = LDHLogic.tierFromFlags(allFlags());
+    const tier = LDHLogic.pickTier(document.getElementById('req-urgency-pick').value, allFlags());
     document.getElementById('req-tier-preview').textContent = LDHLogic.TIER_LABELS[tier] + ' — check ' + LDHLogic.TIER_TARGETS[tier];
   }
   function renderRedFlagForm() {

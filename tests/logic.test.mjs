@@ -554,3 +554,13 @@ test('aaChangeKey changes when a card is updated', () => {
   assert.notEqual(L.aaChangeKey({ id: 'a', updated_at: null }), L.aaChangeKey({ id: 'a', updated_at: '2026-10-18T01:00:00Z' }));
   assert.equal(L.aaChangeKey({ id: 'a' }), L.aaChangeKey({ id: 'a', updated_at: null }));
 });
+
+test('pickTier: staff choice, raised (never lowered) by emergency signs', () => {
+  const pick = L.pickTier;
+  assert.equal(pick('routine', []), 'routine');
+  assert.equal(pick('urgent', []), 'urgent');
+  assert.equal(pick('red_flag', []), 'red_flag');
+  assert.equal(pick('routine', ['collapse']), 'red_flag');
+  assert.equal(pick('urgent', ['collapse']), 'red_flag');
+  assert.equal(pick('garbage', []), 'routine');
+});

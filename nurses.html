@@ -178,11 +178,6 @@
       &nbsp;·&nbsp;
       <a href="https://julianaxue-35.github.io/ldh-shift-tools/" style="color:var(--sidebar-text-muted);">Shift Tools ↗</a>
     </p>
-    <div id="initials-box" style="margin-top:14px;">
-      <label for="initials-input">Your initials</label>
-      <input id="initials-input" maxlength="4" placeholder="e.g. AB" autocomplete="off">
-      <p class="hint" style="margin-top:6px;">Used when you pick up or tick off a task. Type yours in — change it if someone else is using this device.</p>
-    </div>
     <span id="signout-link">Sign out</span>
   </aside>
   <main>
@@ -192,30 +187,11 @@
     </div>
     <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
 
-    <section class="card" id="aa-send-card">
-      <h2>Send to Admission AA</h2>
-      <p class="subtle">The Admission AA enters it in ShelterMate and ticks it off. Your initials (left) are recorded.</p>
-      <select id="aa-kind">
-        <option value="vaccination">Vaccination update</option>
-        <option value="microchip">Microchip</option>
-        <option value="microchip_uv">Microchip + UV</option>
-        <option value="uv">UV result</option>
-        <option value="fiv">FIV result</option>
-      </select>
-      <label id="aa-ids-label" for="aa-ids" style="font-size:0.78rem; font-weight:700;">Animal ID(s), several allowed</label>
-      <textarea id="aa-ids" rows="2" placeholder="e.g. A123, A124, A125"></textarea>
-      <div id="aa-f-result"><input id="aa-result" placeholder="Result, e.g. FIV negative"></div>
-      <div id="aa-f-chip"><input id="aa-chip" inputmode="numeric" placeholder="Microchip number (15 digits)"></div>
-      <div id="aa-f-uv"><input id="aa-uv" placeholder="UV result, e.g. No fluorescence"></div>
-      <div id="aa-f-vacc"><input id="aa-vaccine" placeholder="Vaccine given, e.g. F3"><input id="aa-vdate" type="date"></div>
-      <p id="aa-error" class="oc-modal-error" style="display:none;"></p>
-      <button type="button" id="aa-send">Send to Admission AA</button>
-      <span id="aa-sent" class="subtle" style="display:none;">Sent to the Admission AA ✓</span>
-    </section>
-
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
+    <div class="col-initials" style="margin:0 0 12px;"><label for="initials-welfare" style="font-size:0.78rem; font-weight:700;">Welfare nurse initials for today</label>
+      <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -241,6 +217,8 @@
 
     <div class="nurse-col" id="processing-col">
     <h2 class="nurse-col-title processing">Processing nurse</h2>
+    <div class="col-initials" style="margin:0 0 12px;"><label for="initials-processing" style="font-size:0.78rem; font-weight:700;">Processing nurse initials for today</label>
+      <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="nr-list"></div>
@@ -254,6 +232,29 @@
 
     </div>
     </div>
+
+    <section class="card" id="aa-send-card">
+      <h2>Send to Admission AA</h2>
+      <p class="subtle">The Admission AA enters it in ShelterMate and ticks it off. Your initials are recorded.</p>
+      <select id="aa-kind">
+        <option value="vaccination">Vaccination update</option>
+        <option value="microchip">Microchip</option>
+        <option value="microchip_uv">Microchip + UV</option>
+        <option value="uv">UV result</option>
+        <option value="fiv">FIV result</option>
+      </select>
+      <label id="aa-ids-label" for="aa-ids" style="font-size:0.78rem; font-weight:700;">Animal ID(s), several allowed</label>
+      <textarea id="aa-ids" rows="2" placeholder="e.g. A123, A124, A125"></textarea>
+      <div id="aa-f-result"><input id="aa-result" placeholder="Result, e.g. FIV negative"></div>
+      <div id="aa-f-chip"><input id="aa-chip" inputmode="numeric" placeholder="Microchip number (15 digits)"></div>
+      <div id="aa-f-uv"><input id="aa-uv" placeholder="UV result, e.g. No fluorescence"></div>
+      <div id="aa-f-vacc"><input id="aa-vaccine" placeholder="Vaccine given, e.g. F3"><input id="aa-vdate" type="date"></div>
+      <label for="aa-initials" style="font-size:0.78rem; font-weight:700;">Your initials</label>
+      <input id="aa-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;">
+      <p id="aa-error" class="oc-modal-error" style="display:none;"></p>
+      <button type="button" id="aa-send">Send to Admission AA</button>
+      <span id="aa-sent" class="subtle" style="display:none;">Sent to the Admission AA ✓</span>
+    </section>
 
     <section class="card" id="memo-board">
       <h2>Memo board</h2>
@@ -273,7 +274,7 @@
       <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
-      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the sidebar — they are recorded when you pick up or tick something off. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
+      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the box at the top of your column (Welfare or Processing) once for the day — they are put on everything you pick up or tick off, and are cleared the next day. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
       <details><summary>How do I pick up, share or finish a nurse request?</summary><div><p>On a request, <b>Pick up</b> puts your initials on it (press <b>Release</b> to hand it back to the pool). Use <b>+1</b> as each animal is done, or <b>All done</b>. The coloured chip shows time left against the "needed within" time.</p></div></details>
       <details><summary>How do I do a medication label or a treatment dose?</summary><div><p>Medication labels: copy the label text, then mark it done (tick several and enter your initials once). Treatments due: tick each dose as you give it. Overdue doses are listed first.</p></div></details>
       <details><summary>What are miscellaneous tasks?</summary><div><p>Tasks a vet asked for or transferred from a case — bloods, ear swab, FIV test, flu cat needing IVFT and so on. Press <b>Done</b> when finished.</p></div></details>
@@ -292,15 +293,46 @@
   let TASKS = [], NURSE_REQUESTS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [], NOGA_REQUESTS = [], MEMOS = [];
   let showCompletedMemos = false;
 
-  // Initials come from the visible box in the sidebar. Deliberately NOT remembered between visits.
+  // Initials: each nurse column (Welfare / Processing) has its own box and the Admission AA form has one. They are
+  // remembered for the rest of TODAY on this device (so every tick is stamped automatically) and cleared the next day.
+  const INITIALS_KEY = 'ldh_nurse_initials_v1';
+  const INITIAL_BOXES = { welfare: 'initials-welfare', processing: 'initials-processing', aa: 'aa-initials' };
   function cleanInitials(v) { return String(v || '').trim().toUpperCase().slice(0, 4); }
-  function myInitials() {
-    const el = document.getElementById('initials-input');
+  function dayKey() { return new Date().toLocaleDateString('en-CA'); }
+  function readSavedInitials() {
+    try { const o = JSON.parse(localStorage.getItem(INITIALS_KEY) || '{}'); return o.day === dayKey() ? o : {}; } catch (e) { return {}; }
+  }
+  function saveInitials() {
+    try {
+      const o = { day: dayKey() };
+      Object.keys(INITIAL_BOXES).forEach(k => { o[k] = cleanInitials(document.getElementById(INITIAL_BOXES[k]).value); });
+      localStorage.setItem(INITIALS_KEY, JSON.stringify(o));
+    } catch (e) { /* remembering is a convenience only */ }
+  }
+  (function restoreInitials() {
+    const o = readSavedInitials();
+    Object.keys(INITIAL_BOXES).forEach(k => {
+      const el = document.getElementById(INITIAL_BOXES[k]);
+      el.value = cleanInitials(o[k]);
+      el.addEventListener('input', () => { el.value = cleanInitials(el.value); saveInitials(); });
+    });
+    // the AA form starts from the Processing nurse's initials (or the Welfare nurse's) if it has none of its own
+    document.getElementById('initials-processing').addEventListener('input', fillAaInitials);
+    document.getElementById('initials-welfare').addEventListener('input', fillAaInitials);
+    function fillAaInitials() {
+      const aa = document.getElementById('aa-initials');
+      if (!aa.dataset.touched) { aa.value = cleanInitials(document.getElementById('initials-processing').value) || cleanInitials(document.getElementById('initials-welfare').value); saveInitials(); }
+    }
+    document.getElementById('aa-initials').addEventListener('input', (e) => { e.target.dataset.touched = '1'; });
+    if (!document.getElementById('aa-initials').value) fillAaInitials();
+  })();
+  // col: 'welfare' | 'processing'. Uses that column's saved initials with no prompt; asks only if the box is empty.
+  function myInitials(col) {
+    const el = document.getElementById(INITIAL_BOXES[col || 'welfare']);
     let v = cleanInitials(el.value);
-    if (!v) { v = cleanInitials(window.prompt('Your initials:')); if (v) el.value = v; }
+    if (!v) { v = cleanInitials(window.prompt((col === 'processing' ? 'Processing nurse' : 'Welfare nurse') + ' initials:')); if (v) { el.value = v; saveInitials(); } }
     return v;
   }
-  document.getElementById('initials-input').addEventListener('input', (e) => { e.target.value = cleanInitials(e.target.value); });
 
   function locationText(t) {
     const off = LDHLogic.OFFSITE_NAMES.includes(t.location);
@@ -379,7 +411,7 @@
     if (doneBtn) {
       const t = TASKS.find(x => x.id === doneBtn.dataset.id);
       if (!t) return;
-      const initials = myInitials();
+      const initials = myInitials('welfare');
       if (!initials) { alert('Enter your initials before marking this done.'); return; }
       const { error } = await sb.from('tasks').update({
         med_done_by: initials, med_done_at: new Date().toISOString(), done: true,
@@ -401,7 +433,7 @@
   document.getElementById('med-batch-done-btn').addEventListener('click', async () => {
     const ids = Array.from(selectedMedDone);
     if (!ids.length) return;
-    const initials = myInitials();
+    const initials = myInitials('welfare');
     if (!initials) { alert('Enter your initials before marking these done.'); return; }
     const { error } = await sb.from('tasks').update({
       med_done_by: initials, med_done_at: new Date().toISOString(), done: true,
@@ -477,7 +509,7 @@
       patch = { arrived_at: new Date().toISOString() };
     } else if (btn.classList.contains('nr-claim')) {
       if (r.claimed_by) patch = { claimed_by: null };
-      else { const who = myInitials(); if (!who) return; patch = { claimed_by: who }; }
+      else { const who = myInitials('processing'); if (!who) return; patch = { claimed_by: who }; }
     } else if (btn.classList.contains('nr-plus')) {
       const n = Math.min(r.done_count + 1, r.animal_count);
       patch = { done_count: n, completed_at: n >= r.animal_count ? new Date().toISOString() : null };
@@ -528,7 +560,7 @@
     const cb = e.target.closest('.nt-tick'); if (!cb) return;
     let who = null;
     if (cb.checked) {
-      who = myInitials(); if (!who) { cb.checked = false; return; }
+      who = myInitials('welfare'); if (!who) { cb.checked = false; return; }
     }
     const { error } = await sb.from('nurse_treatment_doses').update({ done_by: who, done_at: cb.checked ? new Date().toISOString() : null }).eq('id', cb.dataset.id);
     if (error) alert('Could not save the tick: ' + error.message);
@@ -564,12 +596,13 @@
     document.getElementById('proc-misc-list').innerHTML = processing.map(miscRowHtml).join('');
     document.getElementById('proc-misc-section').style.display = processing.length ? '' : 'none';
   }
+  function isProcessingMisc(r) { return PROCESSING_MISC_KINDS.includes(r.task); }
   async function miscDoneClick(e) {
     const back = e.target.closest('.noga-back');
     if (back) { const r = NOGA_REQUESTS.find(x => x.id === back.dataset.id); if (r) openBackModal({ src: 'misc', row: r }); return; }
     const btn = e.target.closest('.noga-done'); if (!btn) return;
     const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
-    const initials = myInitials();
+    const initials = myInitials(isProcessingMisc(r) ? 'processing' : 'welfare');
     if (!initials) { alert('Enter your initials before marking this done.'); return; }
     const { error } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString() }).eq('id', r.id);
     if (error) alert('Could not update: ' + error.message);
@@ -624,7 +657,7 @@
     const result = overlay.querySelector('.back-result').value.trim();
     if (!animalId) return fail('Enter the animal ID.');
     if (!result) return fail('Write the result or a comment for the vet.');
-    const initials = myInitials();
+    const initials = myInitials(isMisc ? (isProcessingMisc(r) ? 'processing' : 'welfare') : 'processing');
     if (!initials) return fail('Enter your initials first.');
     ok.disabled = true;
     const row = LDHLogic.returnedResultTask({
@@ -849,7 +882,7 @@
     err.style.display = 'none';
     const built = LDHLogic.aaBuildItem({
       kind: val('aa-kind'), idsText: val('aa-ids'), result: val('aa-result'), chipNumber: val('aa-chip'), uvResult: val('aa-uv'),
-      vaccine: val('aa-vaccine'), vaccDate: val('aa-vdate'), initials: cleanInitials(val('initials-input')) || myInitials()
+      vaccine: val('aa-vaccine'), vaccDate: val('aa-vdate'), initials: cleanInitials(val('aa-initials')) || myInitials('processing')
     });
     if (built.error) { err.textContent = built.error; err.style.display = 'block'; return; }
     btn.disabled = true;
