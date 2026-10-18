@@ -221,6 +221,16 @@
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
+      <div id="uv-bulk-bar" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
+        <div style="font-size:0.85rem; font-weight:700;" id="uv-bulk-count"></div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+          <input id="uv-bulk-result" placeholder="One UV result for all, e.g. UV negative" style="flex:1; min-width:200px; margin:0;">
+          <button type="button" class="secondary" id="uv-bulk-negative">UV negative</button>
+          <button type="button" id="uv-bulk-send">Send to Admission AA &amp; mark done</button>
+          <button type="button" class="secondary" id="uv-bulk-clear">Clear</button>
+        </div>
+        <p id="uv-bulk-error" class="oc-modal-error" style="display:none;"></p>
+      </div>
       <div id="nr-list"></div>
     </section>
 
@@ -484,8 +494,8 @@
     const st = LDHLogic.nurseRequestStatus(r, Date.now());
     const k = nurseReqKind(r);
     return `<div class="attn-item nr-item">
-      <div><div class="aname">${nurseReqTitle(r)}</div>
-        <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
+      <div style="display:flex; gap:8px; align-items:flex-start;">${uvPickBox('nr', r, r.kind === 'uv' && r.animal_id)}<div><div class="aname">${nurseReqTitle(r)}</div>
+        <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div></div>
       <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
@@ -495,10 +505,60 @@
         <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
   }
+  /* ---- Bulk UV: tick several UV-only checks, give ONE result, one card to the Admission AA ---- */
+  const uvSel = new Map();   // 'nr:<id>' | 'misc:<id>' -> animal ID (survives the live refreshes)
+  function uvPickBox(src, r, show) {
+    if (!show) return '';
+    return `<input type="checkbox" class="uv-pick" data-src="${src}" data-id="${esc(r.id)}" data-animal="${esc(r.animal_id)}" ${uvSel.has(src + ':' + r.id) ? 'checked' : ''} aria-label="Select ${esc(r.animal_id)} for a bulk UV result" style="width:18px; height:18px; margin:3px 0 0; flex:none;">`;
+  }
+  function renderUvBar() {
+    // drop selections whose task has gone (done elsewhere, refreshed away)
+    const live = new Set(Array.from(document.querySelectorAll('.uv-pick')).map(c => c.dataset.src + ':' + c.dataset.id));
+    Array.from(uvSel.keys()).forEach(k => { if (!live.has(k)) uvSel.delete(k); });
+    const bar = document.getElementById('uv-bulk-bar');
+    bar.style.display = uvSel.size ? '' : 'none';
+    document.getElementById('uv-bulk-count').textContent = uvSel.size + ' UV check' + (uvSel.size === 1 ? '' : 's') + ' selected';
+  }
+  document.addEventListener('change', (e) => {
+    const c = e.target.closest('.uv-pick'); if (!c) return;
+    const k = c.dataset.src + ':' + c.dataset.id;
+    if (c.checked) uvSel.set(k, c.dataset.animal); else uvSel.delete(k);
+    renderUvBar();
+  });
+  document.getElementById('uv-bulk-negative').addEventListener('click', () => { document.getElementById('uv-bulk-result').value = 'UV negative'; });
+  document.getElementById('uv-bulk-clear').addEventListener('click', () => { uvSel.clear(); document.querySelectorAll('.uv-pick').forEach(c => { c.checked = false; }); document.getElementById('uv-bulk-error').style.display = 'none'; renderUvBar(); });
+  document.getElementById('uv-bulk-send').addEventListener('click', async () => {
+    const err = document.getElementById('uv-bulk-error'), btn = document.getElementById('uv-bulk-send');
+    err.style.display = 'none';
+    const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
+    const ids = Array.from(new Set(Array.from(uvSel.values())));
+    if (!ids.length) return fail('Tick the animals first.');
+    const initials = myInitials('processing');
+    const built = LDHLogic.aaBuildItem({ kind: 'uv', idsText: ids.join(', '), result: document.getElementById('uv-bulk-result').value, initials });
+    if (built.error) return fail(built.error);
+    btn.disabled = true;
+    const { error } = await sb.from('aa_items').insert(built.row);
+    if (error) { btn.disabled = false; return fail('Could not send: ' + error.message); }
+    // the card is with the Admission AA; now mark each ticked task done
+    const now = new Date().toISOString(), problems = [];
+    for (const [k] of Array.from(uvSel.entries())) {
+      const [src, id] = k.split(':');
+      const res = src === 'nr'
+        ? await sb.from('nurse_requests').update({ done_count: (NURSE_REQUESTS.find(x => x.id === id) || {}).animal_count || 1, completed_at: now }).eq('id', id)
+        : await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: now }).eq('id', id);
+      if (res.error) problems.push(res.error.message);
+    }
+    btn.disabled = false;
+    uvSel.clear(); document.getElementById('uv-bulk-result').value = '';
+    if (problems.length) alert('The result was sent to the Admission AA, but ' + problems.length + ' task(s) could not be marked done here: ' + problems[0] + '. Tick them off yourself.');
+    loadAll();
+  });
+
   function renderNurseRequests() {
     const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
     document.getElementById('nr-list').innerHTML = open.map(r => r.arrived_at ? arrivedRowHtml(r) : scheduledRowHtml(r)).join('')
       || '<p class="empty-state">No nurse requests open.</p>';
+    renderUvBar();
   }
   document.getElementById('nr-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button'); if (!btn) return;
@@ -578,8 +638,8 @@
   function miscRowHtml(r) {
     return `
       <div class="attn-item noga-item">
-        <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div></div>
+        <div style="display:flex; gap:8px; align-items:flex-start;">${uvPickBox('misc', r, r.task === 'uv' && !r.done)}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div></div></div>
         ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
@@ -595,6 +655,7 @@
     document.getElementById('noga-list').innerHTML = welfare.map(miscRowHtml).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
     document.getElementById('proc-misc-list').innerHTML = processing.map(miscRowHtml).join('');
     document.getElementById('proc-misc-section').style.display = processing.length ? '' : 'none';
+    renderUvBar();
   }
   function isProcessingMisc(r) { return PROCESSING_MISC_KINDS.includes(r.task); }
   async function miscDoneClick(e) {

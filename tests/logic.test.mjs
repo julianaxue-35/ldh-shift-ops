@@ -478,9 +478,8 @@ test('aaBuildItem: vaccination takes many IDs, needs a vaccine and initials', ()
   assert.match(L.aaBuildItem({ kind: 'vaccination', idsText: 'A1', vaccine: 'F3', initials: '' }).error, /initials/i);
 });
 
-test('aaBuildItem: FIV / UV / microchip take exactly one animal ID', () => {
+test('aaBuildItem: FIV / microchip take exactly one animal ID (UV may list several, see below)', () => {
   assert.match(L.aaBuildItem({ kind: 'fiv', idsText: 'A1 A2', result: 'Negative', initials: 'AB' }).error, /one animal/i);
-  assert.match(L.aaBuildItem({ kind: 'uv', idsText: 'A1, A2', result: 'Clear', initials: 'AB' }).error, /one animal/i);
   assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'A1 A2', chipNumber: '985112000123456', initials: 'AB' }).error, /one animal/i);
   assert.deepEqual(L.aaBuildItem({ kind: 'fiv', idsText: 'a1', result: ' FIV negative ', initials: 'ab' }).row.payload, { result: 'FIV negative' });
   assert.match(L.aaBuildItem({ kind: 'fiv', idsText: 'A1', result: '', initials: 'AB' }).error, /result/i);
@@ -563,4 +562,12 @@ test('pickTier: staff choice, raised (never lowered) by emergency signs', () => 
   assert.equal(pick('routine', ['collapse']), 'red_flag');
   assert.equal(pick('urgent', ['collapse']), 'red_flag');
   assert.equal(pick('garbage', []), 'routine');
+});
+
+test('aaBuildItem: a UV result may list several animals; FIV and microchip still one at a time', () => {
+  const uv = L.aaBuildItem({ kind: 'uv', idsText: 'a1, a2, a3', result: 'UV negative', initials: 'cd' });
+  assert.deepEqual(uv.row.animal_ids, ['A1', 'A2', 'A3']);
+  assert.equal(uv.row.payload.result, 'UV negative');
+  assert.match(L.aaBuildItem({ kind: 'fiv', idsText: 'a1, a2', result: 'neg', initials: 'cd' }).error, /one animal at a time/i);
+  assert.match(L.aaBuildItem({ kind: 'microchip', idsText: 'a1, a2', chipNumber: '985112000123456', initials: 'cd' }).error, /one animal at a time/i);
 });
