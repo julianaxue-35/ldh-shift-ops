@@ -56,7 +56,7 @@ const H = 3600 * 1000;
     nurse_requests: [{ kind: 'blood', location: 'Cat Room 2', species: 'cat', animal_count: 3, done_count: 0, arrived_at: ago(1 * H) }]
   }, 'nurses.html');
   try {
-    await n.page.fill('#initials-input', 'JX');
+    await n.page.fill('#initials-welfare', 'JX'); await n.page.fill('#initials-processing', 'JX');
     await n.page.locator('.noga-item', { hasText: 'FIV-1' }).locator('.noga-back').click();
     await n.page.fill('.back-result', '');
     await n.page.click('.back-confirm');

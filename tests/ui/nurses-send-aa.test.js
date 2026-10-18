@@ -11,7 +11,7 @@ const todayISO = LDHLogic.localISO(new Date());
   };
   const p = await open(seed, 'nurses.html');
   try {
-    await p.page.fill('#initials-input', 'ab');
+    await p.page.fill('#aa-initials', 'ab'); await p.page.fill('#initials-processing', 'ab'); await p.page.fill('#initials-welfare', 'ab');
 
     // Bulk vaccination update: messy IDs, several animals, one card for the AA.
     await p.page.selectOption('#aa-kind', 'vaccination');
