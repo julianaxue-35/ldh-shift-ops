@@ -49,18 +49,63 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     await a.page.click('.aa-card[data-id="late"] .aa-done');   // harness auto-accepts the confirm()
     await a.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="late"]'));
     const db = await a.db();
-    t.ok(!db.aa_items.some(r => r.id === 'late'), 'ticking removes the row from the database completely');
-    t.ok(db.aa_items.length === 3, 'other items are untouched');
+    const lateRow = db.aa_items.find(r => r.id === 'late');
+    t.ok(lateRow && lateRow.completed_at, 'ticking marks the card completed (kept for the Completed list, not deleted yet)');
+    t.ok(db.aa_items.length === 4 && !db.aa_items.find(r => r.id === 'fresh').completed_at, 'other items are untouched');
     t.ok(await a.page.isHidden('#aa-overdue-count'), 'overdue counter clears');
+    t.ok(/A200/.test(await a.page.textContent('#aa-completed')), 'it appears in the Completed list at the bottom');
 
-    // Another device already ticked it: our delete matches 0 rows, no error dialog, list refreshes.
-    let alerts = 0; a.page.on('dialog', d => { if (d.type() === 'alert') alerts++; });
-    await a.page.evaluate(() => { window.__db.aa_items = window.__db.aa_items.filter(r => r.id !== 'vacc'); });
-    await a.page.click('.aa-card[data-id="vacc"] .aa-done');
+    /* several animals on one card: every animal is asked about separately */
+    t.ok(await a.page.locator('.aa-card[data-id="vacc"] .aa-done').count() === 0, 'a multi-animal card has no single "all done" button');
+    t.ok(await a.page.locator('.aa-card[data-id="vacc"] .aa-animal').count() === 3, 'each of the 3 animals has its own tick');
+    await a.page.check('.aa-card[data-id="vacc"] .aa-animal[data-animal="A1"]');
+    await a.page.waitForFunction(() => document.querySelector('.aa-card[data-id="vacc"] .aa-animal[data-animal="A1"]').checked);
+    let vrow = (await a.db()).aa_items.find(r => r.id === 'vacc');
+    t.ok(vrow.done_ids.join() === 'A1' && !vrow.completed_at, 'ticking one animal records it; the card stays open');
+    t.ok(/1 of 3 done/.test(await a.page.textContent('.aa-card[data-id="vacc"]')), 'progress is shown');
+    await a.page.check('.aa-card[data-id="vacc"] .aa-animal[data-animal="A2"]');
+    await a.page.waitForFunction(() => document.querySelector('.aa-card[data-id="vacc"] .aa-animal[data-animal="A2"]').checked);
+    await a.page.click('.aa-card[data-id="vacc"] .aa-animal[data-animal="A3"]');   // last one: the card leaves the list
     await a.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="vacc"]'));
+    vrow = (await a.db()).aa_items.find(r => r.id === 'vacc');
+    t.ok(vrow.completed_at && vrow.done_ids.join() === 'A1,A2,A3', 'when the last animal is ticked the card completes');
+
+    /* Completed list: newest first, each can be put back */
+    const doneOrder = await a.page.$$eval('#aa-completed .aa-done-row', els => els.map(e => e.dataset.id));
+    t.ok(doneOrder.join() === 'vacc,late', 'completed list is newest first: ' + doneOrder.join());
+    await a.page.click('#aa-completed .aa-putback[data-id="vacc"][data-animal="A2"]');
+    await a.page.waitForSelector('.aa-card[data-id="vacc"]');
+    vrow = (await a.db()).aa_items.find(r => r.id === 'vacc');
+    t.ok(!vrow.completed_at && vrow.done_ids.join() === 'A1,A3', 'putting one animal back reopens the card with only that animal unticked');
+    t.ok(await a.page.locator('.aa-card[data-id="vacc"] .aa-animal:not(:checked)').count() === 1, 'the card shows just that animal waiting');
+    await a.page.click('#aa-completed .aa-putback[data-id="late"]');
+    await a.page.waitForSelector('.aa-card[data-id="late"]');
+    t.ok(!(await a.db()).aa_items.find(r => r.id === 'late').completed_at, 'a single-animal card goes back to waiting');
+    await a.page.click('.aa-card[data-id="late"] .aa-done');
+    await a.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="late"]'));
+    await a.page.click('#aa-empty-done');
+    await a.page.waitForFunction(() => !document.querySelector('#aa-completed .aa-done-row'));
+    t.ok(!(await a.db()).aa_items.some(r => r.completed_at), 'Empty list removes every completed card from the database');
+    t.ok((await a.db()).aa_items.some(r => r.id === 'fresh') && (await a.db()).aa_items.some(r => r.id === 'vacc'), 'waiting cards are untouched by Empty list');
+
+    // Another device already ticked it: our update matches 0 rows, no error dialog, list refreshes.
+    let alerts = 0; a.page.on('dialog', d => { if (d.type() === 'alert') alerts++; });
+    await a.page.evaluate(() => { window.__db.aa_items = window.__db.aa_items.filter(r => r.id !== 'fresh'); });
+    await a.page.click('.aa-card[data-id="fresh"] .aa-done');
+    await a.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="fresh"]'));
     t.ok(alerts === 0, 'ticking an already-ticked card raises no error');
     t.ok(a.errors.length === 0, 'no page errors: ' + a.errors.join('; '));
   } finally { await a.browser.close(); }
+
+  /* completed cards older than 24 h are never shown and are removed */
+  const old = await open({ aa_items: [
+    { id: 'o1', kind: 'fiv', animal_ids: ['Z1'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(30 * H), completed_at: ago(25 * H), done_ids: ['Z1'] },
+    { id: 'o2', kind: 'fiv', animal_ids: ['Z2'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(3 * H), completed_at: ago(1 * H), done_ids: ['Z2'] }] }, 'admission-aa.html');
+  try {
+    await old.page.waitForTimeout(400);
+    t.ok(/Z2/.test(await old.page.textContent('#aa-completed')) && !/Z1/.test(await old.page.textContent('#aa-completed')), 'a card completed over 24 h ago is not listed');
+    t.ok(!(await old.db()).aa_items.some(r => r.id === 'o1') && (await old.db()).aa_items.some(r => r.id === 'o2'), 'and it is deleted from the database');
+  } finally { await old.browser.close(); }
 
   /* Tab B: items arriving while the page is open raise one banner with a count. */
   const b = await open({ aa_items: [{ id: 'old', kind: 'fiv', animal_ids: ['A1'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(1 * H) }] }, 'admission-aa.html');

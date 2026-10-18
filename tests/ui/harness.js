@@ -28,7 +28,7 @@ const STUB = `
     flag_history: () => ({}),
     surveillance_snapshots: () => ({}),
     noga_requests: () => ({ task: 'other', done: false, created_at: now() }),
-    aa_items: () => ({ payload: {}, sent_at: now() })
+    aa_items: () => ({ payload: {}, sent_at: now(), done_ids: [], completed_at: null })
   };
   // Mirrors the tasks_hold_medication trigger (0010_round3.sql): a medication
   // case can't be marked done until the nurse sets med_done_at.

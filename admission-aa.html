@@ -206,12 +206,14 @@
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
     <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
+    <section class="card" id="aa-completed" style="margin-top:18px;"></section>
   </main>
 </div>
 <script>
   let sb = null;
   const esc = OpsCore.esc;
   let ITEMS = [];
+  let DONE = [];                         // completed cards (kept at most 24 h, newest first)
   let doneThisSession = 0;               // a count only; no patient data is kept in the browser
 
   const openNotes = new Set();           // which note cards are expanded (ids only; survives re-renders)
@@ -238,8 +240,31 @@
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(c.level)}">${esc(c.label)}</span>
-        <button type="button" class="aa-done" data-id="${esc(it.id)}">Entered in ShelterMate ✓</button>
-      </div></div>`;
+        ${it.animal_ids.length > 1 ? '' : `<button type="button" class="aa-done" data-id="${esc(it.id)}">Entered in ShelterMate ✓</button>`}
+      </div>
+      ${it.animal_ids.length > 1 ? checklistHtml(it) : ''}</div>`;
+  }
+  // Several animals on one card: the AA says yes or no for EACH animal; the card completes when every one is ticked.
+  function checklistHtml(it) {
+    const done = new Set(it.done_ids || []);
+    return `<div class="aa-checklist" style="flex-basis:100%; border-top:1px solid var(--border); margin-top:8px; padding-top:8px;">
+      <div class="ameta" style="margin-bottom:4px;">Tick each animal once it is entered in ShelterMate (${done.size} of ${it.animal_ids.length} done)</div>
+      ${it.animal_ids.map(a => `<label style="display:flex; gap:8px; align-items:center; padding:3px 0;"><input type="checkbox" class="aa-animal" data-id="${esc(it.id)}" data-animal="${esc(a)}" ${done.has(a) ? 'checked' : ''} style="width:18px; height:18px; margin:0;"> <b>${esc(a)}</b></label>`).join('')}
+    </div>`;
+  }
+  function completedHtml() {
+    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const rows = DONE.map(it => `<div class="aa-done-row" data-id="${esc(it.id)}" style="padding:8px 0; border-top:1px solid var(--border);">
+        <div class="aname" style="font-size:0.9rem;">${esc(it.animal_ids.join(', '))} <span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span> <span class="ameta">completed ${esc(hm(it.completed_at))}</span></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+          ${it.animal_ids.map(a => `<button type="button" class="secondary aa-putback" data-id="${esc(it.id)}" data-animal="${esc(a)}" style="padding:4px 10px; font-size:0.78rem;">Put ${it.animal_ids.length > 1 ? esc(a) + ' ' : ''}back</button>`).join('')}
+        </div></div>`).join('');
+    return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <h2 style="margin:0;">Completed <span class="box-count">${DONE.length}</span></h2>
+        ${DONE.length ? '<button type="button" class="secondary" id="aa-empty-done">Empty list</button>' : ''}
+      </div>
+      <p class="subtle" style="margin:6px 0 0;">Newest first. Ticked by mistake? Put it back. Nothing stays here more than 24 hours: empty the list at the end of the day.</p>
+      ${rows || '<p class="col-empty">Nothing completed yet.</p>'}`;
   }
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); }
@@ -274,6 +299,7 @@
           const late = mine.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
           return `<div class="aa-col" data-col="${c.key}"><h3>${c.title} <span class="box-count">${mine.length}</span>${late ? `<span class="box-overdue">${late} overdue</span>` : ''}</h3>${mine.map(i => cardHtml(i, now)).join('') || `<p class="col-empty">${c.empty}</p>`}</div>`;
         }).join('') + '</div>';
+    document.getElementById('aa-completed').innerHTML = completedHtml();
     openNotes.forEach(id => { const el = document.querySelector('.aa-notes[data-id="' + CSS.escape(id) + '"]'); if (el) el.classList.add('open'); });
     const late = sorted.filter(i => LDHLogic.aaCountdown(i, now).overdue).length;
     const el = document.getElementById('aa-overdue-count');
@@ -291,21 +317,59 @@
     const xl = e.target.closest('.aa-xlsx');
     if (xl) { const it = ITEMS.find(x => x.id === xl.dataset.id); if (it) downloadXlsx(it); return; }
     const btn = e.target.closest('.aa-done'); if (!btn) return;
-    if (!confirm('Have you entered this in ShelterMate? Ticking removes it from here for good.')) return;
-    btn.disabled = true;
     const it = ITEMS.find(x => x.id === btn.dataset.id);
-    // Delete only the version she read: if the vet updated the card since, her tick must not throw the correction away.
-    let q = sb.from('aa_items').delete().eq('id', btn.dataset.id);
-    q = (it && it.updated_at) ? q.eq('updated_at', it.updated_at) : q.is('updated_at', null);
-    const { data: gone, error } = await q.select('id');
-    if (error) { btn.disabled = false; alert('Could not tick this off: ' + error.message); return; }
-    if (!gone || !gone.length) {                 // nothing deleted: ticked on another device, or updated since she read it
+    if (!it) return;
+    if (!confirm('Have you entered ' + it.animal_ids.join(', ') + ' in ShelterMate?\n\nIt moves to the Completed list below, where you can put it back.')) return;
+    btn.disabled = true;
+    if (await saveDone(it, it.animal_ids.slice())) doneThisSession++;
+    else btn.disabled = false;
+  });
+  // Move a card to Completed (every animal ticked) or record partial progress. Only the version she read is touched:
+  // if the vet updated the card since, her tick must not swallow the correction.
+  async function saveDone(it, doneIds) {
+    const complete = it.animal_ids.every(a => doneIds.indexOf(a) !== -1);
+    let q = sb.from('aa_items').update({ done_ids: doneIds, completed_at: complete ? new Date().toISOString() : null }).eq('id', it.id).is('completed_at', null);
+    q = it.updated_at ? q.eq('updated_at', it.updated_at) : q.is('updated_at', null);
+    const { data: changed, error } = await q.select('id');
+    if (error) { alert('Could not tick this off: ' + error.message); return false; }
+    if (!changed || !changed.length) {             // ticked on another device, or updated since she read it
       await loadAll();
-      if (ITEMS.some(x => x.id === btn.dataset.id)) alert('This card was just updated by the vet. It has been refreshed: check the new version, then tick it again.');
+      if (ITEMS.some(x => x.id === it.id)) alert('This card was just updated by the vet. It has been refreshed: check the new version, then tick it again.');
+      return false;
+    }
+    await loadAll();
+    return true;
+  }
+  document.getElementById('aa-list').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.aa-animal'); if (!cb) return;
+    const it = ITEMS.find(x => x.id === cb.dataset.id); if (!it) return;
+    const set = new Set(it.done_ids || []);
+    if (cb.checked) set.add(cb.dataset.animal); else set.delete(cb.dataset.animal);
+    cb.disabled = true;
+    if (!(await saveDone(it, it.animal_ids.filter(a => set.has(a))))) { cb.checked = !cb.checked; cb.disabled = false; }
+    else if (set.size === it.animal_ids.length) doneThisSession++;
+  });
+  document.getElementById('aa-completed').addEventListener('click', async (e) => {
+    const pb = e.target.closest('.aa-putback');
+    if (pb) {
+      const it = DONE.find(x => x.id === pb.dataset.id); if (!it) return;
+      pb.disabled = true;
+      const left = (it.done_ids || []).filter(a => a !== pb.dataset.animal);
+      const { error } = await sb.from('aa_items').update({ completed_at: null, done_ids: left }).eq('id', it.id).not('completed_at', 'is', null);
+      if (error) {
+        pb.disabled = false;
+        alert(error.code === '23505' ? 'A newer card for this animal is already waiting above, so this one cannot be put back. Finish that one first.' : 'Could not put it back: ' + error.message);
+        return;
+      }
+      loadAll();
       return;
     }
-    doneThisSession++;
-    loadAll();
+    if (e.target.closest('#aa-empty-done')) {
+      if (!confirm('Remove all ' + DONE.length + ' completed card(s) for good? You will not be able to put them back.')) return;
+      const { error } = await sb.from('aa_items').delete().not('completed_at', 'is', null);
+      if (error) { alert('Could not empty the list: ' + error.message); return; }
+      loadAll();
+    }
   });
 
   /* ---------- new-item banner + sound (same shared module as the Vets and Nurses pages) ---------- */
@@ -344,7 +408,13 @@
       return;
     }
     warn.style.display = 'none';
-    ITEMS = data || [];
+    const all = data || [];
+    // anything completed more than 24 hours ago is removed, never shown
+    const cutoff = Date.now() - 24 * 3600 * 1000;
+    const stale = all.filter(i => i.completed_at && new Date(i.completed_at).getTime() < cutoff);
+    if (stale.length) sb.from('aa_items').delete().in('id', stale.map(i => i.id)).then(() => {}, () => {});
+    ITEMS = all.filter(i => !i.completed_at);
+    DONE = all.filter(i => i.completed_at && new Date(i.completed_at).getTime() >= cutoff).sort((x, y) => new Date(y.completed_at) - new Date(x.completed_at));
     checkForNewItems();
     render();
   }

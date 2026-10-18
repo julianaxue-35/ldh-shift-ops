@@ -74,7 +74,7 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     // second tick now matches the new version and deletes
     await u.page.click('.aa-card[data-id="u1"] .aa-done');
     await u.page.waitForFunction(() => !document.querySelector('.aa-card[data-id="u1"]'));
-    t.ok((await u.db()).aa_items.length === 0, 'ticking the refreshed card deletes it');
+    t.ok((await u.db()).aa_items.length === 1 && (await u.db()).aa_items[0].completed_at, 'ticking the refreshed card completes it');
   } finally { await u.browser.close(); }
   t.done();
 })();
