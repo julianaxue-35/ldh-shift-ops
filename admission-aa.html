@@ -163,7 +163,7 @@
     .nurse-cols { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
-    .layout { grid-template-columns: 1fr; }
+    .layout { grid-template-columns: minmax(0, 1fr); }
   }
   .aa-card .aa-done { background: var(--green); color: #fff; }
   .aa-notes { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 0.85rem; margin: 8px 0 0; display: none; }
@@ -187,6 +187,7 @@
   .aa-card.aa-priority { border: 2px solid #c0392b; background: rgba(192,57,43,.07); }
   .aa-pri-tag { font-size: 11px; font-weight: 800; color: #fff; background: #c0392b; border-radius: 999px; padding: 2px 9px; letter-spacing: .03em; }
   @media (max-width: 900px) { .aa-cols { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) { .aa-col .aa-card { flex-direction: column; align-items: stretch; gap: 10px; } .aa-col .aa-card .aa-done { flex: 1; } }
 </style>
 </head>
 <body>

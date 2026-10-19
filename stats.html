@@ -223,9 +223,12 @@
     .dashboard-body { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
-    .layout { grid-template-columns: 1fr; }
+    .layout { grid-template-columns: minmax(0, 1fr); }
     .kpi-row { grid-template-columns: 1fr; }
   }
+  /* phones and tablets: 16px fields (no iPhone zoom) and finger-sized links and buttons */
+  @media (pointer: coarse), (max-width: 800px) { select, textarea, input:not([type=checkbox]):not([type=radio]):not([type=file]) { font-size: 16px; } }
+  @media (pointer: coarse) { aside a { display: inline-block; padding: 12px 0; min-width: 44px; } button { min-height: 40px; } }
   .print-only { display: none; }
   @media print {
     @page { size: A4; margin: 12mm; }
