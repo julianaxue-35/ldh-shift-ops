@@ -9,7 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test' };
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -31,6 +31,7 @@ const STUB = `
     surgery_log: () => ({}),
     nurse_on_duty: () => ({}),
     vacc_list: () => ({}),
+    aa_done_log: () => ({ completed_at: now() }),
     aa_items: () => ({ payload: {}, sent_at: now(), done_ids: [], completed_at: null })
   };
   // Mirrors the tasks_hold_medication trigger (0010_round3.sql): a medication
@@ -131,6 +132,15 @@ const STUB = `
       if (fn === 'check_passcode') {
         const expected = PASSCODES[args && args.p_role];
         return { data: expected != null && expected === (args && args.p_code), error: null };
+      }
+      if (fn === 'aa_daily_counts') {
+        const by = {};
+        window.__db.aa_done_log.forEach(r => {
+          const d = new Date(r.completed_at), day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+          const cat = ['processing_note', 'si_note'].includes(r.kind) ? 'notes' : r.kind === 'med_chart' ? 'charts' : 'tasks';
+          by[day + '|' + cat] = (by[day + '|' + cat] || 0) + Number(r.animals || 1);
+        });
+        return { data: Object.keys(by).map(k => ({ day: k.split('|')[0], cat: k.split('|')[1], n: by[k] })), error: null };
       }
       if (fn === 'nurse_daily_counts') return { data: window.__nurseCounts || [], error: null };
       return { data: [], error: null };

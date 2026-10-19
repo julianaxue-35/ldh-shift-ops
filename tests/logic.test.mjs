@@ -675,3 +675,23 @@ test('requestRing: only staff requests count; completed today + open raised toda
   assert.deepEqual(L.requestRing(tasks, NOW2), { done: 2, total: 4, older: 1 });
   assert.deepEqual(L.requestRing([], NOW2), { done: 0, total: 0, older: 0 });
 });
+
+test('aaStats: notes / charts / nurse tasks completed, with the average per working day', () => {
+  const NOW2 = new Date('2026-11-18T12:00:00').getTime();   // a Wednesday
+  const rows = [
+    { day: '2026-11-18', cat: 'notes', n: 8 }, { day: '2026-11-17', cat: 'notes', n: 12 }, { day: '2026-11-16', cat: 'notes', n: 10 },
+    { day: '2026-11-15', cat: 'notes', n: 30 },            // Sunday: last week, this month
+    { day: '2026-10-05', cat: 'notes', n: 20 },            // last month, this quarter
+    { day: '2026-02-01', cat: 'notes', n: 50 },            // this year only
+    { day: '2026-11-18', cat: 'charts', n: 3 }, { day: '2026-11-17', cat: 'tasks', n: 7 },
+    { day: '2026-11-19', cat: 'notes', n: 99 }             // the future is ignored
+  ];
+  const s = L.aaStats(rows, NOW2);
+  assert.equal(s.notes.today, 8);
+  assert.deepEqual(s.notes.week, { total: 30, days: 3, avg: 10 });
+  assert.deepEqual(s.notes.month, { total: 60, days: 4, avg: 15 });
+  assert.deepEqual(s.notes.quarter, { total: 80, days: 5, avg: 16 });
+  assert.deepEqual(s.notes.year, { total: 130, days: 6, avg: 21.7 });
+  assert.equal(s.charts.today, 3); assert.equal(s.tasks.week.total, 7);
+  assert.deepEqual(L.aaStats([], NOW2).notes.week, { total: 0, days: 0, avg: 0 });
+});
