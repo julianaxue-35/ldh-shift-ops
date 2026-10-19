@@ -283,14 +283,18 @@
         <button class="filter-chip" data-type="medication">Medication</button>
         <button class="filter-chip" data-type="check_recheck">Check-recheck</button>
       </div>
+      <div id="select-all-row" style="margin:0 0 10px; display:none;">
+        <button type="button" class="secondary" id="select-all-btn" style="padding:8px 14px; font-size:0.85rem;">Select all</button>
+        <span class="subtle" style="margin-left:8px;">ticks every case showing that can be picked up</span>
+      </div>
       <div id="batch-pickup-bar" style="display:none; margin-bottom:14px;">
         <button type="button" id="batch-pickup-btn">Pick up <span id="batch-pickup-count">0</span> selected, sorted by location →</button>
         <button type="button" class="secondary" id="batch-pickup-clear" style="margin-left:8px; padding:10px 14px; font-size:0.82rem;">Clear selection</button>
       </div>
       <div class="urgency-board">
-        <div class="urgency-col"><h3 class="red-h" id="col-red-h"></h3><div id="board-redflag"></div></div>
-        <div class="urgency-col"><h3 class="urgent-h" id="col-urgent-h"></h3><div id="board-urgent"></div></div>
-        <div class="urgency-col"><h3 class="routine-h" id="col-routine-h"></h3><div id="board-routine"></div></div>
+        <div class="urgency-col"><h3 class="red-h" id="col-red-h"></h3><button type="button" class="secondary col-select-all" data-col="board-redflag" style="display:none; padding:4px 10px; font-size:0.75rem; margin:0 0 8px;">Select all</button><div id="board-redflag"></div></div>
+        <div class="urgency-col"><h3 class="urgent-h" id="col-urgent-h"></h3><button type="button" class="secondary col-select-all" data-col="board-urgent" style="display:none; padding:4px 10px; font-size:0.75rem; margin:0 0 8px;">Select all</button><div id="board-urgent"></div></div>
+        <div class="urgency-col"><h3 class="routine-h" id="col-routine-h"></h3><button type="button" class="secondary col-select-all" data-col="board-routine" style="display:none; padding:4px 10px; font-size:0.75rem; margin:0 0 8px;">Select all</button><div id="board-routine"></div></div>
       </div>
     </section>
 
@@ -592,6 +596,33 @@
     renderBoardCol('board-routine', open.filter(t => LDHLogic.normTier(t.urgency) === 'routine'));
     updateBatchBar();
   }
+  /* Select all (2026-10-19): one tap ticks every case that can be picked up, or every case in one column, instead of ticking
+     one by one. It only touches the cases showing (the type filter applies); pressing it again unticks them. */
+  function pickableIn(scopeSelector) {
+    return Array.from(document.querySelectorAll(scopeSelector + ' .pickup-check')).map(c => c.dataset.id);
+  }
+  function updateSelectAllButtons() {
+    const setBtn = (btn, ids, label) => {
+      if (!btn) return;
+      btn.style.display = ids.length ? '' : 'none';
+      const all = ids.length && ids.every(id => selectedPickup.has(id));
+      btn.textContent = (all ? 'Unselect all' : 'Select all') + (label && !all ? ' (' + ids.length + ')' : '');
+    };
+    const every = pickableIn('#vet-cases');
+    document.getElementById('select-all-row').style.display = every.length ? '' : 'none';
+    setBtn(document.getElementById('select-all-btn'), every, true);
+    document.querySelectorAll('.col-select-all').forEach(b => setBtn(b, pickableIn('#' + b.dataset.col), true));
+  }
+  function toggleSelectAll(ids) {
+    const all = ids.length && ids.every(id => selectedPickup.has(id));
+    ids.forEach(id => { if (all) selectedPickup.delete(id); else selectedPickup.add(id); });
+    renderCases();
+  }
+  document.getElementById('vet-cases').addEventListener('click', (e) => {
+    const col = e.target.closest('.col-select-all');
+    if (col) { toggleSelectAll(pickableIn('#' + col.dataset.col)); return; }
+    if (e.target.closest('#select-all-btn')) toggleSelectAll(pickableIn('#vet-cases'));
+  });
   document.getElementById('type-filter-bar').addEventListener('click', (e) => {
     const btn = e.target.closest('.filter-chip'); if (!btn) return;
     typeFilter = btn.dataset.type;
@@ -609,6 +640,7 @@
     const bar = document.getElementById('batch-pickup-bar');
     const tasks = TASKS.filter(t => selectedPickup.has(t.id) && !t.claimed_at && !t.done);
     selectedPickup = new Set(tasks.map(t => t.id));
+    updateSelectAllButtons();
     if (!tasks.length) { bar.style.display = 'none'; return; }
     document.getElementById('batch-pickup-count').textContent = tasks.length;
     bar.style.display = 'block';
