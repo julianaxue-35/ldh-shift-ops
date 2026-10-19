@@ -22,6 +22,8 @@
 //
 //   9. { surgery_log: {source_id,species,surg_type,surg_type2,registered} } — (2026-10-19) a registered surgery, for the stats
 //
+//  10. { flag_check: {titles:[...]} } / 11. { flag_done: {title, plan} } — (2026-10-19) open staff requests on an animal, and marking them done
+//
 //   5. { status: {shift, items:[{title,location}]} } — read-back: which of
 //      these were already completed today by another device? Answers only
 //      about the pairs sent; never lists other animals.
@@ -133,6 +135,26 @@ function validateAaCheck(c) {
 }
 // aa-validate-end
 
+// flag-validate-start
+// Flags (2026-10-19): the Processing tool asks "which of these animals are also flagged on the dashboard?" and can mark such a
+// flag done with a quick plan. Matching ignores case and spaces. Only requests (not routine list checks) are ever touched.
+const flagId = (s) => String(s == null ? '' : s).replace(/\s+/g, '').toUpperCase();
+function validateFlagCheck(c) {
+  if (!c || typeof c !== 'object' || !Array.isArray(c.titles)) return { error: 'Bad request.' };
+  const titles = c.titles.map((t) => (typeof t === 'string' ? t.trim() : '')).filter(Boolean);
+  if (!titles.length || titles.length > 100 || titles.some((t) => t.length > 40)) return { error: 'Send between 1 and 100 animal IDs.' };
+  return { ids: Array.from(new Set(titles.map(flagId))) };
+}
+function validateFlagDone(c) {
+  if (!c || typeof c !== 'object') return { error: 'Bad request.' };
+  const title = typeof c.title === 'string' ? c.title.trim() : '';
+  if (!title || title.length > 40) return { error: 'An animal ID is required.' };
+  const plan = typeof c.plan === 'string' ? c.plan.trim().slice(0, 1000) : '';
+  if (!plan) return { error: 'A quick plan is required.' };
+  return { id: flagId(title), plan: plan };
+}
+// flag-validate-end
+
 // surgery-validate-start
 // Surgery stats: the Surgery tool reports each registered surgery (species + procedure only). Routine = spey / castrate.
 const SURGERY_ROUTINE_TYPES = ['spey', 'spey-flank', 'preg1', 'preg2', 'preg3', 'castrate', 'cryptorchid'];
@@ -182,6 +204,34 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(PROJECT_URL, SERVICE_KEY);
 
+  // Shapes 10 and 11 (2026-10-19): { flag_check: {titles:[...]} } -> {ok, flags:[{title,location,condition,problem,type,created_at,needs_medication}]}
+  // for the OPEN staff requests on those animals; { flag_done: {title, plan} } marks them done with a quick plan.
+  if ((body.flag_check && typeof body.flag_check === 'object') || (body.flag_done && typeof body.flag_done === 'object')) {
+    const isDone = !!body.flag_done;
+    const v = isDone ? validateFlagDone(body.flag_done) : validateFlagCheck(body.flag_check);
+    if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const { data, error } = await supabase.from('tasks')
+      .select('id,title,location,condition,problem,type,created_at,needs_medication,med_done_at')
+      .eq('done', false).neq('type', 'check_recheck').gte('created_at', since).limit(1000);
+    if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+    const want = new Set(isDone ? [v.id] : v.ids);
+    const hits = (data ?? []).filter((r) => want.has(flagId(r.title)));
+    if (!isDone) {
+      return new Response(JSON.stringify({ ok: true, flags: hits.map((r) => ({ title: r.title, location: r.location, condition: r.condition, problem: r.problem, type: r.type, created_at: r.created_at, needs_medication: !!r.needs_medication })) }), { status: 200, headers: CORS_HEADERS });
+    }
+    const waiting = hits.filter((r) => r.needs_medication && !r.med_done_at).length;   // a medication case stays open until the nurse has made the label
+    let updated = 0;
+    if (hits.length) {
+      const now = new Date().toISOString();
+      const upd = await supabase.from('tasks')
+        .update({ done: true, completed_by_role: 'vet_nurse', completed_at: now, vet_done_at: now, plan: v.plan })
+        .in('id', hits.map((r) => r.id)).select('id');
+      if (upd.error) return new Response(JSON.stringify({ error: upd.error.message }), { status: 500, headers: CORS_HEADERS });
+      updated = (upd.data ?? []).length;
+    }
+    return new Response(JSON.stringify({ ok: true, updated: updated, found: hits.length, waiting_medication: waiting }), { status: 200, headers: CORS_HEADERS });
+  }
   // Shape 9 (2026-10-19): { surgery_log: {source_id, species, surg_type, surg_type2, registered} } — the Surgery tool
   // reports a registered surgery (or an un-registered one: registered:false removes it) for the dashboard stats.
   if (body.surgery_log && typeof body.surgery_log === 'object') {
