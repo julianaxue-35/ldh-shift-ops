@@ -256,6 +256,12 @@
       <p class="subtle">Upload the <b>Vet Treatments Due</b> report (Excel) from ShelterMate. The animals are grouped by shelter location. Tick the ones you have vaccinated, then send them to the Admission AA to enter in ShelterMate.</p>
       <input type="file" id="vacc-file" accept=".xlsx" style="margin-bottom:8px;">
       <p id="vacc-error" class="oc-modal-error" style="display:none;"></p>
+      <div id="vacc-add-row" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0 10px;">
+        <input id="vacc-add-id" placeholder="Shelter ID (a litter: 1170123 - 1170130)" style="flex:1; min-width:200px; margin:0;">
+        <input id="vacc-add-loc" list="vacc-locs" placeholder="Location" style="flex:1; min-width:150px; margin:0;">
+        <datalist id="vacc-locs"></datalist>
+        <button type="button" class="secondary" id="vacc-add">Add a cat / dog</button>
+      </div>
       <div id="vacc-bar" style="display:none; margin:8px 0; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
           <span style="font-size:0.85rem; font-weight:700; flex:1;" id="vacc-count"></span>
@@ -1093,7 +1099,7 @@
         <label style="display:flex; gap:8px; align-items:center; font-weight:700;"><input type="checkbox" class="vr-all" data-location="${esc(g.location)}" style="width:18px; height:18px;"> ${esc(g.location)} <span class="ameta">(${g.animals.length})</span></label>
         ${g.animals.map(a => `<label class="vr-row" style="display:flex; gap:8px; align-items:center; padding:4px 0 4px 26px; border-top:1px solid var(--border);">
           <input type="checkbox" class="vr-pick" data-key="${esc(vaccKey(a))}" data-location="${esc(g.location)}" ${vaccPicked.has(vaccKey(a)) ? 'checked' : ''} style="width:18px; height:18px;">
-          <span><b>${esc(a.id)}</b>${a.kennel ? ' · kennel ' + esc(a.kennel) : ''} · ${esc(a.treatment)}${a.weight ? ' · ' + esc(a.weight) + ' kg' : ''}${a.due ? ' · due ' + esc(a.due) : ''}${a.due && a.due < today ? ' <b style="color:#c0392b;">overdue</b>' : ''}</span></label>`).join('')}
+          <span><b>${esc(a.id)}</b>${a.kennel ? ' · kennel ' + esc(a.kennel) : ''} · ${esc(a.treatment)}${a.weight ? ' · ' + esc(a.weight) + ' kg' : ''}${a.manual ? ' · added by hand' : (a.due ? ' · due ' + esc(a.due) : '')}${!a.manual && a.due && a.due < today ? ' <b style="color:#c0392b;">overdue</b>' : ''}</span></label>`).join('')}
       </div>`).join('') || '<p class="empty-state">No report loaded.</p>';
     const bar = document.getElementById('vacc-bar');
     bar.style.display = VACC.animals.length ? '' : 'none';
@@ -1141,6 +1147,26 @@
     VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));
     vaccPicked.clear(); vaccPush(); renderVacc();
     const ok = document.getElementById('vacc-count'); ok.textContent = 'Sent ' + chosen.length + ' to the Admission AA \u2713 \u00b7 ' + VACC.animals.length + ' still due';
+  });
+  // Add an animal by hand: just its shelter ID and where it is (a litter range adds each animal). Sent to the Admission AA as
+  // a plain "Vaccination" like the rest.
+  document.getElementById('vacc-locs').innerHTML = LDHLogic.LOCATIONS.map(l => `<option value="${esc(l)}">`).join('');
+  document.getElementById('vacc-add').addEventListener('click', () => {
+    const err = document.getElementById('vacc-error'); err.style.display = 'none';
+    const say = (m) => { err.textContent = m; err.style.display = 'block'; };
+    const exp = LDHLogic.expandAnimalIds(document.getElementById('vacc-add-id').value);
+    if (exp.error) return say(exp.error);
+    if (!exp.ids.length) return say('Enter the shelter ID first.');
+    const location = document.getElementById('vacc-add-loc').value.trim();
+    if (!location) return say('Enter the location too.');
+    const have = new Set(VACC.animals.map(a => a.id).concat(VACC.sent.map(k => String(k).split('|')[0])));
+    const fresh = exp.ids.filter(id => !have.has(id));
+    const skipped = exp.ids.length - fresh.length;
+    if (!fresh.length) return say(exp.ids.join(', ') + (exp.ids.length > 1 ? ' are' : ' is') + ' already on the list or already sent today.');
+    VACC = { day: vaccToday(), animals: VACC.animals.concat(fresh.map(id => ({ id, treatment: 'Vaccination', location, kennel: '', due: vaccToday(), weight: '', manual: true }))), sent: VACC.sent, updatedAt: VACC.updatedAt };
+    document.getElementById('vacc-add-id').value = '';          // the location stays, ready for the next animal in the same room
+    vaccPush(); renderVacc();
+    if (skipped) say(skipped + ' of those ' + (skipped > 1 ? 'were' : 'was') + ' already on the list or sent today and ' + (skipped > 1 ? 'were' : 'was') + ' left out.');
   });
   vaccLoad(); renderVacc();
 
