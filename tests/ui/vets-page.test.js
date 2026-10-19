@@ -112,11 +112,15 @@ const H = 3600 * 1000;
     await a.page.locator('.attn-item', { hasText: 'DONE-NM' }).locator('.done-btn').click();
     await a.page.waitForSelector('.done-modal-overlay');
     t.ok(await a.page.locator('.done-modal-overlay .done-medlabel').count() === 0, 'no medication fields for a non-medication case');
+    t.ok(await a.page.locator('.done-modal-overlay .done-note').count() === 1, 'the Done box has a quick note field');
+    await a.page.fill('.done-modal-overlay .done-note', 'Eating well, bright. Recheck in 3 days.');
     await a.page.click('.done-confirm');
     await a.page.waitForTimeout(250);
     tasks = (await a.db()).tasks;
     const doneNm = tasks.find(x => x.title === 'DONE-NM');
     t.ok(doneNm.done === true && doneNm.completed_by_role === 'vet_nurse' && !!doneNm.completed_at, 'non-medication DONE completes the case as vet_nurse');
+    t.ok(doneNm.note === 'Eating well, bright. Recheck in 3 days.' && doneNm.plan === 'Eating well, bright. Recheck in 3 days.', 'the quick note is saved on the case (staff Plan column and the Shelter board): ' + JSON.stringify([doneNm.note, doneNm.plan]));
+    t.ok((await a.page.textContent('#completed-list')).includes('Eating well, bright'), 'and shows on the completed row');
     t.ok((await a.page.textContent('#completed-list')).includes('DONE-NM'), 'completed case shows in the Completed (last 24h) group');
 
     /* ---------- DONE (medication): label required, chlorsig quick-insert, then waiting-on-medication ---------- */

@@ -650,6 +650,7 @@
     return `<div class="completed-row">
       <span>${esc(t.title)} — ${t.needs_medication && t.med_done_by ? 'meds by ' + esc(t.med_done_by) : 'done by ' + (t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff')}</span>
       <span style="display:flex; align-items:center; gap:8px;">
+        ${t.note ? `<span class="ameta" style="font-size:0.75rem; max-width:340px;">${esc(t.note)}</span>` : ''}
         <span class="time">${esc(fmtTime(t.completed_at || t.created_at))}</span>
         <button type="button" class="secondary undo-done" data-id="${esc(t.id)}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>
       </span>
@@ -678,7 +679,9 @@
             <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
               ${LDHLogic.CHLORSIG_OPTIONS.map(o => `<button type="button" class="secondary chlorsig-btn" data-label="${esc(o.label)}" style="padding:6px 10px; font-size:0.72rem;">${esc(o.label)}</button>`).join('')}
             </div>
-          ` : `<p style="font-size:0.88rem; margin:0 0 16px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
+          ` : `<p style="font-size:0.88rem; margin:0 0 12px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin:0 0 6px;">Quick note (optional)</label>
+          <textarea class="done-note" rows="2" placeholder="e.g. Eating well, bright. Recheck in 3 days." style="margin-bottom:14px;"></textarea>
           <div class="oc-modal-actions">
             <button type="button" class="oc-modal-cancel done-cancel">Cancel</button>
             <button type="button" class="oc-modal-submit done-confirm">Confirm</button>
@@ -778,18 +781,20 @@
       const id = overlay.dataset.id;
       const t = TASKS.find(x => x.id === id);
       if (!t) { overlay.remove(); return; }
+      const quickNote = overlay.querySelector('.done-note').value.trim().slice(0, 500);
       if (t.needs_medication) {
         const chart = overlay.querySelector('.done-medchart').checked;
         const label = overlay.querySelector('.done-medlabel').value.trim();
         if (!label) { overlay.querySelector('.done-medlabel-error').style.display = 'block'; return; }
-        const { error } = await sb.from('tasks').update({
+        const { error } = await sb.from('tasks').update(Object.assign({
           done: true, med_chart_done: chart, med_label: label, vet_done_at: new Date().toISOString()
-        }).eq('id', id);
+        }, quickNote ? { note: quickNote } : {})).eq('id', id);
         if (error) { alert('Could not complete: ' + error.message); return; }
       } else {
-        const { error } = await sb.from('tasks').update({
+        // the quick note shows in the staff Cases table (Plan column) and, if no plan was synced from the tool, on the Shelter board
+        const { error } = await sb.from('tasks').update(Object.assign({
           done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString()
-        }).eq('id', id);
+        }, quickNote ? (t.plan ? { note: quickNote } : { note: quickNote, plan: quickNote }) : {})).eq('id', id);
         if (error) { alert('Could not complete: ' + error.message); return; }
       }
       overlay.remove();
