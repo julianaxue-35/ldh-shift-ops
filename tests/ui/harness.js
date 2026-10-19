@@ -152,7 +152,7 @@ const STUB = `
 
 async function open(seed = {}, pageName, opts = {}) {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1300, height: 1000 } });
+  const ctx = await browser.newContext(Object.assign({ viewport: { width: 1300, height: 1000 } }, opts.contextOptions || {}));
   await ctx.route('**/supabase.js', r => r.abort());
   await ctx.route('https://julianaxue-35.github.io/**', r => r.abort());   // Pick up opens the shift tool in a new tab; keep tests offline
   await ctx.addInitScript(STUB);
