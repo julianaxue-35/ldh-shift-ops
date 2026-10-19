@@ -695,3 +695,13 @@ test('aaStats: notes / charts / nurse tasks completed, with the average per work
   assert.equal(s.charts.today, 3); assert.equal(s.tasks.week.total, 7);
   assert.deepEqual(L.aaStats([], NOW2).notes.week, { total: 0, days: 0, avg: 0 });
 });
+
+test('aaSortItems: priority cards come first, then overdue, then oldest', () => {
+  const now = Date.parse('2026-11-18T12:00:00Z'), H2 = 3600e3;
+  const mk = (id, hoursAgo, priority) => ({ id, sent_at: new Date(now - hoursAgo * H2).toISOString(), payload: priority ? { priority: true } : {} });
+  const order = L.aaSortItems([mk('old', 30), mk('new', 1), mk('pri-new', 0.5, true), mk('pri-old', 2, true), mk('mid', 5)], now).map(i => i.id);
+  assert.deepEqual(order, ['pri-old', 'pri-new', 'old', 'mid', 'new']);
+  assert.equal(L.aaIsPriority({ payload: { priority: true } }), true);
+  assert.equal(L.aaIsPriority({ payload: { priority: 'yes' } }), false);
+  assert.equal(L.aaIsPriority(null), false);
+});
