@@ -9,6 +9,7 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
   const seed = { aa_items: [
     { id: 'n1', kind: 'processing_note', animal_ids: ['T-100'], sent_by: 'AB', sent_at: ago(2 * H), payload: { text: 'Exam normal.\nWeight 12 kg.', docx_b64: DOCX, location: 'Pound 1' } },
     { id: 'n2', kind: 'processing_note', animal_ids: ['T-200'], sent_by: 'AB', sent_at: ago(3 * H), updated_at: ago(10 * 60 * 1000), payload: { text: '<img src=x onerror=window.__pwned=1>' } },
+    { id: 's1', kind: 'si_note', animal_ids: ['T-400'], sent_by: 'EF', sent_at: ago(1 * H), payload: { text: 'Lame RF leg.' } },
     { id: 'm1', kind: 'med_chart', animal_ids: ['T-300'], sent_by: 'CD', sent_at: ago(1 * H), payload: { lines: ['Drug A 1 tablet BID x 5 days', 'Drug B 0.5 mL SID x 3 days'], xlsx_b64: DOCX } },
     { id: 'm2', kind: 'med_chart', animal_ids: ['T-301'], sent_by: 'CD', sent_at: ago(1 * H), payload: { lines: ['Drug C'] } }
   ] };
@@ -47,13 +48,18 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(dx.suggestedFilename() === 'T-300_medication_chart.xlsx', 'Excel download is named after the animal: ' + dx.suggestedFilename());
     t.ok(require('fs').readFileSync(await dx.path()).toString() === 'PK-fake-docx-bytes', 'downloaded bytes are the decoded Excel file');
 
-    /* layout: vet notes (left half); medication charts and nurse tasks (right half, side by side) */
+    /* layout: Processing notes (green) and Sick & Injured notes (orange) side by side on top, charts and nurse tasks below */
     const col = id => a.page.evaluate(i => { const c = document.querySelector('.aa-card[data-id="' + i + '"]'); const w = c && c.closest('[data-col]'); return w ? w.dataset.col : null; }, id);
-    t.ok(await col('n1') === 'notes' && await col('n2') === 'notes', 'vet notes are in the notes column');
-    t.ok(await col('m1') === 'charts' && await col('m2') === 'charts', 'medication charts are in the charts column');
-    const xs = await a.page.evaluate(() => ['notes', 'charts', 'tasks'].map(k => { const r = document.querySelector('[data-col="' + k + '"]').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.width)]; }));
-    t.ok(xs[0][0] < xs[1][0] && xs[1][0] < xs[2][0], 'columns run notes | charts | nurse tasks left to right: ' + JSON.stringify(xs));
-    t.ok(xs[0][1] > xs[1][1] * 1.7 && Math.abs(xs[1][1] - xs[2][1]) < 4, 'notes take half the width, the other two a quarter each: ' + JSON.stringify(xs));
+    t.ok(await col('n1') === 'processing' && await col('n2') === 'processing', 'Processing notes have their own box');
+    t.ok(await col('s1') === 'sick', 'Sick & Injured notes have their own box, not mixed with Processing');
+    t.ok(await col('m1') === 'charts' && await col('m2') === 'charts', 'medication charts are in the charts box');
+    const r = await a.page.evaluate(() => Object.fromEntries(['processing', 'sick', 'charts', 'tasks'].map(k => { const b = document.querySelector('[data-col="' + k + '"]').getBoundingClientRect(); return [k, { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }]; })));
+    t.ok(r.processing.x < r.sick.x && Math.abs(r.processing.y - r.sick.y) < 4, 'Processing on the left, Sick & Injured on the right, same row: ' + JSON.stringify(r));
+    t.ok(r.charts.y > r.processing.y + 20 && r.tasks.y > r.sick.y + 20 && r.charts.x < r.tasks.x, 'medication charts and nurse tasks sit on the row below: ' + JSON.stringify(r));
+    t.ok(Math.abs(r.processing.w - r.sick.w) < 6 && r.processing.w > 400, 'the boxes are wide and equal, not cramped: ' + r.processing.w + 'px');
+    const colours = await a.page.evaluate(() => Object.fromEntries(['processing', 'sick', 'charts', 'tasks'].map(k => [k, getComputedStyle(document.querySelector('[data-col="' + k + '"]')).borderTopColor])));
+    t.ok(colours.processing === 'rgb(31, 122, 77)' && colours.sick === 'rgb(201, 138, 26)', 'Processing is green and Sick & Injured is orange, like the tools: ' + JSON.stringify(colours));
+    t.ok(new Set(Object.values(colours)).size === 4, 'every box has its own colour');
     t.ok(await a.page.isVisible('[data-col="tasks"] .col-empty'), 'an empty column says so');
 
     const asked = []; a.page.on('dialog', d => asked.push(d.message()));
