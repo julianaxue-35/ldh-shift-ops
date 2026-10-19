@@ -400,7 +400,7 @@
       return false;
     }
     // count it for the progress totals (kind and number of animals only), then refresh
-    if (complete) { try { await sb.from('aa_done_log').insert({ item_id: it.id, kind: it.kind, animals: it.animal_ids.length }); await loadAaCounts(); } catch (e) { /* the totals are a nicety */ } }
+    if (complete) { try { const r = await sb.from('aa_done_log').insert({ item_id: it.id, kind: it.kind, animals: it.animal_ids.length }); if (r && r.error) console.warn('aa_done_log', r.error.message); await loadAaCounts(); } catch (e) { /* the totals are a nicety */ } }
     await loadAll();
     return true;
   }
@@ -486,6 +486,22 @@
     DONE = all.filter(i => i.completed_at && new Date(i.completed_at).getTime() >= cutoff).sort((x, y) => new Date(y.completed_at) - new Date(x.completed_at));
     checkForNewItems();
     render();
+    backfillDoneLog();
+  }
+  // Cards ticked before the totals existed (or while the count failed) are in the Completed list but not in the log: count them once.
+  let backfilled = false;
+  async function backfillDoneLog() {
+    if (backfilled || !DONE.length) return;
+    backfilled = true;
+    try {
+      const { data, error } = await sb.from('aa_done_log').select('item_id').in('item_id', DONE.map(i => i.id));
+      if (error) return;
+      const have = new Set((data || []).map(r => r.item_id));
+      const missing = DONE.filter(i => !have.has(i.id) && i.animal_ids.every(a => (i.done_ids || []).indexOf(a) !== -1));
+      if (!missing.length) return;
+      const { error: e2 } = await sb.from('aa_done_log').insert(missing.map(i => ({ item_id: i.id, kind: i.kind, animals: i.animal_ids.length, completed_at: i.completed_at })));
+      if (!e2) { await loadAaCounts(); renderAaStats(); }
+    } catch (e) { /* the totals are a nicety */ }
   }
   setInterval(render, 60000);          // countdowns tick even with no data change
 
