@@ -94,3 +94,13 @@ test('0024: nurse_on_duty holds one row per day and role, initials 1-4 character
   try { await d.exec(`insert into public.nurse_on_duty (day, role, initials) values ('2026-11-19', 'vet', 'AB')`); } catch (e) { err = String(e.message); }
   assert.match(err, /check/i);
 });
+
+test('0025: vacc_list holds one row per day with the animals and the sent list', async () => {
+  const d = await db('0025_vacc_list.sql');
+  await d.exec(`insert into public.vacc_list (day, animals) values ('2026-11-18', '[{"id":"A1"}]'::jsonb)`);
+  await d.exec(`insert into public.vacc_list (day, animals, sent) values ('2026-11-18', '[]'::jsonb, '["A1|x"]'::jsonb) on conflict (day) do update set animals = excluded.animals, sent = excluded.sent`);
+  const r = (await d.query(`select animals, sent from public.vacc_list`)).rows;
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0].sent, ['A1|x']);
+  assert.deepEqual(r[0].animals, []);
+});
