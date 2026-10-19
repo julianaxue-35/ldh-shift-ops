@@ -265,7 +265,9 @@
       <div id="vacc-bar" style="display:none; margin:8px 0; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
           <span style="font-size:0.85rem; font-weight:700; flex:1;" id="vacc-count"></span>
+          <button type="button" class="secondary" id="vacc-select-all">Select all</button>
           <button type="button" id="vacc-send">Send ticked to Admission AA</button>
+          <button type="button" id="vacc-done">Mark ticked as done</button>
           <button type="button" class="secondary" id="vacc-clear">Clear list</button>
         </div>
       </div>
@@ -1091,6 +1093,11 @@
       sb.from('vacc_list').delete().lt('day', LDHLogic.addDaysISO(vaccToday(), -3)).then(() => {}, () => {});
     } catch (e) { /* the local copy is kept */ }
   }
+  function vaccCount() {
+    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due \u00b7 ' + vaccPicked.size + ' ticked' + (VACC.sent.length ? ' \u00b7 ' + VACC.sent.length + ' already done today' : '');
+    const all = VACC.animals.length > 0 && VACC.animals.every(a => vaccPicked.has(vaccKey(a)));
+    document.getElementById('vacc-select-all').textContent = all ? 'Untick all' : 'Select all';
+  }
   function renderVacc() {
     const list = document.getElementById('vacc-list');
     const groups = Report7.groupByLocation(VACC.animals, LDHLogic.LOCATIONS);
@@ -1103,7 +1110,7 @@
       </div>`).join('') || '<p class="empty-state">No report loaded.</p>';
     const bar = document.getElementById('vacc-bar');
     bar.style.display = VACC.animals.length ? '' : 'none';
-    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due \u00b7 ' + vaccPicked.size + ' ticked' + (VACC.sent.length ? ' \u00b7 ' + VACC.sent.length + ' already sent today' : '');
+    vaccCount();
   }
   document.getElementById('vacc-file').addEventListener('change', async (e) => {
     const err = document.getElementById('vacc-error'); err.style.display = 'none';
@@ -1121,7 +1128,27 @@
     const all = e.target.closest('.vr-all'), one = e.target.closest('.vr-pick');
     if (all) document.querySelectorAll('.vr-pick').forEach(c => { if (c.dataset.location === all.dataset.location) { c.checked = all.checked; if (all.checked) vaccPicked.add(c.dataset.key); else vaccPicked.delete(c.dataset.key); } });
     if (one) { if (one.checked) vaccPicked.add(one.dataset.key); else vaccPicked.delete(one.dataset.key); }
-    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due \u00b7 ' + vaccPicked.size + ' ticked' + (VACC.sent.length ? ' \u00b7 ' + VACC.sent.length + ' already sent today' : '');
+    vaccCount();
+  });
+  // One tap ticks (or unticks) every animal on the list, then Send or Mark as done works on the whole lot.
+  document.getElementById('vacc-select-all').addEventListener('click', () => {
+    const all = VACC.animals.length > 0 && VACC.animals.every(a => vaccPicked.has(vaccKey(a)));
+    VACC.animals.forEach(a => { if (all) vaccPicked.delete(vaccKey(a)); else vaccPicked.add(vaccKey(a)); });
+    document.querySelectorAll('.vr-pick').forEach(c => { c.checked = !all; });
+    document.querySelectorAll('.vr-all').forEach(c => { c.checked = !all; });
+    vaccCount();
+  });
+  // Vaccinated but nothing for the Admission AA to enter: take the ticked animals off the list (a re-upload of the report leaves them out).
+  document.getElementById('vacc-done').addEventListener('click', () => {
+    const err = document.getElementById('vacc-error'); err.style.display = 'none';
+    const chosen = VACC.animals.filter(a => vaccPicked.has(vaccKey(a)));
+    if (!chosen.length) { err.textContent = 'Tick the animals you have vaccinated first.'; err.style.display = 'block'; return; }
+    if (!confirm('Mark ' + chosen.length + ' animal' + (chosen.length === 1 ? '' : 's') + ' as done WITHOUT sending to the Admission AA?')) return;
+    const gone = new Set(chosen.map(vaccKey));
+    VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
+    VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));
+    vaccPicked.clear(); vaccPush(); renderVacc();
+    document.getElementById('vacc-count').textContent = 'Marked ' + chosen.length + ' done \u2713 \u00b7 ' + VACC.animals.length + ' still due';
   });
   document.getElementById('vacc-clear').addEventListener('click', () => {
     if (VACC.animals.length && !confirm('Clear this list? Animals you have not sent to the Admission AA will need the report uploaded again.')) return;
