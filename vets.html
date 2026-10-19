@@ -244,6 +244,7 @@
       <div class="nt-form">
         <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
         <label>Space<select id="nt-location"></select></label>
+        <label>Pen #<input id="nt-pen" placeholder="Pen #" maxlength="12"></label>
         <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
         <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
         <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
@@ -260,6 +261,7 @@
       <div class="nt-form">
         <label>Animal ID<input id="mt-animal" placeholder="Animal ID"></label>
         <label>Space<select id="mt-location"></select></label>
+        <label id="mt-pen-wrap">Pen #<input id="mt-pen" placeholder="Pen #" maxlength="12"></label>
         <label id="mt-detail-wrap" style="display:none;">Detail<input id="mt-detail" placeholder="e.g. foster name"></label>
         <label>Task<select id="mt-task"></select></label>
         <label>Note (optional)<input id="mt-note" placeholder="e.g. before surgery tomorrow"></label>
@@ -907,7 +909,7 @@
       if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
       if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
       const { data: tr, error } = await sb.from('nurse_treatments').insert({
-        animal_id: animal, location: document.getElementById('nt-location').value, treatment,
+        animal_id: animal, location: (() => { const room = document.getElementById('nt-location').value, pen = document.getElementById('nt-pen').value.trim(); return pen && !LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' / ' + pen : room; })(), treatment,
         times_per_day: times, days, start_date: start, requested_by: 'Vet team'
       }).select().single();
       if (error) { alert('Could not save the request: ' + error.message); return; }
@@ -919,6 +921,7 @@
         return;
       }
       document.getElementById('nt-animal').value = '';
+      document.getElementById('nt-pen').value = '';
       document.getElementById('nt-treatment').value = '';
       loadAll();
     } finally { _btn.disabled = false; }
@@ -946,21 +949,25 @@
     document.getElementById('mt-task').innerHTML = Object.keys(LDHLogic.MISC_TASK_LABELS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('');
   }
   document.getElementById('mt-location').addEventListener('change', (e) => {
-    document.getElementById('mt-detail-wrap').style.display = LDHLogic.OFFSITE_NAMES.includes(e.target.value) ? '' : 'none';
+    const off = LDHLogic.OFFSITE_NAMES.includes(e.target.value);
+    document.getElementById('mt-detail-wrap').style.display = off ? '' : 'none';
+    document.getElementById('mt-pen-wrap').style.display = off ? 'none' : '';      // offsite animals have a foster / rescue detail instead of a pen
   });
   document.getElementById('mt-submit').addEventListener('click', async () => {
     const btn = document.getElementById('mt-submit'); btn.disabled = true;
     try {
       const animal = document.getElementById('mt-animal').value.trim();
       if (!animal) { alert('Enter an animal ID.'); return; }
-      const location = document.getElementById('mt-location').value;
+      const room = document.getElementById('mt-location').value;
       const detail = document.getElementById('mt-detail').value.trim();
+      const pen = document.getElementById('mt-pen').value.trim();
+      const location = !LDHLogic.OFFSITE_NAMES.includes(room) && pen ? room + ' / ' + pen : room;      // the same "room / pen" form the flag board uses
       const { error } = await sb.from('noga_requests').insert({
-        animal_id: animal, location, location_detail: LDHLogic.OFFSITE_NAMES.includes(location) ? (detail || null) : null,
+        animal_id: animal, location, location_detail: LDHLogic.OFFSITE_NAMES.includes(room) ? (detail || null) : null,
         task: document.getElementById('mt-task').value, note: document.getElementById('mt-note').value.trim() || null, added_by: 'Vet team'
       });
       if (error) { alert('Could not save the task: ' + error.message); return; }
-      document.getElementById('mt-animal').value = ''; document.getElementById('mt-note').value = ''; document.getElementById('mt-detail').value = '';
+      document.getElementById('mt-animal').value = ''; document.getElementById('mt-note').value = ''; document.getElementById('mt-detail').value = ''; document.getElementById('mt-pen').value = '';
       loadAll();
     } finally { btn.disabled = false; }
   });
