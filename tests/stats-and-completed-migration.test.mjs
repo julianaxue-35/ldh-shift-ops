@@ -104,3 +104,14 @@ test('0025: vacc_list holds one row per day with the animals and the sent list',
   assert.deepEqual(r[0].sent, ['A1|x']);
   assert.deepEqual(r[0].animals, []);
 });
+
+test('0026: aa_daily_counts groups completions by Melbourne day into notes / charts / tasks', async () => {
+  const d = await db('0026_aa_done_log.sql');
+  await d.exec(`insert into public.aa_done_log (item_id, kind, animals, completed_at) values
+    (gen_random_uuid(), 'processing_note', 1, '2026-11-18 03:00:00+00'), (gen_random_uuid(), 'si_note', 1, '2026-11-18 04:00:00+00'),
+    (gen_random_uuid(), 'med_chart', 1, '2026-11-18 03:00:00+00'), (gen_random_uuid(), 'vaccination', 12, '2026-11-18 03:00:00+00'),
+    (gen_random_uuid(), 'uv', 3, '2026-11-17 03:00:00+00')`);
+  const rows = (await d.query(`select day::text, cat, n::int from public.aa_daily_counts('2026-11-01') order by day, cat`)).rows;
+  assert.deepEqual(rows, [{ day: '2026-11-17', cat: 'tasks', n: 3 }, { day: '2026-11-18', cat: 'charts', n: 1 }, { day: '2026-11-18', cat: 'notes', n: 2 }, { day: '2026-11-18', cat: 'tasks', n: 12 }]);
+  assert.equal((await d.query(`select count(*)::int n from public.aa_daily_counts('2026-12-01')`)).rows[0].n, 0);
+});
