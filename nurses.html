@@ -1057,10 +1057,34 @@
   const vaccKey = a => a.id + '|' + a.treatment;
   function vaccToday() { return LDHLogic.localISO(new Date()); }
   function vaccLoad() {
-    try { const o = JSON.parse(localStorage.getItem(VACC_KEY) || '{}'); VACC = o.day === vaccToday() ? { day: o.day, animals: o.animals || [], sent: o.sent || [] } : { day: vaccToday(), animals: [], sent: [] }; }
+    try { const o = JSON.parse(localStorage.getItem(VACC_KEY) || '{}'); VACC = o.day === vaccToday() ? { day: o.day, animals: o.animals || [], sent: o.sent || [], updatedAt: o.updatedAt || '' } : { day: vaccToday(), animals: [], sent: [] }; }
     catch (e) { VACC = { day: vaccToday(), animals: [], sent: [] }; }
   }
   function vaccSave() { try { localStorage.setItem(VACC_KEY, JSON.stringify(VACC)); } catch (e) { /* a convenience only */ } }
+  // Shared between the computer and the phones through the dashboard database (the same staff sign-in the page already
+  // needs, no extra password). The newest copy wins; ticks stay on each device until sent.
+  async function vaccPull() {
+    if (typeof sb === 'undefined' || !sb) return;
+    try {
+      const { data, error } = await sb.from('vacc_list').select('*').eq('day', vaccToday());
+      const row = !error && data && data[0];
+      if (!row) return;
+      if (!VACC.updatedAt || String(row.updated_at) > String(VACC.updatedAt)) {
+        VACC = { day: vaccToday(), animals: row.animals || [], sent: row.sent || [], updatedAt: row.updated_at };
+        vaccSave();
+        Array.from(vaccPicked).forEach(k => { if (!VACC.animals.some(a => vaccKey(a) === k)) vaccPicked.delete(k); });
+        renderVacc();
+      }
+    } catch (e) { /* offline or not set up yet: the local copy still works */ }
+  }
+  async function vaccPush() {
+    VACC.updatedAt = new Date().toISOString(); vaccSave();
+    if (typeof sb === 'undefined' || !sb) return;
+    try {
+      await sb.from('vacc_list').upsert({ day: vaccToday(), animals: VACC.animals, sent: VACC.sent, updated_at: VACC.updatedAt }, { onConflict: 'day' });
+      sb.from('vacc_list').delete().lt('day', LDHLogic.addDaysISO(vaccToday(), -3)).then(() => {}, () => {});
+    } catch (e) { /* the local copy is kept */ }
+  }
   function renderVacc() {
     const list = document.getElementById('vacc-list');
     const groups = Report7.groupByLocation(VACC.animals, LDHLogic.LOCATIONS);
@@ -1084,7 +1108,7 @@
     const sent = new Set(VACC.sent);
     const fresh = res.animals.filter(a => !sent.has(a.id + '|' + a.treatment));
     VACC = { day: vaccToday(), animals: fresh, sent: VACC.sent };
-    vaccPicked.clear(); vaccSave(); renderVacc();
+    vaccPicked.clear(); vaccPush(); renderVacc();
     if (res.animals.length !== fresh.length) { err.textContent = (res.animals.length - fresh.length) + ' animal(s) in this report were already sent to the Admission AA today and have been left out.'; err.style.display = 'block'; }
   });
   document.getElementById('vacc-list').addEventListener('change', (e) => {
@@ -1095,7 +1119,7 @@
   });
   document.getElementById('vacc-clear').addEventListener('click', () => {
     if (VACC.animals.length && !confirm('Clear this list? Animals you have not sent to the Admission AA will need the report uploaded again.')) return;
-    VACC = { day: vaccToday(), animals: [], sent: VACC.sent }; vaccPicked.clear(); vaccSave(); renderVacc();
+    VACC = { day: vaccToday(), animals: [], sent: VACC.sent }; vaccPicked.clear(); vaccPush(); renderVacc();
   });
   document.getElementById('vacc-send').addEventListener('click', async () => {
     const err = document.getElementById('vacc-error'), btn = document.getElementById('vacc-send');
@@ -1115,7 +1139,7 @@
     const gone = new Set(chosen.map(vaccKey));
     VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
     VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));
-    vaccPicked.clear(); vaccSave(); renderVacc();
+    vaccPicked.clear(); vaccPush(); renderVacc();
     const ok = document.getElementById('vacc-count'); ok.textContent = 'Sent ' + chosen.length + ' to the Admission AA \u2713 \u00b7 ' + VACC.animals.length + ' still due';
   });
   vaccLoad(); renderVacc();
@@ -1172,6 +1196,7 @@
     TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || []; NOGA_REQUESTS = ngRes.data || []; MEMOS = memosRes.data || [];
     await loadNurseCounts();
+    vaccPull();
     if (!window.__onDutySynced) { window.__onDutySynced = true; syncOnDuty(); }
     checkForNewItems();
     renderAll();
@@ -1182,7 +1207,7 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos'], loadAll);
+    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos', 'vacc_list'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
   })();
 </script>
