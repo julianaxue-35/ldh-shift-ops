@@ -32,8 +32,8 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
   const a = await open(seed, 'admission-aa.html');
   try {
     t.ok((await a.page.textContent('[data-col="tasks"] .box-overdue')).trim() === '1 overdue', 'the nurse-tasks box shows its own overdue count');
-    t.ok(await a.page.locator('[data-col="notes"] .box-overdue').count() === 0, 'a box with nothing overdue shows no overdue label');
-    t.ok(await a.page.evaluate(() => ['notes', 'charts', 'tasks'].every(k => { const s = getComputedStyle(document.querySelector('[data-col="' + k + '"]')); return parseFloat(s.borderTopWidth) >= 1 && parseFloat(s.borderRadius) >= 8 && parseFloat(s.paddingTop) >= 10; })), 'each of the three is a defined, padded, rounded box');
+    t.ok(await a.page.locator('[data-col="processing"] .box-overdue').count() === 0, 'a box with nothing overdue shows no overdue label');
+    t.ok(await a.page.evaluate(() => ['processing', 'sick', 'charts', 'tasks'].every(k => { const s = getComputedStyle(document.querySelector('[data-col="' + k + '"]')); return parseFloat(s.borderTopWidth) >= 1 && parseFloat(s.borderRadius) >= 8 && parseFloat(s.paddingTop) >= 10; })), 'each of the three is a defined, padded, rounded box');
     t.ok(/1 card is overdue/.test(await a.page.textContent('#aa-overdue-banner')) && await a.page.isVisible('#aa-overdue-banner'), 'a red banner tells the AA overdue cards need doing ASAP: ' + await a.page.textContent('#aa-overdue-banner'));
     const order = await a.page.$$eval('.aa-card', els => els.map(e => e.dataset.id));
     t.ok(order[0] === 'late', 'the overdue card is first: ' + order.join(','));

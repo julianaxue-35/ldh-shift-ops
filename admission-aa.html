@@ -170,16 +170,20 @@
   .aa-notes.open { display: block; }
   .aa-extra { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .aa-lines { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; }
-  .aa-cols { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; align-items: start; }
-  .aa-col { min-width: 0; background: var(--card-bg); border: 1px solid var(--border); border-top-width: 4px; border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px 14px 10px; }
-  .aa-col[data-col="notes"] { border-top-color: #3b6ea5; }
-  .aa-col[data-col="charts"] { border-top-color: #2f8f5b; }
-  .aa-col[data-col="tasks"] { border-top-color: #c98a1a; }
-  .aa-col > h3 { margin: 0 0 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .aa-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+  .aa-col { min-width: 0; background: var(--card-bg); border: 1px solid var(--border); border-top-width: 5px; border-radius: 14px; box-shadow: var(--shadow-card); padding: 18px 20px 14px; }
+  /* Processing = green and Sick & Injured = orange, the same colours as the two shift tools; the others are told apart by blue / purple */
+  .aa-col[data-col="processing"] { border-top-color: #1f7a4d; }
+  .aa-col[data-col="processing"] > h3 { color: #1f7a4d; }
+  .aa-col[data-col="sick"] { border-top-color: #c98a1a; }
+  .aa-col[data-col="sick"] > h3 { color: #b07a10; }
+  .aa-col[data-col="charts"] { border-top-color: #3b6ea5; }
+  .aa-col[data-col="tasks"] { border-top-color: #7c5cbf; }
+  .aa-col > h3 { margin: 0 0 12px; font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .aa-col > h3 .box-count { font-size: 12px; font-weight: 600; background: rgba(128,128,128,.18); border-radius: 999px; padding: 1px 9px; }
   .aa-col > h3 .box-overdue { font-size: 12px; font-weight: 700; color: #fff; background: #c0392b; border-radius: 999px; padding: 1px 9px; }
   .aa-col .col-empty { color: var(--ink-soft, #6b7280); font-size: 13px; margin: 6px 0 4px; }
-  .aa-col .aa-card { margin-bottom: 8px; }
+  .aa-col .aa-card { margin-bottom: 10px; }
   @media (max-width: 900px) { .aa-cols { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -292,7 +296,8 @@
     const sorted = LDHLogic.aaSortItems(ITEMS, now);
     // Left half: vet notes. Right half, side by side: medication charts (to print) and nurse tasks.
     const COLS = [
-      { key: 'notes', title: 'Notes from vets', has: i => i.kind === 'processing_note' || i.kind === 'si_note', empty: 'No notes waiting.' },
+      { key: 'processing', title: 'Processing notes', has: i => i.kind === 'processing_note', empty: 'No Processing notes waiting.' },
+      { key: 'sick', title: 'Sick & Injured notes', has: i => i.kind === 'si_note', empty: 'No Sick & Injured notes waiting.' },
       { key: 'charts', title: 'Medication charts to print', has: i => i.kind === 'med_chart', empty: 'No charts waiting.' },
       { key: 'tasks', title: 'Tasks from nurses', has: i => i.kind !== 'processing_note' && i.kind !== 'si_note' && i.kind !== 'med_chart', empty: 'No tasks waiting.' }
     ];
