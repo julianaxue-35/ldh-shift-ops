@@ -57,3 +57,9 @@ test('aa_check: accepts 1-100 kind/animal pairs, upper-cases IDs, refuses junk',
   assert.match(validateAaCheck({ items: [{ kind: 'si_note', animal_id: '' }] }).error, /animal ID/i);
   assert.match(validateAaCheck({}).error, /Bad request/);
 });
+
+test('priority: only an explicit true is kept, and only on notes', () => {
+  assert.equal(validateAaShare(ok({ payload: { text: 'x', priority: true } })).row.payload.priority, true);
+  assert.equal(validateAaShare(ok({ payload: { text: 'x', priority: 'yes' } })).row.payload.priority, undefined);
+  assert.equal(validateAaShare(ok({ payload: { text: 'x' } })).row.payload.priority, undefined);
+});

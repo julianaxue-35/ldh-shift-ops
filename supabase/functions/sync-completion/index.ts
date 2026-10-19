@@ -110,6 +110,7 @@ function validateAaShare(a) {
     if (!text) return { error: 'The note text is empty.' };
     if (text.length > 20000) return { error: 'The note is too long (limit 20,000 characters).' };
     payload = { text: text };
+    if (p.priority === true) payload.priority = true;          // the vet asked for this one to be done first (e.g. awaiting foster)
     if (p.docx_b64 != null && p.docx_b64 !== '') {
       if (typeof p.docx_b64 !== 'string' || p.docx_b64.length > 1200000) return { error: 'The Word file is too large to send.' };
       if (!/^[A-Za-z0-9+\/=]+$/.test(p.docx_b64)) return { error: 'The Word file is not valid base64.' };

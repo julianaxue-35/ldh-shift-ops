@@ -184,6 +184,8 @@
   .aa-col > h3 .box-overdue { font-size: 12px; font-weight: 700; color: #fff; background: #c0392b; border-radius: 999px; padding: 1px 9px; }
   .aa-col .col-empty { color: var(--ink-soft, #6b7280); font-size: 13px; margin: 6px 0 4px; }
   .aa-col .aa-card { margin-bottom: 10px; }
+  .aa-card.aa-priority { border: 2px solid #c0392b; background: rgba(192,57,43,.07); }
+  .aa-pri-tag { font-size: 11px; font-weight: 800; color: #fff; background: #c0392b; border-radius: 999px; padding: 2px 9px; letter-spacing: .03em; }
   @media (max-width: 900px) { .aa-cols { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -210,6 +212,7 @@
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
     <div id="aa-on-duty" style="margin:14px 0 0; font-size:0.9rem;"></div>
+    <div id="aa-priority-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#fff; border:2px solid #c0392b; color:#c0392b; font-weight:800;"></div>
     <div id="aa-overdue-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#c0392b; color:#fff; font-weight:700;"></div>
     <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
     <section class="card" id="aa-completed" style="margin-top:18px;"></section>
@@ -245,9 +248,10 @@
   function cardHtml(it, now) {
     const c = LDHLogic.aaCountdown(it, now);
     const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    return `<div class="attn-item aa-card" data-id="${esc(it.id)}">
+    const pri = LDHLogic.aaIsPriority(it);
+    return `<div class="attn-item aa-card${pri ? ' aa-priority' : ''}" data-id="${esc(it.id)}">
       <div>
-        <div class="aname">${esc(it.animal_ids.join(', '))} <span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span></div>
+        <div class="aname">${esc(it.animal_ids.join(', '))} ${pri ? '<span class="aa-pri-tag">PRIORITY \u2014 do first</span> ' : ''}<span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span></div>
         <div class="ameta">${esc(LDHLogic.aaSummary(it))}${it.payload && it.payload.location ? ' · ' + esc(it.payload.location) : ''} · sent ${esc(hm(it.sent_at))}${it.sent_by ? ' by ' + esc(it.sent_by) : ''}${it.updated_at ? ' · <b class="aa-updated">updated ' + esc(hm(it.updated_at)) + '</b>' : ''}</div>
         ${extraHtml(it)}
       </div>
@@ -354,6 +358,10 @@
     el.style.display = late ? '' : 'none';
     el.textContent = late + ' overdue';
     const ob = document.getElementById('aa-overdue-banner');
+    const priWaiting = ITEMS.filter(LDHLogic.aaIsPriority).length;
+    const pb = document.getElementById('aa-priority-banner');
+    pb.style.display = priWaiting ? 'block' : 'none';
+    pb.textContent = priWaiting ? '\u26a1 ' + priWaiting + ' PRIORITY card' + (priWaiting > 1 ? 's' : '') + ' waiting: do ' + (priWaiting > 1 ? 'these' : 'this') + ' first (marked in red below).' : '';
     ob.style.display = late ? 'block' : 'none';
     ob.textContent = late ? '\u26a0 ' + late + ' card' + (late > 1 ? 's are' : ' is') + ' overdue (waiting over 24 hours). Please enter ' + (late > 1 ? 'these' : 'this') + ' in ShelterMate ASAP.' : '';
     document.getElementById('aa-session-count').textContent = doneThisSession ? 'Done this session: ' + doneThisSession : '';
@@ -432,10 +440,10 @@
   /* ---------- new-item banner + sound (same shared module as the Vets and Nurses pages) ---------- */
   const alertSound = OpsCore.createAlertSound('sound-chip');
   const BASE_TITLE = document.title;
-  let seen = new Set(), seenInitialised = false, pendingNew = 0, titleFlashTimer = null;
+  let seen = new Set(), seenInitialised = false, pendingNew = 0, pendingPri = 0, titleFlashTimer = null;
   function hideBanner() {
     document.getElementById('new-item-banner').style.display = 'none';
-    pendingNew = 0;
+    pendingNew = 0; pendingPri = 0;
     if (titleFlashTimer) { clearInterval(titleFlashTimer); titleFlashTimer = null; }
     document.title = BASE_TITLE;
   }
@@ -446,7 +454,9 @@
     if (!seenInitialised) { seenInitialised = true; return; }     // nothing already open alerts on page load
     if (!fresh.length) return;
     pendingNew += fresh.length;
-    document.getElementById('new-item-banner-text').textContent = `🔔 ${pendingNew} new item${pendingNew > 1 ? 's' : ''} sent through — enter in ShelterMate below.`;
+    const pri = fresh.filter(LDHLogic.aaIsPriority).length;
+    pendingPri += pri;
+    document.getElementById('new-item-banner-text').textContent = `🔔 ${pendingNew} new item${pendingNew > 1 ? 's' : ''} sent through` + (pendingPri ? ` — ${pendingPri} PRIORITY, do ${pendingPri > 1 ? 'those' : 'that'} first` : ' — enter in ShelterMate below') + '.';
     document.getElementById('new-item-banner').style.display = 'flex';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     alertSound.play();
