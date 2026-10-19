@@ -44,6 +44,35 @@ const { makeReport7 } = require('../fixtures/report7-fixture.cjs');
     await n.page.waitForSelector('#vacc-list .vr-group');
     t.ok(await n.page.locator('.vr-pick').count() === 2 && /already sent to the Admission AA today/.test(await n.page.textContent('#vacc-error')), 're-uploading the same report leaves out what was already sent');
 
+    // add a cat / dog by hand: just the ID and the location
+    await n.page.fill('#vacc-add-id', '9300001');
+    await n.page.click('#vacc-add');
+    t.ok(/location/i.test(await n.page.textContent('#vacc-error')), 'a location is needed too');
+    await n.page.fill('#vacc-add-loc', 'Pound 3');
+    await n.page.click('#vacc-add');
+    let grp = (await n.page.innerText('.vr-group[data-location="Pound 3"]')).replace(/\s+/g, ' ');
+    t.ok(/9300001/.test(grp) && /added by hand/.test(grp), 'the animal appears under its location: ' + grp);
+    t.ok((await n.page.inputValue('#vacc-add-id')) === '' && (await n.page.inputValue('#vacc-add-loc')) === 'Pound 3', 'the ID clears but the location stays for the next one');
+    await n.page.fill('#vacc-add-id', '9300010 - 9300012');
+    await n.page.click('#vacc-add');
+    t.ok(await n.page.locator('.vr-pick[data-location="Pound 3"]').count() === 4, 'a litter range adds each animal');
+    await n.page.fill('#vacc-add-id', '9300001, 9300013');
+    await n.page.click('#vacc-add');
+    t.ok(await n.page.locator('.vr-pick[data-location="Pound 3"]').count() === 5 && /already on the list/.test(await n.page.textContent('#vacc-error')), 'an animal already on the list is not added twice');
+    await n.page.fill('#vacc-add-id', '9300020 - 9300010');
+    await n.page.click('#vacc-add');
+    t.ok(/backwards/.test(await n.page.textContent('#vacc-error')), 'a bad range is explained');
+    // they are sent like the rest: a plain Vaccination card, and shared to the other devices
+    await n.page.locator('.vr-row', { hasText: '9300001' }).locator('.vr-pick').check();
+    await n.page.locator('.vr-row', { hasText: '9300013' }).locator('.vr-pick').check();
+    const cardsBefore = (await n.db()).aa_items.length;
+    await n.page.click('#vacc-send');
+    await n.page.waitForFunction((c) => window.__db.aa_items.length === c + 1, cardsBefore);
+    const manual = (await n.db()).aa_items.find(r => r.payload.vaccine === 'Vaccination');
+    t.ok(manual && manual.kind === 'vaccination' && manual.animal_ids.slice().sort().join() === '9300001,9300013' && manual.sent_by === 'CD', 'by-hand animals go to the Admission AA as one Vaccination card: ' + JSON.stringify(manual && manual.animal_ids));
+    await n.page.waitForTimeout(300);
+    t.ok((await n.db()).vacc_list[0].animals.some(a => a.id === '9300010'), 'and the by-hand animals still waiting are in the shared list');
+
     // a wrong file gives a message, not an error
     await n.page.setInputFiles('#vacc-file', { name: 'notes.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('not a spreadsheet') });
     await n.page.waitForFunction(() => /could not be opened/.test(document.getElementById('vacc-error').textContent));
