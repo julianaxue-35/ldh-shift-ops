@@ -13,6 +13,12 @@ const t = require('./check')('vets-new-task-first');
     await v.page.waitForFunction(() => /NEW-1/.test(document.getElementById('misc-list').textContent));
     const rows = await v.page.$$eval('#misc-list .attn-item', rs => rs.map(r => r.textContent));
     t.ok(/NEW-1/.test(rows[0]) && /OLD-1/.test(rows[1]), 'a task just requested appears at the top of the list');
+    // the treatment request: form above the courses already running
+    await v.page.fill('#nt-animal', 'TRT-1'); await v.page.fill('#nt-treatment', 'flush site'); await v.page.click('#nt-submit');
+    await v.page.waitForFunction(() => window.__db.nurse_treatments.length === 1);
+    await v.page.waitForFunction(() => /TRT-1/.test(document.getElementById('nt-courses').textContent));
+    const y2 = sel => v.page.$eval(sel, e => Math.round(e.getBoundingClientRect().top));
+    t.ok(await y2('#nt-animal') < await y2('#nt-courses'), 'the treatment request form is above the courses in progress');
     t.ok(v.errors.length === 0, 'no page errors: ' + v.errors.join('; '));
   } finally { await v.browser.close(); }
   t.done();
