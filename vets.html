@@ -214,6 +214,12 @@
       </div>
     </div>
 
+    <section class="card" id="vet-initials-card" style="padding:12px 16px;">
+      <label for="vet-initials" style="font-size:0.85rem; font-weight:700;">Vet initials for today</label>
+      <input id="vet-initials" maxlength="4" placeholder="e.g. JX" autocomplete="off" style="max-width:110px; margin:0 8px;">
+      <span class="subtle" style="font-size:0.78rem;">The nurses see these on every task, treatment or transfer you send them. Cleared tomorrow.</span>
+    </section>
+
     <section class="card" id="start-shift-card">
       <h2>Start a shift</h2>
       <p class="subtle">Opens the shift tool in a new tab. Clinical detail is entered there, not here.</p>
@@ -908,10 +914,11 @@
       const days = parseInt(document.getElementById('nt-days').value, 10);
       const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
       if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
+      const who = vetInitials(); if (!who) { alert('Enter your initials first, so the nurses can see who asked.'); return; }
       if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
       const { data: tr, error } = await sb.from('nurse_treatments').insert({
         animal_id: animal, location: (() => { const room = document.getElementById('nt-location').value, pen = document.getElementById('nt-pen').value.trim(); return pen && !LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' / ' + pen : room; })(), treatment,
-        times_per_day: times, days, start_date: start, requested_by: 'Vet team'
+        times_per_day: times, days, start_date: start, requested_by: who
       }).select().single();
       if (error) { alert('Could not save the request: ' + error.message); return; }
       const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
@@ -935,6 +942,25 @@
     loadAll();
   });
 
+  /* ---------- vet initials: put on everything a vet sends to the nurses ---------- */
+  const VET_INIT_KEY = 'ldh_vets_initials_v1';
+  const cleanVetInit = v => String(v || '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4);
+  (function loadVetInit() {
+    try { const o = JSON.parse(localStorage.getItem(VET_INIT_KEY) || '{}'); if (o.d === LDHLogic.localISO(new Date())) document.getElementById('vet-initials').value = o.v || ''; } catch (e) { /* just empty */ }
+  })();
+  function saveVetInit() {
+    const el = document.getElementById('vet-initials'); el.value = cleanVetInit(el.value);
+    try { localStorage.setItem(VET_INIT_KEY, JSON.stringify({ d: LDHLogic.localISO(new Date()), v: el.value })); } catch (e) { /* kept for this visit only */ }
+  }
+  document.getElementById('vet-initials').addEventListener('input', saveVetInit);
+  // the initials on this request; asks once if the box is still empty
+  function vetInitials() {
+    const el = document.getElementById('vet-initials');
+    let v = cleanVetInit(el.value);
+    if (!v) { v = cleanVetInit(window.prompt('Your initials (the nurses will see them):')); if (v) { el.value = v; saveVetInit(); } }
+    return v;
+  }
+
   /* ---------- miscellaneous nurse tasks (Welfare nurse) ---------- */
   function renderMisc() {
     const now = Date.now();
@@ -942,7 +968,7 @@
     document.getElementById('misc-list').innerHTML = visible.map(r => `
       <div class="attn-item">
         <div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(LDHLogic.MISC_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ' · waiting for the nurse'}</div></div>
+          <div class="ameta">${esc(LDHLogic.MISC_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ' · waiting for the nurse'}</div></div>
       </div>`).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
   }
   function fillMiscSelects() {
@@ -959,13 +985,14 @@
     try {
       const animal = document.getElementById('mt-animal').value.trim();
       if (!animal) { alert('Enter an animal ID.'); return; }
+      const who = vetInitials(); if (!who) { alert('Enter your initials first, so the nurses can see who asked.'); return; }
       const room = document.getElementById('mt-location').value;
       const detail = document.getElementById('mt-detail').value.trim();
       const pen = document.getElementById('mt-pen').value.trim();
       const location = !LDHLogic.OFFSITE_NAMES.includes(room) && pen ? room + ' / ' + pen : room;      // the same "room / pen" form the flag board uses
       const { error } = await sb.from('noga_requests').insert({
         animal_id: animal, location, location_detail: LDHLogic.OFFSITE_NAMES.includes(room) ? (detail || null) : null,
-        task: document.getElementById('mt-task').value, note: document.getElementById('mt-note').value.trim() || null, added_by: 'Vet team'
+        task: document.getElementById('mt-task').value, note: document.getElementById('mt-note').value.trim() || null, added_by: who
       });
       if (error) { alert('Could not save the task: ' + error.message); return; }
       document.getElementById('mt-animal').value = ''; document.getElementById('mt-note').value = ''; document.getElementById('mt-detail').value = ''; document.getElementById('mt-pen').value = '';
@@ -1007,11 +1034,12 @@
     const overlay = ok.closest('.transfer-modal-overlay');
     const t = TASKS.find(x => x.id === overlay.dataset.id);
     if (!t) { overlay.remove(); return; }
+    const who = vetInitials(); if (!who) { alert('Enter your initials first, so the nurses can see who asked.'); return; }
     ok.disabled = true;
     const task = overlay.querySelector('.transfer-task').value;
     const note = overlay.querySelector('.transfer-note').value.trim() || t.problem || null;
     const { error } = await sb.from('noga_requests').insert({
-      animal_id: t.title, location: t.location, location_detail: t.location_detail || null, task, note, added_by: 'Vet team', source_task_id: t.id
+      animal_id: t.title, location: t.location, location_detail: t.location_detail || null, task, note, added_by: who, source_task_id: t.id
     });
     if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
     const { error: closeErr } = await sb.from('tasks').update({
