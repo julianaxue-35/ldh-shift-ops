@@ -641,7 +641,8 @@
   });
 
   function renderNurseRequests() {
-    const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count);
+    // newest request first, so a request just logged is at the top and not buried under the earlier ones
+    const open = NURSE_REQUESTS.filter(r => r.done_count < r.animal_count).sort((x, y) => String(y.created_at || '').localeCompare(String(x.created_at || '')));
     document.getElementById('nr-list').innerHTML = open.map(r => r.arrived_at ? arrivedRowHtml(r) : scheduledRowHtml(r)).join('')
       || '<p class="empty-state">No nurse requests open.</p>';
     renderPickBars();
