@@ -726,8 +726,8 @@
     return `
       <div class="attn-item noga-item">
         <div style="display:flex; gap:8px; align-items:flex-start;">${r.done ? '' : rowPickBox('misc', r, isProcessingMisc(r) ? 'processing' : 'welfare', r.task === 'uv')}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div></div></div>
-        ${r.done ? '' : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note && r.task !== 'med_label' ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div>${r.task === 'med_label' && r.note ? `<div class="med-label-text">${esc(r.note)}</div>` : ''}</div></div>
+        ${r.done ? '' : r.task === 'med_label' ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>` : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
   function renderNoga() {
@@ -748,6 +748,12 @@
   async function miscDoneClick(e) {
     const back = e.target.closest('.noga-back');
     if (back) { const r = NOGA_REQUESTS.find(x => x.id === back.dataset.id); if (r) openBackModal({ src: 'misc', row: r }); return; }
+    const cp = e.target.closest('.noga-copy');
+    if (cp) {
+      const r = NOGA_REQUESTS.find(x => x.id === cp.dataset.id); if (!r) return;
+      try { await navigator.clipboard.writeText(r.note || ''); } catch (err) { copyTextFallback(r.note || ''); }
+      cp.textContent = 'Copied'; setTimeout(() => { cp.textContent = 'Copy'; }, 1500); return;
+    }
     const btn = e.target.closest('.noga-done'); if (!btn) return;
     const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
     const initials = myInitials(isProcessingMisc(r) ? 'processing' : 'welfare');

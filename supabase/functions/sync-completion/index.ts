@@ -18,6 +18,7 @@
 //      medication case, or not on the dashboard at all) this is a no-op —
 //      it must never create a stray task row out of a chart record alone.
 //
+//   9. { nurse_label: {animal_id,location,sent_by,labels:[{key,text}]} } — (2026-10-21) medication labels for the Welfare nurse
 //   8. { aa_check: {items:[{kind,animal_id}]} } — (2026-10-19) read-only: which Admission AA cards are still waiting?
 //
 //   9. { surgery_log: {source_id,species,surg_type,surg_type2,registered} } — (2026-10-19) a registered surgery, for the stats
@@ -122,6 +123,24 @@ function validateAaShare(a) {
   return { row: { kind: a.kind, animal_ids: [id], payload: payload, sent_by: sentBy } };
 }
 // Shape 8 request: which of these cards are still waiting for the Admission AA? (anything no longer there was ticked)
+// (2026-10-21) { nurse_label: { animal_id, location, sent_by, labels: [{ key, text }] } } — a vet sends medication labels to the Welfare nurse.
+function validateNurseLabel(n) {
+  if (!n || typeof n !== 'object') return { error: 'Bad request.' };
+  const id = typeof n.animal_id === 'string' ? n.animal_id.trim() : '';
+  if (!id || id.length > 40) return { error: 'An animal ID (up to 40 characters) is required.' };
+  const location = typeof n.location === 'string' ? n.location.trim().slice(0, 80) : '';
+  if (!location) return { error: 'A location is required.' };
+  const sentBy = typeof n.sent_by === 'string' ? n.sent_by.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4) : '';
+  if (!Array.isArray(n.labels) || !n.labels.length || n.labels.length > 10) return { error: 'Send between 1 and 10 labels.' };
+  const labels = [];
+  for (const l of n.labels) {
+    const key = typeof l?.key === 'string' ? l.key.trim().slice(0, 120) : '';
+    const text = typeof l?.text === 'string' ? l.text.trim().slice(0, 1000) : '';
+    if (!key || !text) return { error: 'Each label needs a key and its text.' };
+    labels.push({ key, text });
+  }
+  return { id, location, sentBy, labels };
+}
 function validateAaCheck(c) {
   if (!c || typeof c !== 'object' || !Array.isArray(c.items)) return { error: 'Bad request.' };
   if (!c.items.length || c.items.length > 100) return { error: 'Send between 1 and 100 items.' };
@@ -243,6 +262,23 @@ Deno.serve(async (req) => {
       : await supabase.from('surgery_log').upsert(v.row, { onConflict: 'id' });
     if (res.error) return new Response(JSON.stringify({ error: res.error.message }), { status: 500, headers: CORS_HEADERS });
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: CORS_HEADERS });
+  }
+  // Shape 9 (2026-10-21): { nurse_label: { animal_id, location, sent_by, labels: [{key, text}] } } — medication labels for the
+  // Welfare nurse. One open task per label key: sending again UPDATES the open task (the vet edited the chart), a finished one
+  // is not reopened (a new task is made).
+  if (body.nurse_label && typeof body.nurse_label === 'object') {
+    const v = validateNurseLabel(body.nurse_label);
+    if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    for (const l of v.labels) {
+      const row = { animal_id: v.id, location: v.location, task: 'med_label', note: l.text, added_by: v.sentBy || null };
+      const { data: open, error: e1 } = await supabase.from('noga_requests').select('id').eq('source_key', l.key).eq('done', false).limit(1);
+      if (e1) return new Response(JSON.stringify({ error: e1.message }), { status: 500, headers: CORS_HEADERS });
+      const res = open && open.length
+        ? await supabase.from('noga_requests').update(row).eq('id', open[0].id)
+        : await supabase.from('noga_requests').insert(Object.assign({}, row, { source_key: l.key }));
+      if (res.error) return new Response(JSON.stringify({ error: res.error.message }), { status: 500, headers: CORS_HEADERS });
+    }
+    return new Response(JSON.stringify({ ok: true, count: v.labels.length }), { status: 200, headers: CORS_HEADERS });
   }
   // Shape 8 (2026-10-19): { aa_check: { items: [{kind, animal_id}] } } — read-back for the shift tools: which of the
   // cards they sent are still waiting? Replies {ok:true, pending:["kind|ANIMAL", ...]}; a card that is gone was ticked.
