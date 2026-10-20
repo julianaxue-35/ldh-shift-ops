@@ -368,7 +368,7 @@ test('birthing reasons are Red-flag signs with readable labels; misc task labels
   assert.deepEqual(L.BIRTHING_SIGNS.map(b => b.key), ['birth_neonates', 'birth_discharge', 'birth_mum_distress']);
   L.BIRTHING_SIGNS.forEach(b => { assert.equal(L.signLabel(b.key), b.label); assert.equal(L.tierFromFlags([b.key]), 'red_flag'); });
   assert.ok(!L.EMERGENCY_SIGNS.some(s => s.key.startsWith('birth_')), 'birthing reasons are not general tick-boxes');
-  assert.deepEqual(Object.keys(L.MISC_TASK_LABELS).sort(), ['blood', 'ear_swab', 'fiv_test', 'ivft', 'microchip', 'other', 'treatment', 'uv']);
+  assert.deepEqual(Object.keys(L.MISC_TASK_LABELS).sort(), ['blood', 'ear_swab', 'fiv_test', 'ivft', 'med_label', 'microchip', 'other', 'treatment', 'uv']);
 });
 
 test('todayTasks: only today\'s checks — old open rows are carried over, duplicates count once per animal per shift', () => {
