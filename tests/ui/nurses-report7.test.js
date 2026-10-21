@@ -17,7 +17,7 @@ const { makeReport7 } = require('../fixtures/report7-fixture.cjs');
     await n.page.setInputFiles('#vacc-file', { name: 'Report7.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf });
     await n.page.waitForSelector('#vacc-list .vr-group');
     const groups = await n.page.$$eval('#vacc-list .vr-group', gs => gs.map(g => g.dataset.location));
-    t.ok(groups.join('|') === 'Cat Room 2|Cat Adoptions 1|Vet Clinic', 'animals are grouped by shelter location in room order: ' + groups.join('|'));
+    t.ok(groups.join('|') === 'Cat Room 2|Vet Clinic|Cat Adoptions 1', 'animals are grouped by shelter location in room order (Vet clinic is now a known place, so it sorts before names the dashboard does not know): ' + groups.join('|'));
     const room2 = (await n.page.innerText('.vr-group[data-location="Cat Room 2"]')).replace(/\s+/g, ' ');
     t.ok(room2.indexOf('9000002') < room2.indexOf('9000001') && /kennel 07/.test(room2) && /overdue/.test(room2), 'kennels in number order, overdue flagged: ' + room2.slice(0, 160));
     t.ok(!/Never Shown|956000000000001/.test(await n.page.textContent('#vacc-list')), 'names and microchip numbers are never shown');

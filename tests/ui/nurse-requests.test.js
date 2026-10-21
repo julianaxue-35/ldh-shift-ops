@@ -7,9 +7,10 @@ const t = require('./check')('nurse-requests');
 (async () => {
   const { browser, page, errors, db } = await open();
   try {
+    await page.click('.sr-tab[data-sr="nurses"]');
     t.ok(await page.locator('#nr-list').count() === 0, 'the nurse-requests list is gone from the shelter staff page');
     t.ok(await page.isVisible('#nr-form'), 'the vaccination request form stays on the shelter staff page');
-    t.ok((await page.textContent('#nurse-requests')).includes('Nurse request'), 'the form has its own small card heading');
+    t.ok((await page.textContent('#send-request')).includes('Send a request') && (await page.textContent('.sr-tab[data-sr="nurses"]')) === 'Nurses', 'the form is the Nurses tab of the one "Send a request" card');
 
     t.ok((await page.inputValue('#nr-location')) === 'FIR Room', 'cats default to FIR Room');
     await page.selectOption('#nr-species', 'dog');
