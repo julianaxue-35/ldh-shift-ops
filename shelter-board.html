@@ -161,6 +161,7 @@
   let TASKS = [];
   let LOCATION_ROWS = [];
   let HISTORY = [];
+  let BEHAVIOUR = [];   // behaviour team tasks (migration 0028); the board still works if that has not been run
   let LOAD_ERROR = '';
 
   const STAGE_PILL = {
@@ -172,11 +173,13 @@
 
   async function loadAll() {
     const since = new Date(Date.now() - LDHLogic_HISTORY_DAYS * 86400000).toISOString();
-    const [tasksRes, lcRes, histRes] = await Promise.all([
+    const [tasksRes, lcRes, histRes, behRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('flag_history').select('*').gte('flagged_at', since)
+      sb.from('flag_history').select('*').gte('flagged_at', since),
+      sb.from('behaviour_tasks').select('*')
     ]);
+    BEHAVIOUR = behRes.error ? [] : (behRes.data || []);
     HISTORY = histRes.error ? [] : (histRes.data || []);   // history is a nice-to-have: the board still works without it
     LOAD_ERROR = tasksRes.error ? ('Could not load the flagged animals: ' + tasksRes.error.message) : '';
     if (!tasksRes.error) TASKS = tasksRes.data || [];
@@ -192,6 +195,11 @@
 
   // the foster/offsite detail is already the pill text for Pathway cases — don't repeat it in the footer
   function r_notShown(t) { return LDHLogic.boardRoomOf(t.location).code !== 'PATHWAY'; }
+  function behaviourLines(t) {
+    const bh = LDHLogic.behaviourForAnimal(BEHAVIOUR, t.title, Date.now());
+    return bh.open.map(r => `<div class="field bh-line"><span class="lbl">Behaviour</span><span class="txt">${esc(LDHLogic.BEHAVIOUR_KINDS[r.kind] || r.kind)} \u2014 waiting for the behaviour team</span></div>`).join('')
+      + (bh.done ? `<div class="field bh-line"><span class="lbl">Behaviour done</span><span class="txt">${esc(bh.done.done_note || '')} (${esc(bh.done.done_by || '?')}, ${esc(fmtClock(bh.done.done_at))})</span></div>` : '');
+  }
   function caseHtml(t, stage, penLabel) {
     const [cls, label] = STAGE_PILL[stage];
     const hasCare = !!((t.treatment && t.treatment.trim()) || (t.plan && t.plan.trim()));
@@ -209,6 +217,7 @@
         ${histText ? `<div class="hist">${esc(histText)}</div>` : ''}
         ${line('Treatment', t.treatment)}
         ${line('Plan', t.plan)}
+        ${behaviourLines(t)}
       </div>
       <div class="meta">Flagged ${esc(fmtClock(t.created_at))}${t.location_detail && r_notShown(t) ? ' · ' + esc(t.location_detail) : ''}</div>
     </div>`;
@@ -262,7 +271,7 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['tasks'], loadAll);
+    OpsCore.subscribe(['tasks', 'behaviour_tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {
       await sb.auth.signOut();
       location.reload();
