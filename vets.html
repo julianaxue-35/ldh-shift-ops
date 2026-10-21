@@ -332,6 +332,7 @@
       <details><summary>How do I finish a case?</summary><div><p>Press <b>DONE</b> once you have seen the animal. For a medication case the DONE panel asks for the medication details, and the case then waits for the nurses to make the label.</p></div></details>
       <details><summary>How do I hand a case to the nurses?</summary><div><p>Press <b>Transfer to nurse</b> on a picked-up case, choose the task (blood test, ear swab, FIV test, IVFT, microchip, UV, other) and add a note. The case leaves the vet board and appears on the Nurses page. Microchip and UV go to the Processing nurse, everything else to the Welfare nurse.</p></div></details>
       <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Request a nurse task — miscellaneous</b> for one-off tasks, or <b>Request a treatment</b> for a course such as "flush twice a day for 7 days".</p></div></details>
+      <details><summary>How will I know a new request has arrived?</summary><div><p>A red <b>NEW REQUEST</b> banner appears at the top, the page plays three beeps and the tab title flashes. It covers requests from shelter staff, results sent back by nurses, and requests from the Behaviour team (the banner says how many came from Behaviour). Tap the page, or the <b>alert sound</b> button, once at the start of your shift so the browser allows sound.</p></div></details>
       <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p><p>While this page is open, every new request — including a result sent back — raises a red <b>NEW REQUEST</b> banner with one count (for example “3 new requests sent through”), flashes the tab title and beeps. The sound is on by default; browsers need one tap on the page before they will play it, and the sound button at the top mutes it.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
       <details><summary>The Behaviour team asked me for something — where is it?</summary><div><p>Requests from the Behaviour team (shelter stress medication, a post adoption med pack, or another request) arrive on the vet board like any other request, with a note that says it came from Behaviour and a courthold mention if it applies. Shelter stress medication and post adoption packs wait for the nurse&rsquo;s label like other medication requests.</p></div></details>
@@ -430,19 +431,19 @@
   const alertSound = OpsCore.createAlertSound('sound-chip');
   const playAlertTone = () => alertSound.play();
 
-  let pendingRequests = 0, titleFlashTimer = null;
+  let pendingRequests = 0, pendingBehaviour = 0, titleFlashTimer = null;
   const BASE_TITLE = document.title;
   function hideAlertBanner() {
     document.getElementById('new-item-banner').style.display = 'none';
-    pendingRequests = 0;
+    pendingRequests = 0; pendingBehaviour = 0;
     if (titleFlashTimer) { clearInterval(titleFlashTimer); titleFlashTimer = null; }
     document.title = BASE_TITLE;
   }
   document.getElementById('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
   // One summary count — "6 new requests sent through" — not a list of each one.
-  function showRequestBanner(n) {
-    pendingRequests += n;
-    document.getElementById('new-item-banner-text').textContent = '🔔 NEW REQUEST — ' + pendingRequests + ' new request' + (pendingRequests > 1 ? 's' : '') + ' sent through — check Cases below.';
+  function showRequestBanner(n, fromBehaviour) {
+    pendingRequests += n; pendingBehaviour += fromBehaviour || 0;
+    document.getElementById('new-item-banner-text').textContent = '🔔 NEW REQUEST — ' + pendingRequests + ' new request' + (pendingRequests > 1 ? 's' : '') + ' sent through' + (pendingBehaviour ? ' (' + pendingBehaviour + ' from the Behaviour team)' : '') + ' — check Cases below.';
     document.getElementById('new-item-banner').style.display = 'flex';
     window.scrollTo({ top: 0, behavior: 'smooth' });
     playAlertTone();
@@ -457,18 +458,18 @@
   const seenCases = new Map();   // open task id -> number of nurse results already noticed
   let seenInitialised = false;
   function checkForNewRequests() {
-    let fresh = 0;
+    let fresh = 0, freshBeh = 0;
     const open = TASKS.filter(t => !t.done && LDHLogic.isRequest(t));
     const openIds = new Set(open.map(t => t.id));
     open.forEach(t => {
       const n = LDHLogic.returnedResultCount(t);
-      if (!seenCases.has(t.id)) { if (seenInitialised) fresh += 1; }
+      if (!seenCases.has(t.id)) { if (seenInitialised) { fresh += 1; if (/^Behaviour team request/.test(t.problem || '')) freshBeh += 1; } }
       else if (n > seenCases.get(t.id)) fresh += 1;
       seenCases.set(t.id, n);
     });
     Array.from(seenCases.keys()).forEach(id => { if (!openIds.has(id)) seenCases.delete(id); });   // finished: a re-flag alerts again
     seenInitialised = true;
-    if (fresh > 0) showRequestBanner(fresh);
+    if (fresh > 0) showRequestBanner(fresh, freshBeh);
   }
 
   async function loadAll() {
