@@ -10,3 +10,4 @@
   and the shelter-staff/shared-behaviour suites `flag-form.test.js`, `vet-board.test.js`, `nurse-requests.test.js`,
   `nurse-treatments.test.js`, `disease-watch.test.js`, `memos.test.js`, and the Admission AA suites `admission-aa.test.js` and `nurses-send-aa.test.js`.
 Never point tests at the live Supabase project; the browser tests use an in-memory stub.
+- Behaviour page (Oct 21): `behaviour-logic` + `behaviour-migration` (node), and UI `behaviour-page`, `behaviour-vet-request`, `staff-behaviour-bar`, `staff-initials`, `behaviour-board`, `task-for-behaviour`, `behaviour-mobile`.

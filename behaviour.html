@@ -1,0 +1,409 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LDH Shift Ops — Behaviour</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js"></script>
+<script src="lib/ops-core.js"></script>
+<style>
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
+  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+  }
+  button {
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .filter-chip {
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .urgency-col h3.red-h { color: var(--critical); }
+  .urgency-col h3.urgent-h { color: #c26a00; }
+  .urgency-col h3.routine-h { color: var(--muted); }
+  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
+  .attn-item:last-child { border-bottom: none; }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); margin-top: 2px; }
+  .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .completed-row {
+    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
+    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
+
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
+
+  .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+  .nt-h.overdue { color: var(--critical); }
+
+  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  .memo-done { opacity: 0.6; }
+  #memo-post textarea { min-height: 60px; }
+
+  .done-modal { width: 360px; }
+  .done-modal .done-modal-title { margin: 0 0 12px; font-size: 1rem; }
+  .done-modal textarea { min-height: 90px; }
+
+  .med-label-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+  .med-label-card:last-child { margin-bottom: 0; }
+  .med-label-text { white-space: pre-wrap; background: var(--neutral-100); border-radius: 10px; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; margin: 8px 0; }
+  .med-label-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  #noga-list .attn-item, #proc-misc-list .attn-item { align-items: flex-start; }
+
+  .alert-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: rgba(255,159,67,0.18); border: 1px solid rgba(255,159,67,0.55); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.88rem; font-weight: 600; color: #7a4a00;
+  }
+  #new-item-banner { position: sticky; top: 0; z-index: 50; background: var(--critical); border-color: var(--critical); color: #fff; font-size: 1.05rem; font-weight: 800; letter-spacing: 0.02em; box-shadow: 0 4px 14px rgba(208,59,59,0.35); }
+  #new-item-banner .alert-banner-dismiss { color: #fff; font-size: 1.6rem; }
+  #sound-chip { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); font-size: 0.78rem; padding: 6px 12px; }
+  #sound-chip.sound-off { background: rgba(255,159,67,0.22); border-color: var(--amber); color: #7a4a00; }
+  .alert-banner-dismiss {
+    background: transparent; border: none; box-shadow: none; padding: 0 4px; font-size: 1.1rem;
+    line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
+  }
+
+  .bh-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
+  .bh-col { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .bh-lane { background: var(--card-bg); border: 1px solid var(--border); border-top-width: 5px; border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px 16px; min-width: 0; }
+  .bh-lane[data-lane="tl"] { border-top-color: #7c5cbf; } .bh-lane[data-lane="cat"] { border-top-color: #c98a1a; } .bh-lane[data-lane="dog"] { border-top-color: #3b6ea5; }
+  .bh-lane > h3 { margin: 0 0 10px; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .bh-lane > h3 .bh-add { margin-left: auto; padding: 4px 10px; font-size: 0.75rem; }
+  .bh-card { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background: var(--card-bg); }
+  .bh-card.overdue { border: 2px solid #c0392b; background: rgba(192,57,43,.06); }
+  .bh-card .bh-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .bh-card .aid { font-weight: 800; } .bh-card .meta { font-size: 0.78rem; color: var(--muted); }
+  .bh-court { font-size: 11px; font-weight: 800; color: #fff; background: #c0392b; border-radius: 999px; padding: 2px 9px; }
+  .bh-card .bh-reason { font-size: 0.85rem; margin: 6px 0; white-space: pre-wrap; }
+  .bh-card .bh-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .bh-card .bh-actions select { width: auto; }
+  .bh-card .bh-done { background: var(--green); color: #fff; }
+  .bh-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
+  .bh-filters select, .bh-filters label { width: auto; margin: 0; }
+  .vet-banner .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+  .oc-modal label { display: block; font-size: 0.78rem; font-weight: 700; margin: 8px 0 4px; }
+  main { min-width: 0; }
+  @media (max-width: 900px) { .bh-cols { grid-template-columns: 1fr; } }
+  @media (max-width: 800px) { .layout { grid-template-columns: minmax(0, 1fr); } .vet-banner .row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Your initials (kept on this device today)</label>
+    <input id="bh-initials" maxlength="4" placeholder="e.g. AB" style="margin-bottom:12px;">
+    <p class="hint">Requests from shelter staff arrive in Incoming. Move each to the Behaviour TL or the right assist (cats stay with cat assist, dogs with dog assist), then tick Done with a note about what you found.</p>
+    <span id="signout-link">Sign out</span>
+  </aside>
+  <main>
+    <div class="page-head"><div><h1>Behaviour</h1><p>Behaviour team tasks. Done notes show on the Shelter board.</p></div></div>
+    <p id="bh-error" class="oc-modal-error" style="margin:0;"></p>
+
+    <section class="card vet-banner" id="bh-vet-form">
+      <h2>Request to vets</h2>
+      <p class="subtle">Goes onto the vet board. Dispense shelter stress medication, a post adoption med pack, or something else.</p>
+      <div class="row">
+        <label>Request<select id="bv-type">
+          <option value="shelter_stress_med">Dispense shelter stress medication</option>
+          <option value="post_adoption_pack">Post adoption med pack</option>
+          <option value="other">Other</option></select></label>
+        <label>Shelter ID<input id="bv-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="bv-room"></select></label>
+        <label>Pen / detail<input id="bv-pen" placeholder="Pen #"></label>
+        <label>Note<input id="bv-note" placeholder="optional"></label>
+        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="bv-courthold" style="width:auto;"> Courthold</label>
+        <button type="button" id="bv-send">Send to vets</button>
+      </div>
+      <p id="bv-error" class="oc-modal-error"></p>
+    </section>
+
+    <section class="card"><div class="bh-filters">
+      <b>Filter</b>
+      <select id="f-kind"><option value="">All kinds</option></select>
+      <select id="f-window"><option value="">Any time frame</option></select>
+      <label><input type="checkbox" id="f-court" style="width:auto;"> Courthold only</label>
+    </div></section>
+
+    <section class="card" id="incoming"><h2>Incoming <span id="incoming-count" class="box-count"></span></h2><div id="incoming-list"></div></section>
+
+    <div class="bh-cols">
+      <div class="bh-col"><section class="bh-lane" data-lane="tl"><h3>Behaviour TL <button type="button" class="secondary bh-add" data-lane="tl">+ Task</button></h3><div id="lane-tl"></div></section></div>
+      <div class="bh-col">
+        <section class="bh-lane" data-lane="cat"><h3>Cat assist <button type="button" class="secondary bh-add" data-lane="cat">+ Task</button></h3><div id="lane-cat"></div></section>
+        <section class="bh-lane" data-lane="dog"><h3>Dog assist <button type="button" class="secondary bh-add" data-lane="dog">+ Task</button></h3><div id="lane-dog"></div></section>
+      </div>
+    </div>
+  </main>
+</div>
+<script>
+  let sb = null, ROWS = [];
+  const esc = OpsCore.esc, INIT_KEY = 'ldh_behaviour_initials_v1';
+  const $ = id => document.getElementById(id);
+  const initials = () => ($('bh-initials').value || '').trim().toUpperCase();
+  function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block'; return false; }
+  const locText = (room, pen) => (LDHLogic.OFFSITE_NAMES.includes(room) || !pen ? room : room + ' / ' + pen);
+
+  async function loadAll() {
+    const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
+    if (!error) ROWS = data || [];
+    render();
+  }
+  function filtered() {
+    const k = $('f-kind').value, w = $('f-window').value, c = $('f-court').checked;
+    return ROWS.filter(r => r.status === 'open' && (!k || r.kind === k) && (!w || r.due_window === w) && (!c || r.courthold || r.kind === 'courthold'));
+  }
+  function cardHtml(r, now) {
+    const cd = LDHLogic.behaviourCountdown(r, now);
+    const choices = LDHLogic.behaviourLaneChoices(r.location).filter(l => l !== r.lane);
+    const court = r.courthold || r.kind === 'courthold';
+    return `<div class="bh-card${cd.overdue ? ' overdue' : ''}" data-id="${esc(r.id)}" data-animal="${esc(r.animal_id)}">
+      <div class="bh-top"><span class="aid">${esc(r.animal_id)}</span><span class="meta">${esc(r.location)}</span>${court ? '<span class="bh-court">COURTHOLD</span>' : ''}</div>
+      <div class="meta">${esc(LDHLogic.BEHAVIOUR_KINDS[r.kind] || r.kind)} · ${esc(LDHLogic.BEHAVIOUR_WINDOWS[r.due_window])} · ${esc(cd.text)} · flagged by ${esc(r.flagged_by || '?')}</div>
+      ${r.reason ? `<div class="bh-reason">${esc(r.reason)}</div>` : ''}
+      <div class="bh-actions">
+        <select class="bh-move"><option value="">${r.lane === 'incoming' ? 'Assign to…' : 'Move to…'}</option>${choices.map(l => `<option value="${l}">${esc(LDHLogic.BEHAVIOUR_LANES[l])}</option>`).join('')}</select>
+        <button type="button" class="bh-done">Done</button>
+      </div></div>`;
+  }
+  function render() {
+    const now = Date.now(), rows = filtered();
+    if (!$('f-kind').dataset.ready) {
+      Object.entries(LDHLogic.BEHAVIOUR_KINDS).forEach(([k, v]) => $('f-kind').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
+      Object.entries(LDHLogic.BEHAVIOUR_WINDOWS).forEach(([k, v]) => $('f-window').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
+      $('f-kind').dataset.ready = '1';
+    }
+    ['incoming', 'tl', 'cat', 'dog'].forEach(lane => {
+      const els = rows.filter(r => r.lane === lane).sort((a, b) => LDHLogic.behaviourDue(a) - LDHLogic.behaviourDue(b));
+      const host = lane === 'incoming' ? $('incoming-list') : $('lane-' + lane);
+      host.innerHTML = els.map(r => cardHtml(r, now)).join('') || '<p class="empty-state">Nothing here.</p>';
+      if (lane === 'incoming') $('incoming-count').textContent = els.length || '';
+    });
+  }
+
+  async function changeRow(id, patch, entry) {
+    const row = ROWS.find(r => r.id === id); if (!row) return 'Task not found.';
+    const history = (row.history || []).concat([Object.assign({ at: new Date().toISOString(), by: initials() }, entry)]);
+    const { data, error } = await sb.from('behaviour_tasks').update(Object.assign({ history }, patch)).eq('id', id).eq('status', 'open').select();
+    if (error) return error.message;
+    if (!data || !data.length) return 'Someone already finished that task.';
+    return '';
+  }
+  document.addEventListener('change', async (e) => {
+    const mv = e.target.closest('.bh-move'); if (!mv || !mv.value) return;
+    if (!needInitials()) { mv.value = ''; return; }
+    const id = mv.closest('.bh-card').dataset.id, from = ROWS.find(r => r.id === id).lane;
+    const err = await changeRow(id, { lane: mv.value }, { from, to: mv.value });
+    if (err) { $('bh-error').textContent = err; $('bh-error').style.display = 'block'; }
+    loadAll();
+  });
+  $('bh-initials').addEventListener('change', () => OpsCore.saveInitials(INIT_KEY, initials()));
+  ['f-kind', 'f-window', 'f-court'].forEach(id => $(id).addEventListener('change', render));
+
+  function modal(html, cls) {
+    document.querySelectorAll('.' + cls).forEach(el => el.remove());
+    const w = document.createElement('div'); w.innerHTML = html;
+    document.body.appendChild(w.firstElementChild); return document.querySelector('.' + cls);
+  }
+  document.addEventListener('click', async (e) => {
+    /* ---- Done with a note ---- */
+    const d = e.target.closest('.bh-done');
+    if (d) {
+      if (!needInitials()) return;
+      const card = d.closest('.bh-card');
+      modal(`<div class="oc-modal-overlay done-overlay" data-id="${esc(card.dataset.id)}"><div class="oc-modal">
+        <h3>Done — ${esc(card.dataset.animal)}</h3>
+        <label>Note (what you found / the plan) — this shows on the Shelter board</label>
+        <textarea class="done-note" rows="4"></textarea>
+        <p class="oc-modal-error done-error"></p>
+        <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel done-cancel">Cancel</button><button type="button" class="oc-modal-submit done-confirm">Mark done</button></div></div></div>`, 'done-overlay');
+      return;
+    }
+    if (e.target.closest('.done-cancel')) { document.querySelector('.done-overlay').remove(); return; }
+    const ok = e.target.closest('.done-confirm');
+    if (ok) {
+      const o = ok.closest('.done-overlay'), note = o.querySelector('.done-note').value.trim(), er = o.querySelector('.done-error');
+      if (!note) { er.textContent = 'Write a note — it goes back to the Shelter board.'; er.style.display = 'block'; return; }
+      ok.disabled = true;
+      const err = await changeRow(o.dataset.id, { status: 'done', done_at: new Date().toISOString(), done_note: note, done_by: initials() }, { done: true });
+      if (err) { ok.disabled = false; er.textContent = err; er.style.display = 'block'; return; }
+      o.remove(); loadAll(); return;
+    }
+
+    /* ---- add a team task ---- */
+    const add = e.target.closest('.bh-add');
+    if (add) {
+      if (!needInitials()) return;
+      const o = modal(`<div class="oc-modal-overlay add-overlay"><div class="oc-modal">
+        <h3>New behaviour task</h3>
+        <label>Animal ID</label><input class="add-animal">
+        <label>Space</label><select class="add-room">${LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('')}</select>
+        <label>Pen / detail</label><input class="add-pen">
+        <label>Task</label><select class="add-kind">${Object.entries(LDHLogic.BEHAVIOUR_KINDS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
+        <label>Time frame</label><select class="add-window">${Object.entries(LDHLogic.BEHAVIOUR_WINDOWS).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
+        <label>Reason / details</label><textarea class="add-reason" rows="3"></textarea>
+        <label>Give to</label><select class="add-to"></select>
+        <p class="oc-modal-error add-error"></p>
+        <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel add-cancel">Cancel</button><button type="button" class="oc-modal-submit add-confirm">Add task</button></div></div></div>`, 'add-overlay');
+      const room = o.querySelector('.add-room'), to = o.querySelector('.add-to');
+      const sync = () => { const ch = LDHLogic.behaviourLaneChoices(room.value), keep = ch.includes(add.dataset.lane) ? add.dataset.lane : ch[0];
+        to.innerHTML = ch.map(l => `<option value="${l}">${esc(LDHLogic.BEHAVIOUR_LANES[l])}</option>`).join(''); to.value = keep; };
+      room.addEventListener('change', sync); sync();
+      return;
+    }
+    if (e.target.closest('.add-cancel')) { document.querySelector('.add-overlay').remove(); return; }
+    const addOk = e.target.closest('.add-confirm');
+    if (addOk) {
+      const o = addOk.closest('.add-overlay'), er = o.querySelector('.add-error'), q = s => o.querySelector(s).value.trim();
+      const location = locText(q('.add-room'), q('.add-pen'));
+      const msg = LDHLogic.behaviourValidate({ kind: q('.add-kind'), animalId: q('.add-animal'), location, reason: q('.add-reason') });
+      if (msg) { er.textContent = msg; er.style.display = 'block'; return; }
+      addOk.disabled = true;
+      const { error } = await sb.from('behaviour_tasks').insert({ kind: q('.add-kind'), animal_id: q('.add-animal'), location, lane: q('.add-to'),
+        due_window: q('.add-window'), reason: q('.add-reason') || null, courthold: q('.add-kind') === 'courthold', flagged_by: initials(),
+        history: [{ at: new Date().toISOString(), by: initials(), from: 'new', to: q('.add-to') }] });
+      if (error) { addOk.disabled = false; er.textContent = error.message; er.style.display = 'block'; return; }
+      o.remove(); loadAll();
+    }
+  });
+
+  /* ---- Request to vets ---- */
+  async function sendTaskToVets(row) {
+    let { error } = await sb.from('tasks').insert(row);
+    if (error && error.code === '23505') {   // same animal already has a case in that pen on this shift: add to it (or reopen if finished)
+      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+      const old = found && found[0];
+      if (old && !old.done) ({ error } = await sb.from('tasks').update({ problem: [old.problem, row.problem].filter(Boolean).join(' — ') }).eq('id', old.id));
+      else if (old) ({ error } = await sb.from('tasks').update(Object.assign({}, row, { created_at: new Date().toISOString(), completed_at: null, completed_by_role: null, claimed_by: null, claimed_at: null,
+        vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null, note: null, treatment: null, plan: null })).eq('id', old.id));
+    }
+    return error;
+  }
+  $('bv-send').addEventListener('click', async () => {
+    const er = $('bv-error'), fail = m => { er.style.color = ''; er.textContent = m; er.style.display = 'block'; };
+    er.style.display = 'none';
+    const animalId = $('bv-animal').value.trim();
+    if (!animalId) return fail('Enter the shelter ID.');
+    if (!initials()) return fail('Enter your initials first (top left).');
+    const room = $('bv-room').value, pen = $('bv-pen').value.trim(), off = LDHLogic.OFFSITE_NAMES.includes(room);
+    const btn = $('bv-send'); btn.disabled = true;
+    const row = LDHLogic.behaviourVetRequest({ type: $('bv-type').value, animalId, location: locText(room, pen), locationDetail: off ? pen : '',
+      courthold: $('bv-courthold').checked, note: $('bv-note').value.trim(), initials: initials() });
+    const error = await sendTaskToVets(row);
+    btn.disabled = false;
+    if (error) return fail('Could not send to the vets: ' + error.message);
+    ['bv-animal', 'bv-pen', 'bv-note'].forEach(id => { $(id).value = ''; }); $('bv-courthold').checked = false;
+    er.textContent = 'Sent to the vets.'; er.style.display = 'block'; er.style.color = 'var(--green)';
+  });
+
+  (async function () {
+    const { sb: client } = await OpsCore.init({ page: 'behaviour' });
+    sb = client;
+    $('bv-room').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    $('bh-initials').value = OpsCore.readInitials(INIT_KEY);
+    $('app-root').style.display = 'grid';
+    await loadAll();
+    OpsCore.subscribe(['behaviour_tasks'], loadAll);
+    setInterval(render, 60000);
+    $('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+  })();
+</script>
+<!-- ip-notice-footer -->
+<footer style="margin:2rem 0 0;padding:14px 16px;border-top:1px solid rgba(128,128,128,.35);text-align:center;font-size:12px;line-height:1.55;color:#888;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;">
+  &copy; 2026 Juliana Xue. All rights reserved.<br>
+  This work is the intellectual property of Juliana Xue and may not be copied,
+  modified, or distributed without her express written permission.
+</footer>
+</body>
+</html>

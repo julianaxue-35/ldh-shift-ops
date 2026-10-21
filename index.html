@@ -292,6 +292,7 @@
         <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
         <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
+      <label style="display:block; margin-top:6px;">Your initials (optional)<input id="req-initials" maxlength="4" placeholder="e.g. AB"></label>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
 
@@ -322,8 +323,34 @@
         <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
         <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
         <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
+        <label>Your initials (optional)<input id="nr-initials" maxlength="4" placeholder="e.g. AB"></label>
         <button id="nr-submit" type="button">Log request</button>
       </div>
+    </section>
+
+    <section class="card nurse-card" id="bh-bar" style="background:#f6f1fd; border-left-color:#7c5cbf;">
+      <h2 style="color:#5b3fa0;">Behaviour request</h2>
+      <p class="subtle">Courthold reassessment, owner surrender history with concerns, aggression / incident review or a behaviour review. The behaviour team sees it straight away.</p>
+      <div class="nr-form">
+        <label>Task<select id="bk-kind">
+          <option value="courthold">Courthold reassessment</option>
+          <option value="surrender_history">Owner surrender history with concerns</option>
+          <option value="incident_review">Aggression / incident review</option>
+          <option value="behaviour_review">Behaviour review</option>
+          <option value="other">Other</option></select></label>
+        <label>Animal ID<input id="bk-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="bk-room"></select></label>
+        <label>Pen / detail<input id="bk-pen" placeholder="Pen #"></label>
+        <label>Needed within<select id="bk-window">
+          <option value="30_60m">Within 30–60 minutes</option>
+          <option value="today">Within today</option>
+          <option value="48h">Within 48 hours</option></select></label>
+        <label>Reason (required for reviews)<textarea id="bk-reason" rows="2" placeholder="Why are you flagging this animal? Or describe another issue."></textarea></label>
+        <label>Your initials<input id="bk-initials" maxlength="4" placeholder="e.g. AB"></label>
+        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="bk-tl" style="width:auto;"> Send straight to the Behaviour TL</label>
+        <button id="bk-submit" type="button">Send to behaviour</button>
+      </div>
+      <p id="bk-error" class="oc-modal-error"></p>
     </section>
 
     <div class="kpi-row">
@@ -517,6 +544,7 @@
       if (asked.length && needsVet) row.problem = ['Needs ' + asked.join(' + '), row.problem].filter(Boolean).join(' — ');
       let error = null;
       if (needsVet) {
+        if (window.staffInitials()) row.problem = [row.problem, '(sent by ' + window.staffInitials() + ')'].filter(Boolean).join(' — ');
         ({ error } = await sb.from('tasks').insert(row));
         /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
            (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
@@ -835,8 +863,8 @@
         location: document.getElementById('nr-location').value,
         species: document.getElementById('nr-species').value,
         animal_count: count,
-        note: document.getElementById('nr-note').value.trim() || null,
-        created_by: 'Shelter Staff'
+        note: [document.getElementById('nr-note').value.trim(), window.staffInitials() ? 'sent by ' + window.staffInitials() : ''].filter(Boolean).join(' — ') || null,
+        created_by: 'Shelter Staff' + (window.staffInitials() ? ' (' + window.staffInitials() + ')' : '')
       };
       if (scheduled) {
         const expectedRaw = document.getElementById('nr-expected').value;
@@ -878,6 +906,41 @@
   applyNrDefaultLocation();
   renderRedFlagForm();
   updateLocationFields();
+
+  /* ---- Optional initials on the staff forms (2026-10-21): one box shared by the flag and nurse request forms, remembered for the day ---- */
+  (function () {
+    const KEY = 'ldh_staff_initials_v1', ids = ['nr-initials', 'req-initials'];
+    const els = () => ids.map(i => document.getElementById(i)).filter(Boolean);
+    els().forEach(e => { e.value = OpsCore.readInitials(KEY); e.addEventListener('change', () => { OpsCore.saveInitials(KEY, e.value); els().forEach(o => { o.value = e.value.trim().toUpperCase(); }); }); });
+    window.staffInitials = () => (els()[0] && els()[0].value.trim().toUpperCase()) || '';
+  })();
+
+  /* ---- Behaviour request (2026-10-21) ---- */
+  (function () {
+    const KEY = 'ldh_behaviour_initials_v1', $ = id => document.getElementById(id);
+    $('bk-room').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    $('bk-initials').value = OpsCore.readInitials(KEY);
+    $('bk-initials').addEventListener('change', () => OpsCore.saveInitials(KEY, $('bk-initials').value));
+    $('bk-submit').addEventListener('click', async () => {
+      const er = $('bk-error'), fail = m => { er.textContent = m; er.style.display = 'block'; };
+      er.style.display = 'none';
+      const kind = $('bk-kind').value, room = $('bk-room').value, pen = $('bk-pen').value.trim();
+      const location = LDHLogic.OFFSITE_NAMES.includes(room) || !pen ? room : room + ' / ' + pen;
+      const msg = LDHLogic.behaviourValidate({ kind, animalId: $('bk-animal').value, location, reason: $('bk-reason').value });
+      if (msg) return fail(msg);
+      const who = $('bk-initials').value.trim().toUpperCase();
+      if (!who) return fail('Enter your initials.');
+      const btn = $('bk-submit'); btn.disabled = true;
+      const lane = $('bk-tl').checked ? 'tl' : 'incoming';
+      const { error } = await sb.from('behaviour_tasks').insert({ kind, animal_id: $('bk-animal').value.trim(), location, lane,
+        due_window: $('bk-window').value, reason: $('bk-reason').value.trim() || null, courthold: kind === 'courthold', flagged_by: who,
+        history: [{ at: new Date().toISOString(), by: who, from: 'new', to: lane }] });
+      btn.disabled = false;
+      if (error) return fail('Could not send: ' + error.message);
+      OpsCore.saveInitials(KEY, who);
+      ['bk-animal', 'bk-pen', 'bk-reason'].forEach(id => { $(id).value = ''; }); $('bk-tl').checked = false;
+    });
+  })();
 
   /* ---------- auth (OpsCore) ---------- */
   (async function () {
