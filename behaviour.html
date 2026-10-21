@@ -189,7 +189,11 @@
     <span id="signout-link">Sign out</span>
   </aside>
   <main>
-    <div class="page-head"><div><h1>Behaviour</h1><p>Behaviour team tasks. Done notes show on the Shelter board.</p></div><div style="display:flex; gap:8px; align-items:center;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button></div></div>
+    <div id="new-item-banner" class="alert-banner" style="display:none;">
+      <span id="new-item-banner-text"></span>
+      <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
+    </div>
+    <div class="page-head"><div><h1>Behaviour</h1><p>Behaviour team tasks. Done notes show on the Shelter board.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button></div></div>
     <p id="bh-error" class="oc-modal-error" style="margin:0;"></p>
 
     <section class="card vet-banner" id="bh-vet-form">
@@ -233,6 +237,7 @@
       <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them with <b>Task for behaviour</b>. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
+      <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
       <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
       <details><summary>How do I give a task to someone else on the team?</summary><div><p>Each lane has an <b>add task</b> button. The TL can give a task to an assist, and an assist can give one back to the TL. Choose the animal, the space and pen, the kind of task, the time frame and a reason, and pick who it is for (only the lanes that suit the species are offered).</p></div></details>
       <details><summary>What do the time frames and red cards mean?</summary><div><p>A card shows how long is left. <b>30&ndash;60 min</b> is due an hour after it was sent, <b>within today</b> is due by the end of today, and <b>within 48 hours</b> is due two days after it was sent. Past the time it turns red and says <i>overdue by &hellip;</i>. Cards are sorted with the soonest due first. Use the filters at the top to show one kind, one time frame or courthold only.</p></div></details>
@@ -253,9 +258,34 @@
   function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block'; return false; }
   const locText = (room, pen) => (!pen ? room : LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' \u2014 ' + pen : room + ' / ' + pen);
 
+  /* New-task alert (same approach as the Nurses page): a banner that stays until dismissed, the shared alert sound
+     (browsers stay silent until the page has been tapped once, so the chip at the top asks for one tap), and a
+     flashing tab title. The first load only records what is already there; each new open task alerts once. */
+  const alertSound = OpsCore.createAlertSound('sound-chip');
+  const seenIds = new Set(); let seenInit = false, pendingNew = 0, flashTimer = null;
+  const BASE_TITLE = document.title;
+  function hideAlertBanner() {
+    $('new-item-banner').style.display = 'none'; pendingNew = 0;
+    if (flashTimer) { clearInterval(flashTimer); flashTimer = null; }
+    document.title = BASE_TITLE;
+  }
+  $('new-item-banner-dismiss').addEventListener('click', hideAlertBanner);
+  function checkForNewTasks() {
+    const open = ROWS.filter(r => r.status === 'open');
+    if (!seenInit) { open.forEach(r => seenIds.add(r.id)); seenInit = true; return; }
+    const fresh = open.filter(r => !seenIds.has(r.id));
+    open.forEach(r => seenIds.add(r.id));
+    if (!fresh.length) return;
+    pendingNew += fresh.length;
+    $('new-item-banner-text').textContent = '\uD83D\uDD14 NEW TASK \u2014 ' + pendingNew + ' new behaviour task' + (pendingNew > 1 ? 's' : '') + ' \u2014 check Incoming.';
+    $('new-item-banner').style.display = 'flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    alertSound.play();
+    if (!flashTimer) { let on = false; flashTimer = setInterval(() => { on = !on; document.title = on ? '\uD83D\uDD14 NEW TASK \u2014 Behaviour' : BASE_TITLE; }, 1000); }
+  }
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
-    if (!error) ROWS = data || [];
+    if (!error) { ROWS = data || []; checkForNewTasks(); }
     render();
   }
   function filtered() {
