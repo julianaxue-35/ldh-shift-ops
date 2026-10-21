@@ -3,9 +3,11 @@ const t = require('./check')('staff-behaviour-bar');
 (async () => {
   const s = await open({}, 'index.html');
   try {
-    await s.page.waitForSelector('#bk-submit', { timeout: 5000 });
-    const bar = await s.page.evaluate(() => { const nr = document.getElementById('nurse-requests'), bh = document.getElementById('bh-bar'); return !!(nr.compareDocumentPosition(bh) & Node.DOCUMENT_POSITION_FOLLOWING); });
-    t.ok(bar, 'the behaviour bar sits below the nurse request bar');
+    await s.page.waitForSelector('#bk-submit', { state: 'attached', timeout: 5000 });
+    t.ok((await s.page.$$eval('.sr-tab', ts => ts.map(x => x.textContent))).join() === 'Vets,Nurses,Behaviour', 'one card with Vets, Nurses and Behaviour tabs');
+    t.ok(!(await s.page.isVisible('#bk-submit')), 'the Behaviour form is hidden until its tab is picked');
+    await s.page.click('.sr-tab[data-sr="behaviour"]');
+    t.ok(await s.page.isVisible('#bk-submit') && !(await s.page.isVisible('#req-submit')), 'picking Behaviour shows only that form');
     t.ok((await s.page.$$eval('#bk-kind option', os => os.map(o => o.value))).join() === 'courthold,surrender_history,incident_review,behaviour_review,other', 'task kinds');
     t.ok((await s.page.$$eval('#bk-window option', os => os.map(o => o.value))).join() === '30_60m,today,48h', 'time frames');
     await s.page.click('#bk-submit');
@@ -17,7 +19,7 @@ const t = require('./check')('staff-behaviour-bar');
     await s.page.click('#bk-submit');
     t.ok(/initials/i.test(await s.page.textContent('#bk-error')), 'and initials');
     t.ok((await s.db()).behaviour_tasks.length === 0, 'nothing written yet');
-    await s.page.fill('#bk-initials', 'ab'); await s.page.dispatchEvent('#bk-initials', 'change');
+    await s.page.fill('#sr-initials', 'ab'); await s.page.dispatchEvent('#sr-initials', 'change');
     await s.page.selectOption('#bk-room', 'Pound 2'); await s.page.fill('#bk-pen', '4');
     await s.page.selectOption('#bk-window', '30_60m');
     await s.page.click('#bk-submit');

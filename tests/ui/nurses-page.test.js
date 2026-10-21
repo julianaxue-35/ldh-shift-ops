@@ -174,7 +174,7 @@ const todayISO = LDHLogic.localISO(new Date());
     const procText = await b.page.textContent('#proc-misc-list');
     t.ok(procText.includes('DOG-99') && procText.includes('Microchip'), 'a vet-requested microchip task shows under the Processing nurse');
     t.ok(await b.page.isVisible('#proc-misc-section'), 'the Processing microchip & UV card shows when there is one');
-    t.ok(listText.includes('CAT-7') && listText.includes('Flu cat — needs IVFT') && listText.includes('transferred from a vet case'), 'IVFT task and its vet-transfer note render');
+    t.ok(listText.includes('CAT-7') && listText.includes('Cat in fluids (IVFT)') && listText.includes('transferred from a vet case'), 'IVFT task and its vet-transfer note render');
     const nrText = await b.page.textContent('#nr-list');
     t.ok(nrText.includes('FOS-1') && nrText.includes('Pathway') && nrText.includes('for UV check'), 'a named-animal UV request reads "FOS-1 — Pathway for UV check"');
 

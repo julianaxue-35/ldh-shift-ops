@@ -8,7 +8,7 @@ const t = require('./check')('flag-form');
   t.ok(await page.locator('#req-urgency').count() === 0, 'old urgency dropdown id not reused');
   t.ok(await page.locator('#req-urgency-pick').count() === 1 && (await page.$$eval('#req-urgency-pick option', os => os.map(o => o.value))).join() === 'routine,urgent,red_flag', 'staff can pick Request check / Urgent / Emergency');
   t.ok(await page.locator('#triage-levels').count() === 1 && /Radio the vet team now/.test(await page.textContent('#triage-levels')), 'a small section explains the levels, including radio for emergencies');
-  t.ok(await page.locator('#req-location option').count() === 15, 'location select filled from the shared list (incl. Rabbit Room, Pathway, Offsite)');
+  t.ok(await page.locator('#req-location option').count() === 16, 'location select filled from the shared list (incl. Rabbit Room, Pathway, Offsite, Vet clinic)');
   const signOpts = await page.$$eval('#req-condition option', os => os.map(o => o.value));
   t.ok(signOpts.join() === ',cat_flu,kennel_cough,diarrhoea,vomiting,eye_condition,skin_condition,wounds_injury,cat_birthing,other', 'flag form offers the eight reported signs plus the urgent cat birthing check (got ' + signOpts.join() + ')');
   t.ok(!(await page.textContent('#req-condition')).toLowerCase().includes('giardia'), 'no diagnoses in the sign list');

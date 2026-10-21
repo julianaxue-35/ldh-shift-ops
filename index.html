@@ -153,6 +153,31 @@
   .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
   .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
+  /* One request card for vets / nurses / behaviour (2026-10-21): same field order, labels and look in every panel. */
+  .sr-head { display: flex; gap: 14px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin: 4px 0 14px; }
+  .sr-to { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sr-tab { width: auto; background: var(--card-bg); color: var(--ink); border: 2px solid var(--border); box-shadow: none; font-weight: 700; padding: 10px 22px; border-radius: 12px; cursor: pointer; }
+  .sr-tab[data-sr="vets"][aria-selected="true"] { background: var(--blue, #4a6cf7); border-color: var(--blue, #4a6cf7); color: #fff; }
+  .sr-tab[data-sr="nurses"][aria-selected="true"] { background: #1c7387; border-color: #1c7387; color: #fff; }
+  .sr-tab[data-sr="behaviour"][aria-selected="true"] { background: #7c5cbf; border-color: #7c5cbf; color: #fff; }
+  .sr-who { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; font-weight: 700; color: var(--muted); margin: 0; }
+  .sr-who input { width: 110px; margin: 0; }
+  .sr-who-note { font-weight: 400; max-width: 260px; }
+  .sr-panel { border-left: 5px solid var(--border); padding: 4px 0 4px 14px; }
+  .sr-panel[hidden] { display: none; }
+  .sr-panel[data-to="vets"] { border-left-color: var(--blue, #4a6cf7); }
+  .sr-panel[data-to="nurses"] { border-left-color: #2a9db5; background: #eef8fb; padding: 10px 14px; border-radius: 0 12px 12px 0; }
+  .sr-panel[data-to="behaviour"] { border-left-color: #7c5cbf; background: #f6f1fd; padding: 10px 14px; border-radius: 0 12px 12px 0; }
+  .sr-lead { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; }
+  .sr-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
+  .sr-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .sr-form .sr-wide { grid-column: 1 / -1; }
+  .sr-send { margin-top: 12px; }
+  .sr-panel[data-to="vets"] .sr-send { background: var(--blue, #4a6cf7); color: #fff; }
+  .sr-panel[data-to="nurses"] .sr-send { background: #1c7387; color: #fff; }
+  .sr-panel[data-to="behaviour"] .sr-send { background: #7c5cbf; color: #fff; }
+  .sr-form .sr-span2 { grid-column: span 2; }
+  @media (max-width: 640px) { .sr-form .sr-span2 { grid-column: auto; } }
   .nurse-card { background: #eef8fb; border-left: 5px solid #2a9db5; }
   .nurse-card h2 { color: #1c7387; }
   .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
@@ -223,26 +248,39 @@
       </div>
     </div>
 
-    <section class="card" id="new-request-form">
-      <h2>New task request</h2>
-      <p class="subtle">Logged under Sick &amp; Injured, today's list.</p>
-      <div class="req-grid3">
-        <input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)" style="margin:0;">
-        <div style="display:flex; gap:6px;">
-          <select id="req-location" style="margin:0; flex:2;"></select>
-          <input id="req-pen" placeholder="Pen #" style="margin:0; flex:1; min-width:0;">
-          <input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="margin:0; flex:1; min-width:0; display:none;">
+    <section class="card" id="send-request">
+      <h2>Send a request</h2>
+      <p class="subtle">Pick who it is for, then fill in the form. Every request shows who sent it.</p>
+      <div class="sr-head">
+        <div class="sr-to" role="tablist" aria-label="Send to">
+          <button type="button" role="tab" class="sr-tab" data-sr="vets" aria-selected="true">Vets</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="nurses" aria-selected="false">Nurses</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="behaviour" aria-selected="false">Behaviour</button>
         </div>
-        <select id="req-type" style="margin:0;">
-          <option value="shelter">Shelter request</option>
-          <option value="foster">Foster request</option>
-          <option value="rescue">Rescue request</option>
-          <option value="medication">Medication</option>
-        </select>
+        <label class="sr-who">Your initials<input id="sr-initials" maxlength="4" placeholder="e.g. AB"><span class="sr-who-note">Needed for Behaviour, optional for the others. Remembered on this device for the day.</span></label>
       </div>
-      <div class="req-grid2">
-        <select id="req-condition" style="margin:0;">
-          <option value="">Suspected condition (optional)</option>
+
+      <div class="sr-panel" id="new-request-form" data-to="vets">
+        <p class="sr-lead">For a vet to look at an animal. Logged under Sick &amp; Injured, today's list.</p>
+        <div class="sr-form">
+          <label>What<select id="req-type">
+            <option value="shelter">Shelter request</option>
+            <option value="foster">Foster request</option>
+            <option value="rescue">Rescue request</option>
+            <option value="medication">Medication</option>
+            <option value="other">Other (describe in the note)</option>
+          </select></label>
+          <label>Animal ID<input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)"></label>
+          <label>Space<select id="req-location"></select></label>
+          <label>Pen / detail<input id="req-pen" placeholder="Pen #"><input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="display:none;"></label>
+          <label class="sr-span2">Needed within<select id="req-urgency-pick">
+            <option value="routine">Request check — within 24–48 h</option>
+            <option value="urgent">Urgent — within 12–24 h</option>
+            <option value="red_flag">Emergency — within 2 h (radio the vet now)</option>
+          </select></label>
+          <label>Suspected condition (optional)
+        <select id="req-condition">
+          <option value="">None / not sure</option>
           <option value="cat_flu">Cat flu (URI)</option>
           <option value="kennel_cough">Kennel cough</option>
           <option value="diarrhoea">Diarrhoea / GI upset</option>
@@ -253,8 +291,19 @@
           <option value="cat_birthing">🚨 Cat birthing — urgent check</option>
           <option value="other">Other</option>
         </select>
-        <input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg" style="margin:0;">
-      </div>
+          </label>
+          <label class="sr-wide">Reason / note<input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg"></label>
+        </div>
+      <details id="triage-levels" style="margin-top:6px; font-size:0.82rem;">
+          <summary style="cursor:pointer; font-weight:700;">What do the levels mean?</summary>
+          <div style="padding:6px 2px;">
+            <p style="margin:4px 0;"><b>Request check (24–48 h) — green.</b> Can wait. Old-age changes, stable arthritis, overgrown nails, mild skin disease, mild cat flu and still eating.</p>
+            <p style="margin:4px 0;"><b>Urgent (12–24 h) — yellow / orange.</b> Needs a vet look that day or the next. One vomit or loose stool but bright, limping but weight-bearing, not eating (cat 24 h+, dog 48 h+), a wound that may need stitches, repeated vomiting, anything you think is painful.</p>
+            <p style="margin:4px 0;"><b>Emergency (within 2 h) — red. Radio the vet team now; don't wait for this board.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
+            <p style="margin:4px 0; color:var(--muted);">From the draft triage guide (not yet approved). It does not replace common sense and gut instinct.</p>
+          </div>
+        </details>
+
       <div id="req-birthing-wrap" style="display:none; margin:10px 0 0; padding:10px 12px; border:2px solid var(--critical); border-radius:12px; background:rgba(208,59,59,0.06);">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--critical);">Urgent cat birthing check — what is wrong? (goes straight to the top of the vet board)</div>
         <select id="req-birthing-reason" style="margin:0;"></select>
@@ -269,88 +318,75 @@
           <select id="req-x-window" style="margin:0; width:auto;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select>
         </div>
       </div>
-      <div style="margin:12px 0 4px;">
-        <label for="req-urgency-pick" style="font-size:0.78rem; font-weight:700;">How urgent is it?</label>
-        <select id="req-urgency-pick" style="margin:0;">
-          <option value="routine">Request check — within 24–48 h</option>
-          <option value="urgent">Urgent — within 12–24 h</option>
-          <option value="red_flag">Emergency — within 2 h (radio the vet now)</option>
-        </select>
-        <details id="triage-levels" style="margin-top:6px; font-size:0.82rem;">
-          <summary style="cursor:pointer; font-weight:700;">What do the levels mean?</summary>
-          <div style="padding:6px 2px;">
-            <p style="margin:4px 0;"><b>Request check (24–48 h) — green.</b> Can wait. Old-age changes, stable arthritis, overgrown nails, mild skin disease, mild cat flu and still eating.</p>
-            <p style="margin:4px 0;"><b>Urgent (12–24 h) — yellow / orange.</b> Needs a vet look that day or the next. One vomit or loose stool but bright, limping but weight-bearing, not eating (cat 24 h+, dog 48 h+), a wound that may need stitches, repeated vomiting, anything you think is painful.</p>
-            <p style="margin:4px 0;"><b>Emergency (within 2 h) — red. Radio the vet team now; don't wait for this board.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
-            <p style="margin:4px 0; color:var(--muted);">From the draft triage guide (not yet approved). It does not replace common sense and gut instinct.</p>
-          </div>
-        </details>
-      </div>
       <div id="req-redflags-wrap" style="margin:12px 0 4px;">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Emergency signs — tick any that apply</div>
         <div id="req-redflags" style="display:flex; flex-wrap:wrap; gap:8px 18px;"></div>
         <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
         <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
-      <label style="display:block; margin-top:6px;">Your initials (optional)<input id="req-initials" maxlength="4" placeholder="e.g. AB"></label>
-      <button id="req-submit" style="margin-top:6px;">Submit request</button>
-    </section>
-
-    <section class="card nurse-card" id="nurse-requests">
-      <h2>Nurse request</h2>
-      <p class="subtle">Log animals that need a nurse task on arrival — vaccination, FIV test, blood test, microchip or UV request.</p>
-      <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
-        <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
-      </label>
-      <div class="nr-form" id="nr-form">
-        <label>Type<select id="nr-kind">
-          <option value="vaccination">Vaccination</option>
-          <option value="fiv">FIV test</option>
-          <option value="blood">Blood test</option>
-          <option value="microchip">Microchip</option>
-          <option value="uv">UV request</option>
-          <option value="microchip_uv">Microchip + UV</option>
-        </select></label>
-        <label>Space<select id="nr-location"></select></label>
-        <label>Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
-        <label>How many<input id="nr-count" type="number" min="1" value="1"></label>
-        <label>Needed within<select id="nr-window">
-          <option value="2h">Within 2 hours</option>
-          <option value="today">Within today</option>
-          <option value="24_48h">Within 24–48 hours</option>
-        </select></label>
-        <span id="nr-arrived-wrap"><label>Arrived<input id="nr-arrived" type="datetime-local" step="1800"></label>
-        <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
-        <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
-        <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
-        <label>Your initials (optional)<input id="nr-initials" maxlength="4" placeholder="e.g. AB"></label>
-        <button id="nr-submit" type="button">Log request</button>
+        <button id="req-submit" type="button" class="sr-send">Send to vets</button>
       </div>
-    </section>
 
-    <section class="card nurse-card" id="bh-bar" style="background:#f6f1fd; border-left-color:#7c5cbf;">
-      <h2 style="color:#5b3fa0;">Behaviour request</h2>
-      <p class="subtle">Courthold reassessment, owner surrender history with concerns, aggression / incident review or a behaviour review. The behaviour team sees it straight away.</p>
-      <div class="nr-form">
-        <label>Task<select id="bk-kind">
-          <option value="courthold">Courthold reassessment</option>
-          <option value="surrender_history">Owner surrender history with concerns</option>
-          <option value="incident_review">Aggression / incident review</option>
-          <option value="behaviour_review">Behaviour review</option>
-          <option value="other">Other</option></select></label>
-        <label>Animal ID<input id="bk-animal" placeholder="Animal ID"></label>
-        <label>Space<select id="bk-room"></select></label>
-        <label>Pen / detail<input id="bk-pen" placeholder="Pen #"></label>
-        <label>Needed within<select id="bk-window">
-          <option value="30_60m">Within 30–60 minutes</option>
-          <option value="today">Within today</option>
-          <option value="48h">Within 48 hours</option></select></label>
-        <label>Reason (required for reviews)<textarea id="bk-reason" rows="2" placeholder="Why are you flagging this animal? Or describe another issue."></textarea></label>
-        <label>Your initials<input id="bk-initials" maxlength="4" placeholder="e.g. AB"></label>
-        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="bk-tl" style="width:auto;"> Send straight to the Behaviour TL</label>
-        <button id="bk-submit" type="button">Send to behaviour</button>
+      <div class="sr-panel" id="nurse-requests" data-to="nurses" hidden>
+        <p class="sr-lead">For vaccination on arrival, or one task for one animal (FIV test, bloods, microchip, ear swab, cat in fluids, medication label, other). Microchip, UV and treatment checks for foster or rescue animals are asked on the Vets tab.</p>
+        <label class="nr-grp" style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
+          <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
+        </label>
+        <div class="sr-form" id="nr-form">
+          <label>What<select id="nr-kind">
+            <optgroup label="On arrival">
+              <option value="vaccination">Vaccination</option>
+            </optgroup>
+            <optgroup label="Task for one animal">
+              <option value="task:fiv_test">FIV test</option>
+              <option value="task:blood">Blood test</option>
+              <option value="task:microchip">Microchip</option>
+              <option value="task:ear_swab">Ear swab</option>
+              <option value="task:ivft">Cat in fluids (IVFT)</option>
+              <option value="task:med_label">Medication label to make</option>
+              <option value="task:other">Other</option>
+            </optgroup>
+          </select></label>
+          <label class="nr-one" style="display:none;">Animal ID<input id="nr-animal" placeholder="Animal ID"></label>
+          <label>Space<select id="nr-location"></select></label>
+          <label class="nr-one" style="display:none;">Pen / detail<input id="nr-detail" placeholder="Pen # or detail (e.g. foster name)"></label>
+          <label class="nr-grp">Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
+          <label class="nr-grp">How many<input id="nr-count" type="number" min="1" value="1"></label>
+          <label class="nr-grp">Needed within<select id="nr-window">
+            <option value="2h">Within 2 hours</option>
+            <option value="today">Within today</option>
+            <option value="24_48h">Within 24–48 hours</option>
+          </select></label>
+          <span id="nr-arrived-wrap" class="nr-grp"><label>Arrived<input id="nr-arrived" type="datetime-local" step="1800"></label>
+          <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
+          <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
+          <label class="sr-wide">Reason / note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
+        </div>
+        <button id="nr-submit" type="button" class="sr-send">Send to nurses</button>
       </div>
-      <p id="bk-error" class="oc-modal-error"></p>
+
+      <div class="sr-panel" id="bh-bar" data-to="behaviour" hidden>
+        <p class="sr-lead">For the behaviour team: courthold reassessment, owner surrender history with concerns, aggression / incident review or a behaviour review. They see it straight away.</p>
+        <div class="sr-form">
+          <label>What<select id="bk-kind">
+            <option value="courthold">Courthold reassessment</option>
+            <option value="surrender_history">Owner surrender history with concerns</option>
+            <option value="incident_review">Aggression / incident review</option>
+            <option value="behaviour_review">Behaviour review</option>
+            <option value="other">Other</option></select></label>
+          <label>Animal ID<input id="bk-animal" placeholder="Animal ID"></label>
+          <label>Space<select id="bk-room"></select></label>
+          <label>Pen / detail<input id="bk-pen" placeholder="Pen # or detail"></label>
+          <label>Needed within<select id="bk-window">
+            <option value="30_60m">Within 30–60 minutes</option>
+            <option value="today">Within today</option>
+            <option value="48h">Within 48 hours</option></select></label>
+          <label class="sr-wide">Reason (required for reviews)<textarea id="bk-reason" rows="2" placeholder="Why are you flagging this animal? Or describe another issue."></textarea></label>
+        </div>
+        <label style="display:flex; gap:6px; align-items:center; font-size:0.85rem; margin:8px 0;"><input type="checkbox" id="bk-tl" style="width:auto;"> Send straight to the Behaviour TL</label>
+        <button id="bk-submit" type="button" class="sr-send">Send to behaviour</button>
+        <p id="bk-error" class="oc-modal-error"></p>
+      </div>
     </section>
 
     <div class="kpi-row">
@@ -411,16 +447,17 @@
       <h2>FAQ — shelter staff</h2>
       <p class="subtle">Quick answers for logging requests and following a case.</p>
       <h3 class="faq-group">Logging requests</h3>
-      <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>New task request</b>, type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick the type: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Pick a <b>Suspected condition</b> if you can, and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Press <b>Submit request</b>.</li></ol></div></details>
+      <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival, or one task for one animal (FIV test, bloods, microchip, ear swab, cat in fluids, medication label; microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
+      <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Pick a <b>Suspected condition</b> if you can, and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
       <details><summary>What do the tiers mean? When do I radio the vet instead?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>
-      <details><summary>How do I ask the nurses for a vaccination, FIV test, blood test, microchip or UV check?</summary><div><p>Use the <b>Nurse request</b> card. Choose the type, space, species, how many animals and <b>Needed within</b>. Tick <i>Not here yet</i> to schedule it for a later arrival. For a single foster / rescue animal you can also tick Microchip and / or UV on the request form above — these go to the Processing nurse.</p></div></details>
+      <details><summary>How do I ask the nurses for a vaccination, FIV test, blood test, microchip or UV check?</summary><div><p>In <b>Send a request</b>, pick <b>Nurses</b> at the top. Choose <b>What</b>, space, species, how many animals and <b>Needed within</b>. Tick <i>Not here yet</i> to schedule it for a later arrival. For a single foster / rescue animal you can also tick Microchip and / or UV on the <b>Vets</b> form — these go to the Processing nurse.</p></div></details>
       <h3 class="faq-group">Behaviour tasks and initials</h3>
-      <details><summary>How do I ask the Behaviour team to look at an animal?</summary><div><p>Use the <b>Behaviour task</b> card, just below the nurse request. Choose the <b>task</b> (courthold reassessment, owner surrender history with concerns, aggression / incident review, behaviour review, or other), type the <b>Animal ID</b>, choose the <b>space</b> and pen, and choose <b>Needed within</b>. For a <b>behaviour review</b> and an <b>aggression / incident review</b> you must write <b>why</b> you are flagging the animal; for <b>other</b>, describe the issue in the reason box. Enter your <b>initials</b> and press <b>Send to behaviour</b>.</p></div></details>
+      <details><summary>How do I ask the Behaviour team to look at an animal?</summary><div><p>In <b>Send a request</b>, pick <b>Behaviour</b> at the top. Choose <b>What</b> (courthold reassessment, owner surrender history with concerns, aggression / incident review, behaviour review, or other), type the <b>Animal ID</b>, choose the <b>space</b> and pen, and choose <b>Needed within</b>. For a <b>behaviour review</b> and an <b>aggression / incident review</b> you must write <b>why</b> you are flagging the animal; for <b>other</b>, describe the issue in the reason box. Enter your <b>initials</b> and press <b>Send to behaviour</b>.</p></div></details>
       <details><summary>Which &ldquo;needed within&rdquo; do I pick?</summary><div><p><b>30&ndash;60 minutes</b> is for something that cannot wait (an aggression or incident). <b>Within today</b> is the usual choice. <b>Within 48 hours</b> is for a concern that is not urgent. For a true emergency, <b>radio the team &mdash; do not wait for the board</b>.</p></div></details>
       <details><summary>Who sees my request, and what is &ldquo;Send straight to the Behaviour TL&rdquo;?</summary><div><p>Every request lands on the <b>Behaviour page</b> in Incoming, and the team then gives it to the TL or the right assist (cat or dog assist, matched to the animal&rsquo;s space). Tick <b>Send straight to the Behaviour TL</b> only when you want it to skip Incoming and go to the TL at once.</p></div></details>
       <details><summary>How do I find out what the Behaviour team decided?</summary><div><p>When the team finishes, their note shows on that animal&rsquo;s card on the <b>Shelter board</b> (with their initials and the time) for 24 hours. While the task is open, the Shelter board shows that it is waiting.</p></div></details>
-      <details><summary>Why am I asked for initials, and do I have to type them every time?</summary><div><p>Initials show who sent a request, so the team knows who to ask about it. They are <b>required on the Behaviour task</b> and <b>optional on the nurse request and the flag form</b> (they are only added to a flag that goes to the vet board). Your initials are remembered on this device for the day, so you only type them once.</p></div></details>
+      <details><summary>Why am I asked for initials, and do I have to type them every time?</summary><div><p>Initials show who sent a request, so the team knows who to ask about it. There is one initials box at the top of the <b>Send a request</b> card. It is <b>required for Behaviour</b> and <b>optional for Vets and Nurses</b> (so an emergency is never held up) (they are only added to a flag that goes to the vet board). Your initials are remembered on this device for the day, so you only type them once.</p></div></details>
       <h3 class="faq-group">Following a case</h3>
       <details><summary>Where do I see how a case is going?</summary><div><p>In the <b>Cases</b> table. Each row shows the <b>Stage</b>: <i>flagged</i> (waiting for a vet), <i>picked up</i> (a vet has it), <i>waiting for medication</i> (vet check done, medication still to be made up) or <i>completed</i>. Finished cases stay in the Completed list for 24 hours. The <b>Time left</b> column counts down to the tier's target and turns amber, then red, when it is running late.</p></div></details>
       <details><summary>A case went back from "picked up" to "flagged" — why?</summary><div><p>Vets can <b>put a case back</b> if they are called away. It returns to its tier and any vet can pick it up. The time target keeps running from when it was first flagged.</p></div></details>
@@ -508,6 +545,8 @@
     // number to enter (2026-09-26: she found the extra box redundant/
     // confusing next to the ID field right above it).
     const needsMed = document.getElementById('req-type').value === 'medication';
+    const isOther = document.getElementById('req-type').value === 'other';   // 'Other' is stored as an ordinary shelter request whose note says what is wanted
+    if (isOther && !document.getElementById('req-problem').value.trim()) { alert('Describe what you need the vets for.'); return; }
     const isBirthing = document.getElementById('req-condition').value === 'cat_birthing';
     if (isBirthing && !birthingReason()) { alert('Choose the reason for the urgent cat birthing check.'); return; }
     const btn = document.getElementById('req-submit');
@@ -535,7 +574,7 @@
       location: isOffsite ? room : (pen ? `${room} / ${pen}` : room),
       location_detail: isOffsite ? (detail || null) : null,
       shift: 'sick_injured',
-      type: document.getElementById('req-type').value,
+      type: isOther ? 'shelter' : document.getElementById('req-type').value,
       urgency: LDHLogic.pickTier(document.getElementById('req-urgency-pick').value, allFlags()),
       red_flags: allFlags(),
       needs_medication: needsMed,
@@ -857,9 +896,39 @@
     document.getElementById('nr-arrived-wrap').style.display = e.target.checked ? 'none' : '';
     document.getElementById('nr-expected-wrap').style.display = e.target.checked ? '' : 'none';
   });
+  // Group kinds (nurse_requests) show species / how many / needed within / arrival; one-animal tasks (noga_requests, the
+  // same list the vets page transfers into) show Animal ID and Pen / detail instead.
+  function nrIsTask() { return document.getElementById('nr-kind').value.indexOf('task:') === 0; }
+  function nrSyncKind() {
+    const one = nrIsTask();
+    document.querySelectorAll('#nr-form .nr-one').forEach(el => { el.style.display = one ? '' : 'none'; });
+    document.querySelectorAll('#nurse-requests .nr-grp').forEach(el => { el.style.display = one ? 'none' : ''; });
+    const sched = document.getElementById('nr-scheduled-toggle').checked;
+    document.getElementById('nr-arrived-wrap').style.display = one || sched ? 'none' : '';
+    document.getElementById('nr-expected-wrap').style.display = !one && sched ? '' : 'none';
+    document.getElementById('nr-note').placeholder = one ? 'e.g. bloods before surgery' : 'e.g. from transport van 2';
+  }
+  document.getElementById('nr-kind').addEventListener('change', nrSyncKind);
   document.getElementById('nr-submit').addEventListener('click', async () => {
     const _btn = document.getElementById('nr-submit'); _btn.disabled = true;
     try {
+      if (nrIsTask()) {
+        const animal = document.getElementById('nr-animal').value.trim();
+        const task = document.getElementById('nr-kind').value.slice(5);
+        const note = document.getElementById('nr-note').value.trim();
+        if (!animal) { alert('Enter the animal ID.'); return; }
+        if (task === 'other' && !note) { alert('Describe the task for the nurse.'); return; }
+        const room = document.getElementById('nr-location').value, detail = document.getElementById('nr-detail').value.trim();
+        const offsite = LDHLogic.OFFSITE_NAMES.includes(room);
+        const { error: tErr } = await sb.from('noga_requests').insert({
+          animal_id: animal, location: !offsite && detail ? room + ' / ' + detail : room, location_detail: offsite ? (detail || null) : null,
+          task, note: note || null, added_by: window.staffInitials() || 'Shelter Staff'
+        });
+        if (tErr) { alert('Could not send the task: ' + tErr.message); return; }
+        document.getElementById('nr-animal').value = ''; document.getElementById('nr-detail').value = ''; document.getElementById('nr-note').value = '';
+        loadAll();
+        return;
+      }
       const count = parseInt(document.getElementById('nr-count').value, 10);
       if (!count || count < 1) { alert('Enter how many animals.'); return; }
       const scheduled = document.getElementById('nr-scheduled-toggle').checked;
@@ -913,29 +982,38 @@
   renderRedFlagForm();
   updateLocationFields();
 
-  /* ---- Optional initials on the staff forms (2026-10-21): one box shared by the flag and nurse request forms, remembered for the day ---- */
+  /* ---- One box of initials for the whole "Send a request" card (2026-10-21), remembered on this device for the day ---- */
   (function () {
-    const KEY = 'ldh_staff_initials_v1', ids = ['nr-initials', 'req-initials'];
-    const els = () => ids.map(i => document.getElementById(i)).filter(Boolean);
-    els().forEach(e => { e.value = OpsCore.readInitials(KEY); e.addEventListener('change', () => { OpsCore.saveInitials(KEY, e.value); els().forEach(o => { o.value = e.value.trim().toUpperCase(); }); }); });
-    window.staffInitials = () => (els()[0] && els()[0].value.trim().toUpperCase()) || '';
+    const KEY = 'ldh_staff_initials_v1', el = document.getElementById('sr-initials');
+    el.value = OpsCore.readInitials(KEY);
+    el.addEventListener('change', () => { el.value = el.value.trim().toUpperCase(); OpsCore.saveInitials(KEY, el.value); OpsCore.saveInitials('ldh_behaviour_initials_v1', el.value); });
+    window.staffInitials = () => el.value.trim().toUpperCase();
+  })();
+
+  /* ---- "Send to" tabs: Vets / Nurses / Behaviour ---- */
+  (function () {
+    const tabs = Array.from(document.querySelectorAll('.sr-tab')), panels = Array.from(document.querySelectorAll('.sr-panel'));
+    function pick(to) {
+      tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.sr === to ? 'true' : 'false'));
+      panels.forEach(p => { p.hidden = p.dataset.to !== to; });
+    }
+    tabs.forEach(t => t.addEventListener('click', () => pick(t.dataset.sr)));
+    pick('vets');
   })();
 
   /* ---- Behaviour request (2026-10-21) ---- */
   (function () {
     const KEY = 'ldh_behaviour_initials_v1', $ = id => document.getElementById(id);
     $('bk-room').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
-    $('bk-initials').value = OpsCore.readInitials(KEY);
-    $('bk-initials').addEventListener('change', () => OpsCore.saveInitials(KEY, $('bk-initials').value));
     $('bk-submit').addEventListener('click', async () => {
       const er = $('bk-error'), fail = m => { er.textContent = m; er.style.display = 'block'; };
       er.style.display = 'none';
       const kind = $('bk-kind').value, room = $('bk-room').value, pen = $('bk-pen').value.trim();
-      const location = LDHLogic.OFFSITE_NAMES.includes(room) || !pen ? room : room + ' / ' + pen;
+      const location = !pen ? room : LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' \u2014 ' + pen : room + ' / ' + pen;
       const msg = LDHLogic.behaviourValidate({ kind, animalId: $('bk-animal').value, location, reason: $('bk-reason').value });
       if (msg) return fail(msg);
-      const who = $('bk-initials').value.trim().toUpperCase();
-      if (!who) return fail('Enter your initials.');
+      const who = window.staffInitials();
+      if (!who) return fail('Enter your initials (top of this card) so the team knows who sent it.');
       const btn = $('bk-submit'); btn.disabled = true;
       const lane = $('bk-tl').checked ? 'tl' : 'incoming';
       const { error } = await sb.from('behaviour_tasks').insert({ kind, animal_id: $('bk-animal').value.trim(), location, lane,

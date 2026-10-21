@@ -251,7 +251,7 @@
   const $ = id => document.getElementById(id);
   const initials = () => ($('bh-initials').value || '').trim().toUpperCase();
   function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block'; return false; }
-  const locText = (room, pen) => (LDHLogic.OFFSITE_NAMES.includes(room) || !pen ? room : room + ' / ' + pen);
+  const locText = (room, pen) => (!pen ? room : LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' \u2014 ' + pen : room + ' / ' + pen);
 
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
