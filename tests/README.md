@@ -12,3 +12,4 @@
 Never point tests at the live Supabase project; the browser tests use an in-memory stub.
 - Behaviour page (Oct 21): `behaviour-logic` + `behaviour-migration` (node), and UI `behaviour-page`, `behaviour-vet-request`, `staff-behaviour-bar`, `staff-initials`, `behaviour-board`, `task-for-behaviour`, `behaviour-mobile`.
 - Behaviour Phase B (Oct 21): `behaviour-attached-note-migration` + `behaviour-edge-validate` (node), UI `behaviour-attached-note`, `faq-phase-b`. The tools side (`ldh-shift-tools`) has `behaviour-send.test.mjs` and `behaviour-send-ui.test.js`.
+- One request card (Oct 21): UI `send-request-card` (tabs, same field order, Vet clinic); `staff-initials`, `staff-behaviour-bar`, `nurse-requests` updated for the tabs.
