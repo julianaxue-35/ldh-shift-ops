@@ -72,3 +72,12 @@ test('behaviourSpecies: a free-text pen never turns a dog or cat into "either"',
   assert.deepEqual(L.behaviourLaneChoices('Pound 2 / Run 4'), ['tl', 'dog']);
   assert.equal(L.behaviourSpecies('Transport / van 2'), 'either');
 });
+
+test('behaviourSpecies: an unrecognised location uses the animal\'s own species so a cat is never offered Dog assist', () => {
+  for (const loc of ['Unknown', '', 'T', null]) {
+    assert.equal(L.behaviourSpecies(loc, 'cat'), 'cat', String(loc)); assert.equal(L.behaviourSpecies(loc, 'dog'), 'dog', String(loc));
+    assert.deepEqual(L.behaviourLaneChoices(loc, 'cat'), ['tl', 'cat']); assert.deepEqual(L.behaviourLaneChoices(loc, 'dog'), ['tl', 'dog']);
+  }
+  assert.equal(L.behaviourSpecies('Unknown', 'rabbit'), 'either'); assert.equal(L.behaviourSpecies('Unknown'), 'either');
+  assert.equal(L.behaviourSpecies('Pound 2 / 4', 'cat'), 'dog');   // a recognised room wins
+});

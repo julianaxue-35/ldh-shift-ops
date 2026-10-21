@@ -80,7 +80,7 @@ const STUB = `
             }
             data = payload.map(p => hold(Object.assign({ id: uuid() }, defaults[name](), p))); data.forEach(d => { rows.push(d); logFlag(d); });
           }
-          else if (op === 'update') { data = match(); data.forEach(r => { const before = r.created_at; hold(Object.assign(r, payload)); if (payload && payload.created_at && payload.created_at !== before) logFlag(r); }); }
+          else if (op === 'update') { data = match(); data.forEach(r => { const before = r.created_at; hold(Object.assign(r, payload)); if (name === 'behaviour_tasks' && r.status === 'done') r.attached_note = null; if (payload && payload.created_at && payload.created_at !== before) logFlag(r); }); }
           else if (op === 'upsert') {
             data = payload.map(p => {
               const existing = rows.find(r => conflictCols.every(c => r[c] === p[c]));
