@@ -168,6 +168,7 @@
   .bh-card .bh-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .bh-card .bh-actions select { width: auto; }
   .bh-card .bh-done { background: var(--green); color: #fff; }
+  .bh-card .bh-note { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; }
   .bh-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
   .bh-filters select, .bh-filters label { width: auto; margin: 0; }
   .vet-banner .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
@@ -254,6 +255,7 @@
       ${r.reason ? `<div class="bh-reason">${esc(r.reason)}</div>` : ''}
       <div class="bh-actions">
         <select class="bh-move"><option value="">${r.lane === 'incoming' ? 'Assign to…' : 'Move to…'}</option>${choices.map(l => `<option value="${l}">${esc(LDHLogic.BEHAVIOUR_LANES[l])}</option>`).join('')}</select>
+        ${r.attached_note ? '<button type="button" class="bh-note">Medical note from vets</button>' : ''}
         <button type="button" class="bh-done">Done</button>
       </div></div>`;
   }
@@ -310,13 +312,25 @@
         <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel done-cancel">Cancel</button><button type="button" class="oc-modal-submit done-confirm">Mark done</button></div></div></div>`, 'done-overlay');
       return;
     }
+    /* ---- the medical note a vet attached (read-only; the database deletes it when this task is Done) ---- */
+    const nb = e.target.closest('.bh-note');
+    if (nb) {
+      const r = ROWS.find(x => x.id === nb.closest('.bh-card').dataset.id);
+      modal(`<div class="oc-modal-overlay note-overlay"><div class="oc-modal">
+        <h3>Medical note — ${esc(r.animal_id)}</h3>
+        <p class="meta">Sent by ${esc(r.flagged_by || '?')}. This note is deleted from the system when you tick Done.</p>
+        <div class="note-body" style="white-space:pre-wrap;max-height:50vh;overflow:auto;font-size:0.85rem;border:1px solid var(--border);border-radius:8px;padding:8px;">${esc(r.attached_note)}</div>
+        <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel note-close">Close</button></div></div></div>`, 'note-overlay');
+      return;
+    }
+    if (e.target.closest('.note-close')) { document.querySelector('.note-overlay').remove(); return; }
     if (e.target.closest('.done-cancel')) { document.querySelector('.done-overlay').remove(); return; }
     const ok = e.target.closest('.done-confirm');
     if (ok) {
       const o = ok.closest('.done-overlay'), note = o.querySelector('.done-note').value.trim(), er = o.querySelector('.done-error');
       if (!note) { er.textContent = 'Write a note — it goes back to the Shelter board.'; er.style.display = 'block'; return; }
       ok.disabled = true;
-      const err = await changeRow(o.dataset.id, { status: 'done', done_at: new Date().toISOString(), done_note: note, done_by: initials() }, { done: true });
+      const err = await changeRow(o.dataset.id, { status: 'done', done_at: new Date().toISOString(), done_note: note, done_by: initials(), attached_note: null }, { done: true });
       if (err) { ok.disabled = false; er.textContent = err; er.style.display = 'block'; return; }
       o.remove(); loadAll(); return;
     }

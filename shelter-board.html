@@ -177,7 +177,7 @@
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('locations').select('*').order('sort', { ascending: true }),
       sb.from('flag_history').select('*').gte('flagged_at', since),
-      sb.from('behaviour_tasks').select('*')
+      sb.from('behaviour_tasks').select('id,created_at,kind,animal_id,location,lane,due_window,reason,courthold,flagged_by,status,done_at,done_note,done_by')
     ]);
     BEHAVIOUR = behRes.error ? [] : (behRes.data || []);
     HISTORY = histRes.error ? [] : (histRes.data || []);   // history is a nice-to-have: the board still works without it
