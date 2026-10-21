@@ -1013,6 +1013,18 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
 
 ---
 
+### Task 10 (added 2026-10-21 at Juliana's request): "Task for behaviour" on the Vets and Nurses pages
+
+Juliana: vets, nurses and the behaviour team should each be able to give each other tasks from their own page, not only from the shelter staff page. The vets already have request forms to nurses, and nurses have "Task for vets"; this adds **Task for behaviour** to both.
+
+**Files:** Modify `lib/ops-core.js` (shared window `.bt-open` -> `.bt-overlay`, inserts a `behaviour_tasks` row, initials remembered under `ldh_behaviour_initials_v1`), `vets.html` (button above the KPI row), `nurses.html` (button beside "Task for vets" in both columns); create `tests/ui/task-for-behaviour.test.js`.
+
+- [ ] Write the test (both pages: window opens, asks for animal ID, reason for reviews, initials; lands in Incoming with place, time frame, reason, initials; initials remembered) and watch it fail.
+- [ ] Implement the shared window and the three buttons; test passes; `vets-page`, `nurses-page`, `ops-core` UI tests still pass.
+- [ ] Commit.
+
+---
+
 ### Task 9: Whole-suite check, mobile, docs, memory
 
 **Files:** Modify `tests/README.md`; create `tests/ui/behaviour-mobile.test.js`; update memory file
