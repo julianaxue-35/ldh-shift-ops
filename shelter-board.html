@@ -140,6 +140,7 @@
         <h1>Shelter board</h1>
         <p>Every flagged animal, by room and pen — with the vet's treatment and plan. Updates by itself.</p>
       </div>
+      <div style="display:flex; gap:8px; align-items:center;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button></div>
     </div>
 
     <div class="legend" id="legend">
@@ -151,6 +152,19 @@
 
     <div id="board"></div>
     <p class="empty-state" id="board-error" style="display:none;"></p>
+      <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
+    <div class="card faq-card faq-modal" id="faq">
+      <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
+      <h2>FAQ — Shelter board</h2>
+      <p class="subtle">How to read the board.</p>
+      <h3 class="faq-group">Reading the board</h3>
+      <details><summary>What am I looking at?</summary><div><p>Every animal that has been flagged, shown by <b>room and pen</b>, with the vet&rsquo;s <b>treatment and plan</b> once they have written it. The page updates by itself.</p></div></details>
+      <details><summary>What do the colours mean?</summary><div><p><b>Waiting for vet</b>: flagged, nobody has picked it up yet. <b>Vet has picked up</b>: a vet is on it. <b>Waiting on medication</b>: the vet has checked the animal and the medication is still being made up. <b>Done (last 24 h)</b>: finished in the last 24 hours.</p></div></details>
+      <details><summary>How long does a flagged animal stay on the board?</summary><div><p>For <b>24 hours</b> from when it was finished, counted from that moment (it does not clear at midnight). Earlier flags for the same animal are remembered for 3 months and show on its card as history.</p></div></details>
+      <details><summary>Where do I see what the Behaviour team found?</summary><div><p>On the animal&rsquo;s own card. While a behaviour task is open it shows that it is waiting. When the team ticks Done, their note, their initials and the time appear on the card for 24 hours. Only animals already on the board show this.</p></div></details>
+      <details><summary>The pen has the wrong detail or is missing.</summary><div><p>The room and pen come from the location the person chose when they flagged the animal. Ask them (or a vet) to correct the location on their request.</p></div></details>
+    </div>
+    </div>
   </main>
 </div>
 

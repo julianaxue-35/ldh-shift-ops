@@ -208,6 +208,7 @@
       <div><h1>Admission AA</h1><p>Sent by the nurses. Enter in ShelterMate, then tick off.</p></div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <span id="aa-overdue-count" class="lvl lvl-red" style="display:none;"></span>
+        <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
         <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
       </div>
     </div>
@@ -222,6 +223,26 @@
       <p class="subtle">Cards completed, and the average per working day: a look back at how much gets done. Counted from the day this was switched on.</p>
       <div id="aa-stats-body"></div>
     </section>
+      <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
+    <div class="card faq-card faq-modal" id="faq">
+      <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
+      <h2>FAQ — Admission AA</h2>
+      <p class="subtle">What lands on this page, how to clear it, and what happens to it afterwards.</p>
+      <h3 class="faq-group">Your list</h3>
+      <details><summary>What is on this page?</summary><div><p>Everything the vets and nurses have asked you to enter in ShelterMate. It is split into four columns: <b>Processing notes</b> and <b>Sick &amp; Injured notes</b> (finished notes from the vets&rsquo; shift tools), <b>Medication charts to print</b>, and <b>Tasks from nurses</b> (FIV, microchip, UV, microchip + UV and vaccination updates). A banner and a sound tell you when something new arrives. Tap the sound button once so your browser allows the sound.</p></div></details>
+      <details><summary>How do I clear an item?</summary><div><p>Enter it in ShelterMate, then press <b>Entered in ShelterMate &#10003;</b> (<b>Done &#10003;</b> on a medication chart). The card is deleted from the database straight away. A card with several animals (a litter, say) has a checklist: tick each animal as you enter it, and the card clears when every animal is ticked.</p></div></details>
+      <details><summary>A note is long — how do I copy it into ShelterMate?</summary><div><p>On a note card press <b>View notes</b> to read it, <b>Copy</b> to copy the text, or <b>Download Word</b> if the vet attached the Word file. A medication chart card lists the medication lines, with <b>Download Excel chart</b> to print the chart.</p></div></details>
+      <details><summary>What does PRIORITY mean? What goes red?</summary><div><p>A vet can mark a note <b>PRIORITY &mdash; do first</b> (for example an animal waiting for a foster). Those cards have a red border, sit at the top and are announced in a banner. Every card also has a 24-hour clock: anything left for <b>24 hours turns red</b> and is counted as overdue at the top of the page.</p></div></details>
+      <details><summary>A card changed after I opened it — what does &ldquo;updated&rdquo; mean?</summary><div><p>The vet edited the note and sent it again. The same card is updated rather than a new one added, and it shows <b>updated</b> with the time. Check what changed before you enter it. If you already entered the first version, enter the changes.</p></div></details>
+      <h3 class="faq-group">Mistakes and tidying</h3>
+      <details><summary>I ticked something by mistake.</summary><div><p>Open <b>Completed</b> below the list and press <b>Put back</b> (for a multi-animal card, put back just that animal).</p></div></details>
+      <details><summary>How long are completed items kept?</summary><div><p>Nothing stays on this page more than <b>24 hours</b>. Press <b>Empty list</b> at the end of the day. Ticked items are deleted from the database straight away, and completed cards are removed within 24 hours.</p></div></details>
+      <details><summary>What if the animal ID in the note is wrong or missing?</summary><div><p>The vet&rsquo;s tool will not send a note without an ID. If the ID was corrected after sending, the vet sends it again under the new ID and that makes a new card; the old one stays here until you remove it, so ask the vet which one to use.</p></div></details>
+      <h3 class="faq-group">Numbers and who is on</h3>
+      <details><summary>What are the rings and totals at the bottom?</summary><div><p><b>What the Admission AA has done</b> counts cards you have completed, and the average per working day this week, month, quarter and year. The ring fills as today gets close to a usual working day. It is only a look back; nothing here affects your list.</p></div></details>
+      <details><summary>Why does it say who is on duty?</summary><div><p>The nurses set who is on shift on the Nurses page, and it shows here so everyone knows who to ask.</p></div></details>
+    </div>
+    </div>
   </main>
 </div>
 <script>

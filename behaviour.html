@@ -189,7 +189,7 @@
     <span id="signout-link">Sign out</span>
   </aside>
   <main>
-    <div class="page-head"><div><h1>Behaviour</h1><p>Behaviour team tasks. Done notes show on the Shelter board.</p></div></div>
+    <div class="page-head"><div><h1>Behaviour</h1><p>Behaviour team tasks. Done notes show on the Shelter board.</p></div><div style="display:flex; gap:8px; align-items:center;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button></div></div>
     <p id="bh-error" class="oc-modal-error" style="margin:0;"></p>
 
     <section class="card vet-banner" id="bh-vet-form">
@@ -225,6 +225,23 @@
         <section class="bh-lane" data-lane="cat"><h3>Cat assist <button type="button" class="secondary bh-add" data-lane="cat">+ Task</button></h3><div id="lane-cat"></div></section>
         <section class="bh-lane" data-lane="dog"><h3>Dog assist <button type="button" class="secondary bh-add" data-lane="dog">+ Task</button></h3><div id="lane-dog"></div></section>
       </div>
+    </div>
+      <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
+    <div class="card faq-card faq-modal" id="faq">
+      <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
+      <h2>FAQ — behaviour team</h2>
+      <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
+      <h3 class="faq-group">Working your board</h3>
+      <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them with <b>Task for behaviour</b>. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
+      <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
+      <details><summary>How do I give a task to someone else on the team?</summary><div><p>Each lane has an <b>add task</b> button. The TL can give a task to an assist, and an assist can give one back to the TL. Choose the animal, the space and pen, the kind of task, the time frame and a reason, and pick who it is for (only the lanes that suit the species are offered).</p></div></details>
+      <details><summary>What do the time frames and red cards mean?</summary><div><p>A card shows how long is left. <b>30&ndash;60 min</b> is due an hour after it was sent, <b>within today</b> is due by the end of today, and <b>within 48 hours</b> is due two days after it was sent. Past the time it turns red and says <i>overdue by &hellip;</i>. Cards are sorted with the soonest due first. Use the filters at the top to show one kind, one time frame or courthold only.</p></div></details>
+      <details><summary>How do I finish a task?</summary><div><p>Press <b>Done</b>, write a note (what you found and the plan; it is required) and confirm. The card leaves your board, and the note, your initials and the time show on that animal&rsquo;s card on the <b>Shelter board</b> for 24 hours. Done tasks are deleted from the database after 7 days.</p></div></details>
+      <details><summary>What is the &ldquo;Medical note from vets&rdquo; button?</summary><div><p>When a vet sends an animal from a shift tool, their whole current note is attached to the card. Press the button to read it (you cannot edit it). <b>The moment you tick Done, the note is deleted from the database.</b> If a task is never ticked Done, the note is deleted after 7 days anyway. Copy anything you need into your own records before you tick Done.</p></div></details>
+      <h3 class="faq-group">Asking the vets</h3>
+      <details><summary>How do I ask the vets for shelter stress medication or a post adoption med pack?</summary><div><p>Use the <b>Request to vets</b> banner at the top. Choose the request (<i>Dispense shelter stress medication</i>, <i>Post adoption med pack</i> or <i>Other</i>), type the shelter ID, choose the space and pen, tick <b>Courthold</b> if it applies, and press <b>Send to vets</b>. It goes onto the vet board like any other request, so you do not have to switch pages. For <i>Other</i>, say what you need in the note. Initials are required.</p></div></details>
+      <details><summary>The animal is a courthold — does that change anything?</summary><div><p>Ticking Courthold marks the request so the vets can see it. A <i>Courthold reassessment</i> task from staff always shows a COURTHOLD badge, and the <b>courthold</b> filter shows only those.</p></div></details>
+    </div>
     </div>
   </main>
 </div>
