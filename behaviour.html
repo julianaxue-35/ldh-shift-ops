@@ -172,7 +172,9 @@
   .bh-filters select, .bh-filters label { width: auto; margin: 0; }
   .vet-banner .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
   .oc-modal label { display: block; font-size: 0.78rem; font-weight: 700; margin: 8px 0 4px; }
+  main { min-width: 0; }
   @media (max-width: 900px) { .bh-cols { grid-template-columns: 1fr; } }
+  @media (max-width: 800px) { .layout { grid-template-columns: minmax(0, 1fr); } .vet-banner .row { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
