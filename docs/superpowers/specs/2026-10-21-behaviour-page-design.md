@@ -49,7 +49,7 @@ New table `behaviour_tasks`: id, created_at, kind, animal_id, location, lane (`i
 
 ## Phasing
 - **A (this spec):** migration, `behaviour.html`, staff behaviour bar, vet request banner, Shelter board feedback, initials, tests with fictional animals only.
-- **B (later):** behaviour requests from Sick & Injured, Processing and Surgery. Needs a new request shape in the Edge Function and a species-from-location rule: cat room / cat adoptions = cat, pound 1–4 = dog, transport = either. The tools would send into Incoming.
+- **B (after A is working):** a **"Send to Behaviour"** button on each animal in Sick & Injured, Processing and Surgery. The vet adds a reason and initials; the animal ID, location and the **whole current note** go to the Incoming strip. Needs a new request shape in the Edge Function (same LDH code check, confirmed send with Sent ✓ / NOT SENT and Resend, as in Admission AA). Re-sending after an edit updates the card instead of duplicating it. **When the behaviour task is ticked Done, the attached clinical note is deleted from the database** (the Done note and initials stay). Real notes in the database need IT sign-off before go-live; fictional animals only until then.
 
 ## Privacy
 Animal IDs and behaviour notes are patient data. Fictional animals only until IT sign-off; no real codes or patient text in public repos, tests or commits. No microchip numbers.
