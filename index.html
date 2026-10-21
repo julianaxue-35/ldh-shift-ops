@@ -292,6 +292,7 @@
         <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
         <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
+      <label style="display:block; margin-top:6px;">Your initials (optional)<input id="req-initials" maxlength="4" placeholder="e.g. AB"></label>
       <button id="req-submit" style="margin-top:6px;">Submit request</button>
     </section>
 
@@ -322,6 +323,7 @@
         <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
         <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
         <label>Note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
+        <label>Your initials (optional)<input id="nr-initials" maxlength="4" placeholder="e.g. AB"></label>
         <button id="nr-submit" type="button">Log request</button>
       </div>
     </section>
@@ -542,6 +544,7 @@
       if (asked.length && needsVet) row.problem = ['Needs ' + asked.join(' + '), row.problem].filter(Boolean).join(' — ');
       let error = null;
       if (needsVet) {
+        if (window.staffInitials()) row.problem = [row.problem, '(sent by ' + window.staffInitials() + ')'].filter(Boolean).join(' — ');
         ({ error } = await sb.from('tasks').insert(row));
         /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
            (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
@@ -860,8 +863,8 @@
         location: document.getElementById('nr-location').value,
         species: document.getElementById('nr-species').value,
         animal_count: count,
-        note: document.getElementById('nr-note').value.trim() || null,
-        created_by: 'Shelter Staff'
+        note: [document.getElementById('nr-note').value.trim(), window.staffInitials() ? 'sent by ' + window.staffInitials() : ''].filter(Boolean).join(' — ') || null,
+        created_by: 'Shelter Staff' + (window.staffInitials() ? ' (' + window.staffInitials() + ')' : '')
       };
       if (scheduled) {
         const expectedRaw = document.getElementById('nr-expected').value;
@@ -903,6 +906,14 @@
   applyNrDefaultLocation();
   renderRedFlagForm();
   updateLocationFields();
+
+  /* ---- Optional initials on the staff forms (2026-10-21): one box shared by the flag and nurse request forms, remembered for the day ---- */
+  (function () {
+    const KEY = 'ldh_staff_initials_v1', ids = ['nr-initials', 'req-initials'];
+    const els = () => ids.map(i => document.getElementById(i)).filter(Boolean);
+    els().forEach(e => { e.value = OpsCore.readInitials(KEY); e.addEventListener('change', () => { OpsCore.saveInitials(KEY, e.value); els().forEach(o => { o.value = e.value.trim().toUpperCase(); }); }); });
+    window.staffInitials = () => (els()[0] && els()[0].value.trim().toUpperCase()) || '';
+  })();
 
   /* ---- Behaviour request (2026-10-21) ---- */
   (function () {
