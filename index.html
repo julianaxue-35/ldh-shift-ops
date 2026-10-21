@@ -328,24 +328,21 @@
       </div>
 
       <div class="sr-panel" id="nurse-requests" data-to="nurses" hidden>
-        <p class="sr-lead">For a nurse task on arrival (vaccination, FIV test, blood test, microchip, UV), or one task for one animal (ear swab, IVFT, treatment check, medication label, other).</p>
+        <p class="sr-lead">For vaccination on arrival, or one task for one animal (FIV test, bloods, microchip, ear swab, cat in fluids, medication label, other). Microchip, UV and treatment checks for foster or rescue animals are asked on the Vets tab.</p>
         <label class="nr-grp" style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
           <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
         </label>
         <div class="sr-form" id="nr-form">
           <label>What<select id="nr-kind">
-            <optgroup label="On arrival (a group of animals)">
+            <optgroup label="On arrival">
               <option value="vaccination">Vaccination</option>
-              <option value="fiv">FIV test</option>
-              <option value="blood">Blood test</option>
-              <option value="microchip">Microchip</option>
-              <option value="uv">UV request</option>
-              <option value="microchip_uv">Microchip + UV</option>
             </optgroup>
             <optgroup label="Task for one animal">
+              <option value="task:fiv_test">FIV test</option>
+              <option value="task:blood">Blood test</option>
+              <option value="task:microchip">Microchip</option>
               <option value="task:ear_swab">Ear swab</option>
-              <option value="task:ivft">Flu cat — needs IVFT</option>
-              <option value="task:treatment">Treatment check / due</option>
+              <option value="task:ivft">Cat in fluids (IVFT)</option>
               <option value="task:med_label">Medication label to make</option>
               <option value="task:other">Other</option>
             </optgroup>
@@ -450,7 +447,7 @@
       <h2>FAQ — shelter staff</h2>
       <p class="subtle">Quick answers for logging requests and following a case.</p>
       <h3 class="faq-group">Logging requests</h3>
-      <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination, FIV, bloods, microchip or UV on arrival, or one task for one animal (ear swab, IVFT, treatment check, medication label), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
+      <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival, or one task for one animal (FIV test, bloods, microchip, ear swab, cat in fluids, medication label; microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
       <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Pick a <b>Suspected condition</b> if you can, and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
       <details><summary>What do the tiers mean? When do I radio the vet instead?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>

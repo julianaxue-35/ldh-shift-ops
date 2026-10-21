@@ -21,7 +21,8 @@ const t = require('./check')('send-request-categories');
     // Nurses: one-animal tasks, the same list the vets page sends
     await s.page.click('.sr-tab[data-sr="nurses"]');
     const nurseKinds = await s.page.$$eval('#nr-kind option', os => os.map(o => o.value));
-    for (const k of ['task:ear_swab', 'task:ivft', 'task:treatment', 'task:med_label', 'task:other', 'vaccination', 'fiv', 'blood', 'microchip', 'uv', 'microchip_uv']) t.ok(nurseKinds.includes(k), 'Nurses offers ' + k);
+    for (const k of ['vaccination', 'task:fiv_test', 'task:blood', 'task:microchip', 'task:ear_swab', 'task:ivft', 'task:med_label', 'task:other']) t.ok(nurseKinds.includes(k), 'Nurses offers ' + k);
+    t.ok(!nurseKinds.includes('task:treatment') && !nurseKinds.includes('uv') && !nurseKinds.includes('fiv'), 'treatment / UV are not nurse-tab choices (they come from foster/rescue on the Vets tab)');
     t.ok(!(await s.page.isVisible('#nr-animal')) && await s.page.isVisible('#nr-count'), 'group kinds show How many, not Animal ID');
     await s.page.selectOption('#nr-kind', 'task:ear_swab');
     t.ok(await s.page.isVisible('#nr-animal') && await s.page.isVisible('#nr-detail') && !(await s.page.isVisible('#nr-count')) && !(await s.page.isVisible('#nr-window')), 'a task shows Animal ID and Pen / detail, hides How many and Needed within');
