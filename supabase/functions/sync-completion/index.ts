@@ -18,6 +18,7 @@
 //      medication case, or not on the dashboard at all) this is a no-op —
 //      it must never create a stray task row out of a chart record alone.
 //
+//  12. { behaviour: {animal_id,location,reason,sent_by,window,note} } — (2026-10-21) send an animal to the Behaviour page with its note attached
 //   9. { nurse_label: {animal_id,location,sent_by,labels:[{key,text}]} } — (2026-10-21) medication labels for the Welfare nurse
 //   8. { aa_check: {items:[{kind,animal_id}]} } — (2026-10-19) read-only: which Admission AA cards are still waiting?
 //
@@ -193,6 +194,27 @@ function validateSurgeryLog(s) {
 }
 // surgery-validate-end
 
+// behaviour-validate-start
+// (2026-10-21) { behaviour: { animal_id, location, reason, sent_by, window, note } } — a vet sends an animal to the Behaviour page
+// with the whole medical note attached. The database removes the note when the task is ticked Done.
+function validateBehaviourSend(b, dayISO) {
+  if (!b || typeof b !== 'object') return { error: 'Bad request.' };
+  const id = typeof b.animal_id === 'string' ? b.animal_id.trim().toUpperCase() : '';
+  if (!id || id.length > 40) return { error: 'An animal ID (up to 40 characters) is required.' };
+  const reason = typeof b.reason === 'string' ? b.reason.trim().slice(0, 500) : '';
+  if (!reason) return { error: 'A reason is required.' };
+  const note = typeof b.note === 'string' ? b.note.trim() : '';
+  if (!note) return { error: 'The note is empty.' };
+  if (note.length > 20000) return { error: 'The note is too long (limit 20,000 characters).' };
+  const by = typeof b.sent_by === 'string' ? b.sent_by.trim().toUpperCase() : '';
+  if (!/^[A-Z]{1,4}$/.test(by)) return { error: 'Initials (1 to 4 letters) are required.' };
+  if (['30_60m', 'today', '48h'].indexOf(b.window) === -1) return { error: 'Pick a time frame.' };
+  const location = typeof b.location === 'string' ? b.location.trim().slice(0, 80) : '';
+  return { row: { kind: 'behaviour_review', animal_id: id, location: location || 'Unknown', reason: reason, flagged_by: by,
+    due_window: b.window, attached_note: note, source_key: 'bh|' + dayISO + '|' + id } };
+}
+// behaviour-validate-end
+
 // Completed Admission AA cards are removed within 24 hours (the AA also empties the list daily). Best effort.
 async function purgeCompletedAa(supabase) {
   try {
@@ -262,6 +284,30 @@ Deno.serve(async (req) => {
       : await supabase.from('surgery_log').upsert(v.row, { onConflict: 'id' });
     if (res.error) return new Response(JSON.stringify({ error: res.error.message }), { status: 500, headers: CORS_HEADERS });
     return new Response(JSON.stringify({ ok: true }), { status: 200, headers: CORS_HEADERS });
+  }
+  // Shape 12 (2026-10-21): { behaviour: {...} } — send an animal to the Behaviour page with its note attached. One open card per
+  // animal per Melbourne day: a resend UPDATES it (the vet edited the note). A Done card is not reopened (a new card is made).
+  // Replies {ok:true} only once saved. The note is never logged or echoed in an error.
+  if (body.behaviour && typeof body.behaviour === 'object') {
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Melbourne' }).format(new Date());
+    const v = validateBehaviourSend(body.behaviour, day);
+    if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    const upd = async () => {
+      const { data, error } = await supabase.from('behaviour_tasks')
+        .update({ reason: v.row.reason, attached_note: v.row.attached_note, due_window: v.row.due_window, location: v.row.location })
+        .eq('source_key', v.row.source_key).eq('status', 'open').select('id');
+      return { n: data ? data.length : 0, error };
+    };
+    let u = await upd();
+    if (u.error) return new Response(JSON.stringify({ error: 'Could not save.' }), { status: 500, headers: CORS_HEADERS });
+    if (u.n > 0) return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
+    const ins = await supabase.from('behaviour_tasks').insert(Object.assign({}, v.row, { history: [{ at: new Date().toISOString(), by: v.row.flagged_by, from: 'new', to: 'incoming' }] }));
+    if (ins.error && ins.error.code === '23505') {
+      u = await upd();
+      if (!u.error && u.n > 0) return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
+    }
+    if (ins.error) return new Response(JSON.stringify({ error: 'Could not save.' }), { status: 500, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: true, updated: false }), { status: 200, headers: CORS_HEADERS });
   }
   // Shape 9 (2026-10-21): { nurse_label: { animal_id, location, sent_by, labels: [{key, text}] } } — medication labels for the
   // Welfare nurse. One open task per label key: sending again UPDATES the open task (the vet edited the chart), a finished one
