@@ -65,3 +65,10 @@ test('behaviourForAnimal: open tasks plus the latest done within 24h, matched ig
   assert.equal(L.behaviourForAnimal(rows, 'BEH 1', now).open.length, 1);
   assert.equal(L.behaviourForAnimal(rows, 'NONE', now).done, null);
 });
+
+test('behaviourSpecies: a free-text pen never turns a dog or cat into "either"', () => {
+  for (const loc of ['Pound 2 / Run 4', 'Pound 1 / 10 (outside)']) assert.equal(L.behaviourSpecies(loc), 'dog', loc);
+  for (const loc of ['Cat Room 1 / 12-13', 'Cat Room 2 / A12', 'Adoption 1 / 3 top']) assert.equal(L.behaviourSpecies(loc), 'cat', loc);
+  assert.deepEqual(L.behaviourLaneChoices('Pound 2 / Run 4'), ['tl', 'dog']);
+  assert.equal(L.behaviourSpecies('Transport / van 2'), 'either');
+});

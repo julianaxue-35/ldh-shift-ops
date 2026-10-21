@@ -1,6 +1,6 @@
 -- 2026-10-21: Behaviour team page (behaviour.html). One row per behaviour task.
 -- Staff flag tasks from the shelter staff page; the team moves them between lanes and ticks them Done with a note.
--- Animal IDs and notes are patient data: done rows are deleted after 7 days (trigger below).
+-- Animal IDs and notes are patient data: done rows are deleted after 7 days (trigger below runs on every insert or update).
 -- Run this whole file as ONE script. Safe to run more than once.
 create table if not exists public.behaviour_tasks (
   id uuid primary key default gen_random_uuid(),
@@ -28,7 +28,7 @@ begin
   return null;
 end $$;
 drop trigger if exists behaviour_tasks_cleanup on public.behaviour_tasks;
-create trigger behaviour_tasks_cleanup after insert on public.behaviour_tasks
+create trigger behaviour_tasks_cleanup after insert or update on public.behaviour_tasks
   for each statement execute function public.behaviour_tasks_cleanup();
 
 alter table public.behaviour_tasks enable row level security;

@@ -54,3 +54,13 @@ test('0028: done rows older than 7 days are deleted when a new row arrives; rece
   const ids = (await d.query(`select animal_id from public.behaviour_tasks order by animal_id`)).rows.map(r => r.animal_id);
   assert.deepEqual(ids, ['BEH-1', 'NEW-1']);
 });
+
+test('0028: done rows older than 7 days are also purged when any row is updated (quiet periods with no new tasks)', async () => {
+  const d = await db();
+  await d.exec(ins()); await d.exec(ins().replace('BEH-1', 'GONE-1'));
+  // a row finished 8 days ago that is still sitting there (nothing has been inserted since)
+  await d.exec(`update public.behaviour_tasks set status='done', done_at = now() - interval '8 days', done_note='n', done_by='AB' where animal_id='GONE-1'`);
+  await d.exec(`update public.behaviour_tasks set reason = 'x' where animal_id = 'BEH-1'`);
+  const ids = (await d.query(`select animal_id from public.behaviour_tasks order by animal_id`)).rows.map(r => r.animal_id);
+  assert.deepEqual(ids, ['BEH-1']);
+});
