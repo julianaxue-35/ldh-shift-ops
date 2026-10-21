@@ -161,7 +161,7 @@ const H = 3600 * 1000;
      ============================================================ */
   const b = await open({ memos: [{ author: 'Shelter Staff', text: 'Cage 4 latch is loose', done: false }] }, 'vets.html');
   try {
-    t.ok((await b.page.textContent('#nurse-treatments')).includes('Request a treatment — vets'), 'treatment request card moved here unchanged');
+    t.ok((await b.page.textContent('#nurse-treatments')).includes('Request a treatment to nurse'), 'the treatment request card is titled "Request a treatment to nurse"');
     t.ok(await b.page.locator('#nt-location option').count() === 15, 'treatment form location select filled from the shared list');
     t.ok(await b.page.isVisible('#start-shift-card'), 'Start a shift card present');
     t.ok(await b.page.locator('#start-shift-card a.shift-launch').count() === 3, 'Start a shift links to all three shift tools');
@@ -460,6 +460,7 @@ const H = 3600 * 1000;
     await m.page.selectOption('#mt-location', 'Cat Room 2');
     await m.page.selectOption('#mt-task', 'ear_swab');
     await m.page.fill('#mt-note', 'both ears');
+    await m.page.fill('#mt-initials', 'jx');
     await m.page.click('#mt-submit');
     await m.page.waitForTimeout(250);
     let ng = (await m.db()).noga_requests;
@@ -470,6 +471,7 @@ const H = 3600 * 1000;
     t.ok(await m.page.locator('.attn-item', { hasText: 'MEDCASE' }).locator('.transfer-btn').count() === 0, 'a medication case does not (it has its own nurse hand-off)');
     await m.page.locator('.attn-item', { hasText: 'XFER-1' }).locator('.transfer-btn').click();
     await m.page.selectOption('.transfer-task', 'blood');
+    await m.page.fill('.transfer-initials', 'jx');
     await m.page.click('.transfer-confirm');
     await m.page.waitForTimeout(300);
     const db2 = await m.db();

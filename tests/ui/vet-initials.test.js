@@ -1,37 +1,39 @@
-// Vets put their initials on what they send to the nurses, and the nurses can see them.
+// Vets put their initials in each request to the nurses (misc task, treatment, transfer), and the nurses can see them.
 const { open } = require('./harness');
 const t = require('./check')('vet-initials');
 const ago = ms => new Date(Date.now() - ms).toISOString();
 (async () => {
   const v = await open({ tasks: [{ title: 'CASE-1', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', done: false, created_at: ago(3600e3) }] }, 'vets.html');
   try {
-    await v.page.waitForSelector('#vet-initials');
-    t.ok(await v.page.isVisible('#vet-initials'), 'there is a box for the vet\'s initials');
-    await v.page.fill('#vet-initials', 'ab3c');
-    t.ok((await v.page.inputValue('#vet-initials')) === 'ABC', 'initials are letters only, upper case: ' + await v.page.inputValue('#vet-initials'));
-    // misc task
-    await v.page.fill('#mt-animal', 'INI-1'); await v.page.click('#mt-submit');
+    await v.page.waitForSelector('#mt-initials');
+    t.ok(await v.page.locator('#vet-initials').count() === 0, 'no separate "vet initials for today" box on the vets page');
+    t.ok(await v.page.isVisible('#mt-initials') && await v.page.isVisible('#nt-initials'), 'each request form (nurse task, treatment) has its own initials box');
+    t.ok(/Request a treatment to nurse/.test(await v.page.textContent('#nurse-treatments h2')), 'the treatment card is called "Request a treatment to nurse"');
+    // misc task: blocked without initials
+    await v.page.fill('#mt-animal', 'INI-1');
+    const alerts = []; v.page.on('dialog', d => alerts.push(d.message()));
+    await v.page.click('#mt-submit'); await v.page.waitForTimeout(300);
+    t.ok((await v.db()).noga_requests.length === 0 && alerts.some(a => /initials/i.test(a)), 'a nurse task cannot be sent without initials');
+    await v.page.fill('#mt-initials', 'ab3c');
+    t.ok((await v.page.inputValue('#mt-initials')) === 'ABC', 'initials are letters only, upper case');
+    await v.page.click('#mt-submit');
     await v.page.waitForFunction(() => window.__db.noga_requests.length === 1);
     t.ok((await v.db()).noga_requests[0].added_by === 'ABC', 'a nurse task carries the vet\'s initials');
     t.ok(/requested by ABC/.test(await v.page.textContent('#misc-list')), 'and the vet sees who asked in the list');
-    // treatment
+    // treatment: the box is filled in from the last request, can be changed
+    t.ok((await v.page.inputValue('#nt-initials')) === 'ABC', 'the treatment form starts with the initials just used');
+    await v.page.fill('#nt-initials', 'xy');
     await v.page.fill('#nt-animal', 'INI-2'); await v.page.fill('#nt-treatment', 'flush'); await v.page.click('#nt-submit');
     await v.page.waitForFunction(() => window.__db.nurse_treatments.length === 1);
-    t.ok((await v.db()).nurse_treatments[0].requested_by === 'ABC', 'a treatment request carries them too');
-    // transfer a flagged case
-    await v.page.waitForSelector('.transfer-btn');
-    await v.page.click('.transfer-btn');
-    await v.page.click('.transfer-confirm');
+    t.ok((await v.db()).nurse_treatments[0].requested_by === 'XY', 'a treatment request carries the initials typed in it');
+    // transfer
+    await v.page.waitForSelector('.transfer-btn'); await v.page.click('.transfer-btn');
+    t.ok((await v.page.inputValue('.transfer-initials')) === 'XY', 'the transfer window has an initials box, filled in from the last request');
+    await v.page.fill('.transfer-initials', ''); await v.page.click('.transfer-confirm'); await v.page.waitForTimeout(300);
+    t.ok((await v.db()).noga_requests.length === 1, 'a transfer cannot be sent without initials');
+    await v.page.fill('.transfer-initials', 'jx'); await v.page.click('.transfer-confirm');
     await v.page.waitForFunction(() => window.__db.noga_requests.length === 2);
-    t.ok((await v.db()).noga_requests[1].added_by === 'ABC', 'a case transferred to a nurse carries them');
-    // empty box: asked once (the test browser answers JX), then remembered
-    await v.page.fill('#vet-initials', '');
-    await v.page.fill('#mt-animal', 'INI-3'); await v.page.click('#mt-submit');
-    await v.page.waitForFunction(() => window.__db.noga_requests.length === 3);
-    t.ok((await v.db()).noga_requests[2].added_by === 'JX' && (await v.page.inputValue('#vet-initials')) === 'JX', 'if the box is empty they are asked, and the answer fills the box');
-    // remembered on reload the same day
-    await v.page.reload(); await v.page.waitForSelector('#vet-initials');
-    t.ok((await v.page.inputValue('#vet-initials')) === 'JX', 'kept for the day on this device');
+    t.ok((await v.db()).noga_requests[1].added_by === 'JX', 'a case transferred to a nurse carries them');
     t.ok(v.errors.length === 0, 'no page errors: ' + v.errors.join('; '));
   } finally { await v.browser.close(); }
 
@@ -44,7 +46,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
   try {
     await n.page.waitForSelector('#noga-list .noga-item');
     const misc = (await n.page.textContent('#noga-list')).replace(/\s+/g, ' ');
-    t.ok(/INI-1.*requested by ABC/.test(misc) && !/OLD-1[^|]*requested by/.test(misc), 'the nurse sees who asked on a task (older "Vet team" tasks show nothing extra): ' + misc.slice(0, 140));
+    t.ok(/INI-1.*requested by ABC/.test(misc) && !/OLD-1[^|]*requested by/.test(misc), 'the nurse sees who asked on a task (older "Vet team" tasks show nothing extra)');
     t.ok(/requested by ABC/.test((await n.page.textContent('#nurse-doses')).replace(/\s+/g, ' ')), 'and on a treatment');
     t.ok(n.errors.length === 0, 'no nurse page errors');
   } finally { await n.browser.close(); }
