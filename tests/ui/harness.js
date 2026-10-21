@@ -144,6 +144,7 @@ const STUB = `
         return { data: Object.keys(by).map(k => ({ day: k.split('|')[0], cat: k.split('|')[1], n: by[k] })), error: null };
       }
       if (fn === 'nurse_daily_counts') return { data: window.__nurseCounts || [], error: null };
+      if (fn === 'behaviour_daily_counts') return { data: window.__behaviourCounts || [], error: null };
       return { data: [], error: null };
     },
     channel: () => ({ on(_e, f, cb) { listeners.push({ table: f.table, cb }); return this; }, subscribe() { return this; } })

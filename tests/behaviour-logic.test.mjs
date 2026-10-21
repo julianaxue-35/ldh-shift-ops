@@ -81,3 +81,19 @@ test('behaviourSpecies: an unrecognised location uses the animal\'s own species 
   assert.equal(L.behaviourSpecies('Unknown', 'rabbit'), 'either'); assert.equal(L.behaviourSpecies('Unknown'), 'either');
   assert.equal(L.behaviourSpecies('Pound 2 / 4', 'cat'), 'dog');   // a recognised room wins
 });
+
+test('behaviourStats: today, period totals, per-working-day average and per-kind totals', () => {
+  const now = new Date('2026-10-22T10:00:00').getTime();   // a Thursday
+  const rows = [
+    { day: '2026-10-22', cat: 'courthold', n: 2 }, { day: '2026-10-22', cat: 'behaviour_review', n: 1 },
+    { day: '2026-10-21', cat: 'incident_review', n: 3 }, { day: '2026-03-01', cat: 'courthold', n: 4 },
+    { day: '2026-10-23', cat: 'courthold', n: 9 }   // a future day is ignored
+  ];
+  const s = L.behaviourStats(rows, now);
+  assert.equal(s.cases.today, 3);
+  assert.deepEqual(s.cases.week, { total: 6, days: 2, avg: 3 });
+  assert.equal(s.cases.year.total, 10);
+  assert.equal(s.courthold.year.total, 6);
+  assert.equal(s.incident_review.week.total, 3);
+  assert.equal(L.behaviourStats([], now).cases.year.avg, 0);
+});
