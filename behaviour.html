@@ -22,6 +22,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/ops-core.js"></script>
+<script src="lib/send-card.js"></script>
 <style>
   :root {
     --bg: #F4F6FB;
@@ -171,11 +172,10 @@
   .bh-card .bh-note { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer; }
   .bh-filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 0.85rem; }
   .bh-filters select, .bh-filters label { width: auto; margin: 0; }
-  .vet-banner .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
   .oc-modal label { display: block; font-size: 0.78rem; font-weight: 700; margin: 8px 0 4px; }
   main { min-width: 0; }
   @media (max-width: 900px) { .bh-cols { grid-template-columns: 1fr; } }
-  @media (max-width: 800px) { .layout { grid-template-columns: minmax(0, 1fr); } .vet-banner .row { grid-template-columns: 1fr; } }
+  @media (max-width: 800px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 </style>
 </head>
 <body>
@@ -196,23 +196,7 @@
     <div class="page-head"><div><h1>Behaviour</h1><p>Behaviour team tasks. Done notes show on the Shelter board.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button></div></div>
     <p id="bh-error" class="oc-modal-error" style="margin:0;"></p>
 
-    <section class="card vet-banner" id="bh-vet-form">
-      <h2>Request to vets</h2>
-      <p class="subtle">Goes onto the vet board. Dispense shelter stress medication, a post adoption med pack, or something else.</p>
-      <div class="row">
-        <label>Request<select id="bv-type">
-          <option value="shelter_stress_med">Dispense shelter stress medication</option>
-          <option value="post_adoption_pack">Post adoption med pack</option>
-          <option value="other">Other</option></select></label>
-        <label>Shelter ID<input id="bv-animal" placeholder="Animal ID"></label>
-        <label>Space<select id="bv-room"></select></label>
-        <label>Pen / detail<input id="bv-pen" placeholder="Pen #"></label>
-        <label>Note<input id="bv-note" placeholder="optional"></label>
-        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="bv-courthold" style="width:auto;"> Courthold</label>
-        <button type="button" id="bv-send">Send to vets</button>
-      </div>
-      <p id="bv-error" class="oc-modal-error"></p>
-    </section>
+    <section class="card" id="send-request"></section>
 
     <section class="card"><div class="bh-filters">
       <b>Filter</b>
@@ -236,7 +220,7 @@
       <h2>FAQ — behaviour team</h2>
       <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
       <h3 class="faq-group">Working your board</h3>
-      <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them with <b>Task for behaviour</b>. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
+      <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
       <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
       <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
       <details><summary>How do I give a task to someone else on the team?</summary><div><p>Each lane has an <b>add task</b> button. The TL can give a task to an assist, and an assist can give one back to the TL. Choose the animal, the space and pen, the kind of task, the time frame and a reason, and pick who it is for (only the lanes that suit the species are offered).</p></div></details>
@@ -244,7 +228,7 @@
       <details><summary>How do I finish a task?</summary><div><p>Press <b>Done</b>, write a note (what you found and the plan; it is required) and confirm. The card leaves your board, and the note, your initials and the time show on that animal&rsquo;s card on the <b>Shelter board</b> for 24 hours. Done tasks are deleted from the database after 7 days.</p></div></details>
       <details><summary>What is the &ldquo;Medical note from vets&rdquo; button?</summary><div><p>When a vet sends an animal from a shift tool, their whole current note is attached to the card. Press the button to read it (you cannot edit it). <b>The moment you tick Done, the note is deleted from the database.</b> If a task is never ticked Done, the note is deleted within 7 days anyway. Copy anything you need into your own records before you tick Done.</p></div></details>
       <h3 class="faq-group">Asking the vets</h3>
-      <details><summary>How do I ask the vets for shelter stress medication or a post adoption med pack?</summary><div><p>Use the <b>Request to vets</b> banner at the top. Choose the request (<i>Dispense shelter stress medication</i>, <i>Post adoption med pack</i> or <i>Other</i>), type the shelter ID, choose the space and pen, tick <b>Courthold</b> if it applies, and press <b>Send to vets</b>. It goes onto the vet board like any other request, so you do not have to switch pages. For <i>Other</i>, say what you need in the note. Initials are required.</p></div></details>
+      <details><summary>How do I ask the vets for shelter stress medication or a post adoption med pack?</summary><div><p>Use the <b>Send a request</b> card at the top. Choose <b>What</b> (<i>Dispense shelter stress medication</i>, <i>Post adoption med pack</i> or <i>Other</i>), type the animal ID, choose the space and pen / detail, write a reason or note, tick <b>Courthold</b> if it applies, enter your initials and press <b>Send to vets</b>. It goes onto the vet board like any other request, so you do not have to switch pages. For <i>Other</i>, say what you need in the note.</p></div></details>
       <details><summary>The animal is a courthold — does that change anything?</summary><div><p>Ticking Courthold marks the request so the vets can see it. A <i>Courthold reassessment</i> task from staff always shows a COURTHOLD badge, and the <b>courthold</b> filter shows only those.</p></div></details>
     </div>
     </div>
@@ -421,40 +405,15 @@
   });
 
   /* ---- Request to vets ---- */
-  async function sendTaskToVets(row) {
-    let { error } = await sb.from('tasks').insert(row);
-    if (error && error.code === '23505') {   // same animal already has a case in that pen on this shift: add to it (or reopen if finished)
-      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
-      const old = found && found[0];
-      if (old && !old.done) ({ error } = await sb.from('tasks').update({ problem: [old.problem, row.problem].filter(Boolean).join(' — ') }).eq('id', old.id));
-      else if (old) ({ error } = await sb.from('tasks').update(Object.assign({}, row, { created_at: new Date().toISOString(), completed_at: null, completed_by_role: null, claimed_by: null, claimed_at: null,
-        vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null, note: null, treatment: null, plan: null })).eq('id', old.id));
-    }
-    return error;
-  }
-  $('bv-send').addEventListener('click', async () => {
-    const er = $('bv-error'), fail = m => { er.style.color = ''; er.textContent = m; er.style.display = 'block'; };
-    er.style.display = 'none';
-    const animalId = $('bv-animal').value.trim();
-    if (!animalId) return fail('Enter the shelter ID.');
-    if (!initials()) return fail('Enter your initials first (top left).');
-    const room = $('bv-room').value, pen = $('bv-pen').value.trim(), off = LDHLogic.OFFSITE_NAMES.includes(room);
-    const btn = $('bv-send'); btn.disabled = true;
-    const row = LDHLogic.behaviourVetRequest({ type: $('bv-type').value, animalId, location: locText(room, pen), locationDetail: off ? pen : '',
-      courthold: $('bv-courthold').checked, note: $('bv-note').value.trim(), initials: initials() });
-    const error = await sendTaskToVets(row);
-    btn.disabled = false;
-    if (error) return fail('Could not send to the vets: ' + error.message);
-    ['bv-animal', 'bv-pen', 'bv-note'].forEach(id => { $(id).value = ''; }); $('bv-courthold').checked = false;
-    er.textContent = 'Sent to the vets.'; er.style.display = 'block'; er.style.color = 'var(--green)';
-  });
-
   (async function () {
     const { sb: client } = await OpsCore.init({ page: 'behaviour' });
     sb = client;
-    $('bv-room').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
     $('bh-initials').value = OpsCore.readInitials(INIT_KEY);
     $('app-root').style.display = 'grid';
+    // One request card, same as the other pages: here for asking the vets (shelter stress medication, post adoption pack, other).
+    SendCard.mount($('send-request'), { sb, tabs: ['vets'], vetsFrom: 'behaviour', initials: initials(),
+      saveInitials: v => { OpsCore.saveInitials(INIT_KEY, v); $('bh-initials').value = v; } });
+    $('bh-initials').addEventListener('change', () => { const w = document.querySelector('#send-request [data-f="initials"]'); if (w) w.value = initials(); });
     await loadAll();
     OpsCore.subscribe(['behaviour_tasks'], loadAll);
     setInterval(render, 60000);

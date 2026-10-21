@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/animal-history-view.js"></script>
 <script src="lib/ops-core.js"></script>
+<script src="lib/send-card.js"></script>
 <style>
   :root {
     --bg: #F4F6FB;
@@ -224,7 +225,7 @@
       </div>
     </section>
 
-    <div style="margin:0;"><button type="button" class="secondary bt-open">Task for behaviour</button></div>
+    <section class="card" id="send-request"></section>
 
     <p class="subtle" id="kpi-date" style="margin:-8px 0 0;"></p>
     <div class="kpi-row">
@@ -239,38 +240,14 @@
     </div>
 
     <section class="card" id="nurse-treatments">
-      <h2>Request a treatment to nurse</h2>
-      <p class="subtle">Ask the nurses to give a treatment to an animal in the ward, e.g. flush a dental extraction site twice a day for 7 days.</p>
-      <h3 style="font-size:0.85rem; margin:8px 0 0;">New request</h3>
-      <div class="nt-form">
-        <label>Animal ID<input id="nt-animal" placeholder="Animal ID"></label>
-        <label>Space<select id="nt-location"></select></label>
-        <label>Pen #<input id="nt-pen" placeholder="Pen #" maxlength="12"></label>
-        <label>Your initials<input id="nt-initials" class="vet-init" maxlength="4" placeholder="e.g. JX" autocomplete="off"></label>
-        <label>Treatment<input id="nt-treatment" maxlength="80" placeholder="e.g. flush dental extraction site"></label>
-        <label>Times a day<select id="nt-times"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
-        <label>For how many days<input id="nt-days" type="number" min="1" max="30" value="7"></label>
-        <label>Start date<input id="nt-start" type="date"></label>
-        <button id="nt-submit" type="button">Request</button>
-      </div>
+      <h2>Treatment courses in progress</h2>
+      <p class="subtle">Ask the nurses for a new course from <b>Send a request</b> above (Nurses, then Treatment course).</p>
       <div id="nt-courses" style="margin-top:18px;"></div>
     </section>
 
     <section class="card" id="nurse-misc">
-      <h2>Request a nurse task — miscellaneous</h2>
-      <p class="subtle">Ask the nurses to do a task — bloods, ear swab, FIV test, a flu cat needing IVFT and so on. It shows on the Nurses page under the Welfare nurse's Miscellaneous tasks; microchip and UV checks go to the Processing nurse. To pass on a flagged case, use "Transfer to nurse" on the case below.</p>
-      <h3 style="font-size:0.85rem; margin:8px 0 0;">New task</h3>
-      <div class="nt-form">
-        <label>Animal ID<input id="mt-animal" placeholder="Animal ID"></label>
-        <label>Space<select id="mt-location"></select></label>
-        <label id="mt-pen-wrap">Pen #<input id="mt-pen" placeholder="Pen #" maxlength="12"></label>
-        <label>Your initials<input id="mt-initials" class="vet-init" maxlength="4" placeholder="e.g. JX" autocomplete="off"></label>
-        <label id="mt-detail-wrap" style="display:none;">Detail<input id="mt-detail" placeholder="e.g. foster name"></label>
-        <label>Task<select id="mt-task"></select></label>
-        <label>Note (optional)<input id="mt-note" placeholder="e.g. before surgery tomorrow"></label>
-        <button id="mt-submit" type="button">Request</button>
-      </div>
-      <h3 style="font-size:0.85rem; margin:18px 0 0;">Tasks already requested</h3>
+      <h2>Nurse tasks requested</h2>
+      <p class="subtle">Tasks you asked the nurses for show here. They appear on the Nurses page under the Welfare nurse's Miscellaneous tasks; microchip and UV checks go to the Processing nurse. Ask for a new one from <b>Send a request</b> above.</p>
       <div id="misc-list"></div>
     </section>
 
@@ -331,12 +308,12 @@
       <details><summary>I picked a case up but got called away — how do I put it back?</summary><div><p>Press <b>Put back</b> on the card. The case returns to its tier column for any vet to pick up. No reason is needed. Its time target keeps running from when it was first flagged, and the card shows "Put back" with the time.</p></div></details>
       <details><summary>How do I finish a case?</summary><div><p>Press <b>DONE</b> once you have seen the animal. For a medication case the DONE panel asks for the medication details, and the case then waits for the nurses to make the label.</p></div></details>
       <details><summary>How do I hand a case to the nurses?</summary><div><p>Press <b>Transfer to nurse</b> on a picked-up case, choose the task (blood test, ear swab, FIV test, IVFT, microchip, UV, other) and add a note. The case leaves the vet board and appears on the Nurses page. Microchip and UV go to the Processing nurse, everything else to the Welfare nurse.</p></div></details>
-      <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Request a nurse task — miscellaneous</b> for one-off tasks, or <b>Request a treatment</b> for a course such as "flush twice a day for 7 days".</p></div></details>
+      <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Send a request</b> and pick <b>Nurses</b>. For <b>What</b> choose a one-animal task (blood test, ear swab, FIV test, cat needing IVFT, microchip, UV, treatment check) or <b>Treatment course</b> for something given on a schedule such as "flush twice a day for 7 days" (then fill in times a day and days).</p></div></details>
       <details><summary>How will I know a new request has arrived?</summary><div><p>A red <b>NEW REQUEST</b> banner appears at the top, the page plays three beeps and the tab title flashes. It covers requests from shelter staff, results sent back by nurses, and requests from the Behaviour team (the banner says how many came from Behaviour). Tap the page, or the <b>alert sound</b> button, once at the start of your shift so the browser allows sound.</p></div></details>
       <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p><p>While this page is open, every new request — including a result sent back — raises a red <b>NEW REQUEST</b> banner with one count (for example “3 new requests sent through”), flashes the tab title and beeps. The sound is on by default; browsers need one tap on the page before they will play it, and the sound button at the top mutes it.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
       <details><summary>The Behaviour team asked me for something — where is it?</summary><div><p>Requests from the Behaviour team (shelter stress medication, a post adoption med pack, or another request) arrive on the vet board like any other request, with a note that says it came from Behaviour and a courthold mention if it applies. Shelter stress medication and post adoption packs wait for the nurse&rsquo;s label like other medication requests.</p></div></details>
-      <details><summary>How do I ask the Behaviour team to look at an animal?</summary><div><p>Press <b>Task for behaviour</b>. Choose the task, animal ID, space and pen, <b>Needed within</b> and a reason (required for a behaviour review and an incident review), enter your <b>initials</b> and send. It lands on the Behaviour page in Incoming. Tick <i>Send straight to the Behaviour TL</i> if you want it to skip Incoming.</p></div></details>
+      <details><summary>How do I ask the Behaviour team to look at an animal?</summary><div><p>In <b>Send a request</b> pick <b>Behaviour</b>. Fill it in top to bottom: <b>What</b>, animal ID, space, pen or detail, <b>Needed within</b>, and a reason (required for a behaviour review and an incident review), enter your <b>initials</b> and send. It lands on the Behaviour page in Incoming. Tick <i>Send straight to the Behaviour TL</i> if you want it to skip Incoming.</p></div></details>
       <details><summary>I am worried about an animal&rsquo;s behaviour while writing a note in a shift tool.</summary><div><p>In <b>Processing</b>, <b>Sick &amp; Injured</b> or <b>Surgery</b>, press <b>Send to Behaviour</b> on the animal&rsquo;s card. The animal goes to the Behaviour page with your <b>whole current note</b> attached. The note is <b>deleted from the database when the Behaviour team ticks Done</b> (or within 7 days). Their Done comment shows on the Shelter board.</p></div></details>
       <details><summary>Do I need to give my initials?</summary><div><p>Yes. Whenever you send something to the nurses or to Behaviour, you are asked for your initials. They are remembered on this device for the day.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
@@ -908,36 +885,6 @@
           <button type="button" class="secondary nt-stop" data-id="${esc(c.t.id)}">Stop course</button></div>`).join('')
       : '<p class="empty-state">No treatment courses in progress.</p>';
   }
-  document.getElementById('nt-start').value = LDHLogic.localISO(new Date());
-  document.getElementById('nt-submit').addEventListener('click', async () => {
-    const _btn = document.getElementById('nt-submit'); _btn.disabled = true;
-    try {
-      const animal = document.getElementById('nt-animal').value.trim();
-      const treatment = document.getElementById('nt-treatment').value.trim();
-      const times = parseInt(document.getElementById('nt-times').value, 10);
-      const days = parseInt(document.getElementById('nt-days').value, 10);
-      const start = document.getElementById('nt-start').value || LDHLogic.localISO(new Date());
-      if (!animal || !treatment) { alert('Enter the animal ID and the treatment.'); return; }
-      const who = vetInitFrom(document.getElementById('nt-initials')); if (!who) { alert('Enter your initials in the request, so the nurses can see who asked.'); document.getElementById('nt-initials').focus(); return; }
-      if (!days || days < 1 || days > 30) { alert('Days must be between 1 and 30.'); return; }
-      const { data: tr, error } = await sb.from('nurse_treatments').insert({
-        animal_id: animal, location: (() => { const room = document.getElementById('nt-location').value, pen = document.getElementById('nt-pen').value.trim(); return pen && !LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' / ' + pen : room; })(), treatment,
-        times_per_day: times, days, start_date: start, requested_by: who
-      }).select().single();
-      if (error) { alert('Could not save the request: ' + error.message); return; }
-      const slots = LDHLogic.doseSlots(start, times, days).map(s => Object.assign({ treatment_id: tr.id }, s));
-      const { error: doseErr } = await sb.from('nurse_treatment_doses').insert(slots);
-      if (doseErr) {
-        await sb.from('nurse_treatments').delete().eq('id', tr.id);   // never leave a course without its doses
-        alert('Could not create the dose list: ' + doseErr.message);
-        return;
-      }
-      document.getElementById('nt-animal').value = '';
-      document.getElementById('nt-pen').value = '';
-      document.getElementById('nt-treatment').value = '';
-      loadAll();
-    } finally { _btn.disabled = false; }
-  });
   document.getElementById('nurse-treatments').addEventListener('click', async (e) => {
     const btn = e.target.closest('.nt-stop'); if (!btn) return;
     if (!confirm('Stop this course? Its remaining doses will disappear from the lists.')) return;
@@ -971,35 +918,6 @@
           <div class="ameta">${esc(LDHLogic.MISC_TASK_LABELS[r.task] || r.task)}${r.note ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.done ? ' · done' + (r.done_by ? ' by ' + esc(r.done_by) : '') : ' · waiting for the nurse'}</div></div>
       </div>`).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
   }
-  function fillMiscSelects() {
-    document.getElementById('mt-location').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
-    document.getElementById('mt-task').innerHTML = Object.keys(LDHLogic.MISC_TASK_LABELS).filter(k => k !== 'med_label').map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('');
-  }
-  document.getElementById('mt-location').addEventListener('change', (e) => {
-    const off = LDHLogic.OFFSITE_NAMES.includes(e.target.value);
-    document.getElementById('mt-detail-wrap').style.display = off ? '' : 'none';
-    document.getElementById('mt-pen-wrap').style.display = off ? 'none' : '';      // offsite animals have a foster / rescue detail instead of a pen
-  });
-  document.getElementById('mt-submit').addEventListener('click', async () => {
-    const btn = document.getElementById('mt-submit'); btn.disabled = true;
-    try {
-      const animal = document.getElementById('mt-animal').value.trim();
-      if (!animal) { alert('Enter an animal ID.'); return; }
-      const who = vetInitFrom(document.getElementById('mt-initials')); if (!who) { alert('Enter your initials in the request, so the nurses can see who asked.'); document.getElementById('mt-initials').focus(); return; }
-      const room = document.getElementById('mt-location').value;
-      const detail = document.getElementById('mt-detail').value.trim();
-      const pen = document.getElementById('mt-pen').value.trim();
-      const location = !LDHLogic.OFFSITE_NAMES.includes(room) && pen ? room + ' / ' + pen : room;      // the same "room / pen" form the flag board uses
-      const { error } = await sb.from('noga_requests').insert({
-        animal_id: animal, location, location_detail: LDHLogic.OFFSITE_NAMES.includes(room) ? (detail || null) : null,
-        task: document.getElementById('mt-task').value, note: document.getElementById('mt-note').value.trim() || null, added_by: who
-      });
-      if (error) { alert('Could not save the task: ' + error.message); return; }
-      document.getElementById('mt-animal').value = ''; document.getElementById('mt-note').value = ''; document.getElementById('mt-detail').value = ''; document.getElementById('mt-pen').value = '';
-      loadAll();
-    } finally { btn.disabled = false; }
-  });
-
   /* ---------- transfer a flagged case to the nurses ---------- */
   function openTransferModal(t) {
     document.querySelectorAll('.transfer-modal-overlay').forEach(el => el.remove());
@@ -1053,19 +971,12 @@
     loadAll();
   });
 
-  function fillLocationSelects() {
-    const el = document.getElementById('nt-location');
-    if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
-    fillMiscSelects();
-  }
-
   // Same search as the shelter staff page: narrows the cases below and shows the animal's last 3 months of flags.
   AnimalHistoryView.attach({ sb: () => sb, input: document.getElementById('search-box'), out: document.getElementById('animal-history-out'), card: document.getElementById('animal-history') });
   document.getElementById('search-box').addEventListener('input', () => { CASES = LDHLogic.caseList(searchPool(), Date.now()); renderCases(); });
 
   function refreshTimers() { renderCases(); renderCompleted(); }
   setInterval(refreshTimers, 60000);
-  fillLocationSelects();
   renderColumnHeaders();
 
   /* ---------- auth (OpsCore) ---------- */
@@ -1073,6 +984,8 @@
     const { sb: client } = await OpsCore.init({ page: 'vets', gateRole: 'vet' });
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
+    // One request card, the same on every page: the vets ask the nurses (a treatment course or a one-animal task) or the behaviour team.
+    SendCard.mount(document.getElementById('send-request'), { sb, tabs: ['nurses', 'behaviour'], initials: storedVetInit(), saveInitials: rememberVetInit, onSent: () => loadAll() });
     await loadAll();
     OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {

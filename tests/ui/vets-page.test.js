@@ -161,8 +161,8 @@ const H = 3600 * 1000;
      ============================================================ */
   const b = await open({ memos: [{ author: 'Shelter Staff', text: 'Cage 4 latch is loose', done: false }] }, 'vets.html');
   try {
-    t.ok((await b.page.textContent('#nurse-treatments')).includes('Request a treatment to nurse'), 'the treatment request card is titled "Request a treatment to nurse"');
-    t.ok(await b.page.locator('#nt-location option').count() === 16, 'treatment form location select filled from the shared list');
+    t.ok((await b.page.textContent('#nurse-treatments')).includes('Treatment courses in progress'), 'the treatment card lists the courses in progress');
+    t.ok(await b.page.locator('#send-request .sc-panel[data-to="nurses"] [data-f="room"] option').count() === 16, 'request card location select filled from the shared list');
     t.ok(await b.page.isVisible('#start-shift-card'), 'Start a shift card present');
     t.ok(await b.page.locator('#start-shift-card a.shift-launch').count() === 3, 'Start a shift links to all three shift tools');
 
@@ -454,14 +454,15 @@ const H = 3600 * 1000;
   };
   const m = await open(seedM, 'vets.html');
   try {
-    t.ok(await m.page.locator('#nurse-misc').count() === 1, 'vets page has a Request a nurse task card');
-    t.ok((await m.page.$$eval('#mt-task option', os => os.map(o => o.value))).join() === 'blood,ear_swab,fiv_test,ivft,microchip,uv,treatment,other', 'task list: bloods, ear swab, FIV, flu cat IVFT, microchip, UV, treatment check, other');
-    await m.page.fill('#mt-animal', 'CAT-12');
-    await m.page.selectOption('#mt-location', 'Cat Room 2');
-    await m.page.selectOption('#mt-task', 'ear_swab');
-    await m.page.fill('#mt-note', 'both ears');
-    await m.page.fill('#mt-initials', 'jx');
-    await m.page.click('#mt-submit');
+    t.ok(await m.page.locator('#nurse-misc').count() === 1 && await m.page.locator('#send-request .sc-panel[data-to="nurses"]').count() === 1, 'vets page lists nurse tasks and has the Send a request card');
+    const NF = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
+    t.ok((await m.page.$$eval(NF('kind') + ' option', os => os.map(o => o.value))).join() === 'course,blood,ear_swab,fiv_test,ivft,microchip,uv,treatment,other', 'what list: treatment course, bloods, ear swab, FIV, cat in fluids IVFT, microchip, UV, treatment check, other');
+    await m.page.fill(NF('animal'), 'CAT-12');
+    await m.page.selectOption(NF('room'), 'Cat Room 2');
+    await m.page.selectOption(NF('kind'), 'ear_swab');
+    await m.page.fill(NF('note'), 'both ears');
+    await m.page.fill('#send-request [data-f="initials"]', 'jx');
+    await m.page.click('[data-send="nurses"]');
     await m.page.waitForTimeout(250);
     let ng = (await m.db()).noga_requests;
     t.ok(ng.length === 1 && ng[0].animal_id === 'CAT-12' && ng[0].task === 'ear_swab' && ng[0].note === 'both ears' && ng[0].location === 'Cat Room 2', 'a vet request is saved as a miscellaneous task');
