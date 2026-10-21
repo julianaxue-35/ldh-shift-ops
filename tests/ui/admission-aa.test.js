@@ -1,4 +1,4 @@
-// Admission AA page: own passcode, cards with a 24 h countdown, overdue warning, tick = delete, new-item banner.
+// Admission AA page: own passcode, cards with a 24 h countdown, overdue warning, tick = move to Completed (kept 7 days), new-item banner.
 const { open } = require('./harness');
 const t = require('./check')('admission-aa');
 const H = 3600 * 1000, M = 60 * 1000;
@@ -98,14 +98,23 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     t.ok(a.errors.length === 0, 'no page errors: ' + a.errors.join('; '));
   } finally { await a.browser.close(); }
 
-  /* completed cards older than 24 h are never shown and are removed */
+  /* completed cards are kept 7 days (a note the AA missed can be put back); older ones are never shown and are removed */
   const old = await open({ aa_items: [
-    { id: 'o1', kind: 'fiv', animal_ids: ['Z1'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(30 * H), completed_at: ago(25 * H), done_ids: ['Z1'] },
-    { id: 'o2', kind: 'fiv', animal_ids: ['Z2'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(3 * H), completed_at: ago(1 * H), done_ids: ['Z2'] }] }, 'admission-aa.html');
+    { id: 'o1', kind: 'fiv', animal_ids: ['Z1'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(200 * H), completed_at: ago(8 * 24 * H), done_ids: ['Z1'] },
+    { id: 'o2', kind: 'fiv', animal_ids: ['Z2'], payload: { result: 'neg' }, sent_by: 'AB', sent_at: ago(3 * H), completed_at: ago(1 * H), done_ids: ['Z2'] },
+    { id: 'o3', kind: 'processing_note', animal_ids: ['Z3'], payload: { text: 'Note for Z3' }, sent_by: 'YN', sent_at: ago(60 * H), completed_at: ago(50 * H), done_ids: ['Z3'] }] }, 'admission-aa.html');
   try {
     await old.page.waitForTimeout(400);
-    t.ok(/Z2/.test(await old.page.textContent('#aa-completed')) && !/Z1/.test(await old.page.textContent('#aa-completed')), 'a card completed over 24 h ago is not listed');
-    t.ok(!(await old.db()).aa_items.some(r => r.id === 'o1') && (await old.db()).aa_items.some(r => r.id === 'o2'), 'and it is deleted from the database');
+    const comp = await old.page.textContent('#aa-completed');
+    t.ok(/Z2/.test(comp) && /Z3/.test(comp) && !/Z1/.test(comp), 'a card completed 2 days ago is still listed; one completed 8 days ago is not');
+    t.ok(!(await old.db()).aa_items.some(r => r.id === 'o1') && (await old.db()).aa_items.some(r => r.id === 'o2') && (await old.db()).aa_items.some(r => r.id === 'o3'), 'the 8-day-old one is deleted from the database, the others stay');
+    await old.page.fill('#aa-done-search', 'z3');
+    const shown = await old.page.$$eval('.aa-done-row', rs => rs.map(r => r.textContent));
+    t.ok(shown.length === 1 && /Z3/.test(shown[0]), 'typing an animal ID narrows the completed list');
+    await old.page.click('.aa-putback[data-id="o3"]');
+    await old.page.waitForFunction(() => !window.__db.aa_items.find(r => r.id === 'o3').completed_at);
+    t.ok(/Z3/.test(await old.page.textContent('#aa-list')) && !/Z3/.test(await old.page.textContent('#aa-completed')), 'a card completed 2 days ago can be put back and is waiting again');
+    t.ok(old.errors.length === 0, 'no page errors: ' + old.errors.join('; '));
   } finally { await old.browser.close(); }
 
   /* Tab B: items arriving while the page is open raise one banner with a count. */

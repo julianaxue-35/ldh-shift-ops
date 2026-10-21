@@ -21,3 +21,6 @@ The team's Done comment is kept for 7 days and also shown on the Shelter board f
 **Until sign-off:** use fictional animals only (IDs like "BEH-1"). Do not send real notes until IT has approved this. The feature is a button per animal: nothing is sent unless a vet presses it.
 
 **Migration:** `supabase/migrations/0029_behaviour_attached_note.sql` (adds two columns, a unique index and two triggers; safe to run more than once).
+
+## Admission AA completed cards: kept 7 days (2026-10-22)
+A completed Admission AA card (`aa_items` row with `completed_at` set, including the vet's note text and any attached Word / Excel file) is now kept for **7 days** instead of 24 hours, so a note the AA forgot to enter can be put back. After 7 days the row is deleted (by the page when an AA opens it, and by the sync Edge Function whenever any item is sent). The progress counts in `aa_done_log` are unchanged (kind and number of animals only). Same patient-data rules as the Behaviour attached note: access is the authenticated dashboard accounts only.
