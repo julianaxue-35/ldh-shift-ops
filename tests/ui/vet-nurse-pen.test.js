@@ -6,7 +6,7 @@ const t = require('./check')('vet-nurse-pen');
   try {
     await v.page.waitForSelector('#mt-location option', { state: 'attached' });
     // miscellaneous task
-    await v.page.fill('#mt-animal', 'PEN-1');
+    await v.page.fill('#mt-animal', 'PEN-1'); await v.page.fill('#mt-initials', 'jx');
     await v.page.selectOption('#mt-location', 'Pound 1');
     t.ok(await v.page.isVisible('#mt-pen'), 'a Pen # box sits next to the space');
     await v.page.fill('#mt-pen', '12');
@@ -17,7 +17,7 @@ const t = require('./check')('vet-nurse-pen');
     t.ok(/Pound 1 \/ 12/.test(await v.page.textContent('#misc-list')), 'and the vet sees it in the list');
     t.ok((await v.page.inputValue('#mt-pen')) === '', 'the pen clears for the next one');
     // no pen: just the space, as before
-    await v.page.fill('#mt-animal', 'PEN-2'); await v.page.click('#mt-submit');
+    await v.page.fill('#mt-animal', 'PEN-2'); await v.page.fill('#mt-initials', 'jx'); await v.page.click('#mt-submit');
     await v.page.waitForFunction(() => window.__db.noga_requests.length === 2);
     t.ok((await v.db()).noga_requests[1].location === 'Pound 1', 'leaving the pen blank still works');
     // offsite animals have a detail, not a pen
@@ -27,7 +27,7 @@ const t = require('./check')('vet-nurse-pen');
       t.ok(!(await v.page.isVisible('#mt-pen')) && await v.page.isVisible('#mt-detail'), 'offsite hides the pen and asks for the foster / rescue detail');
     }
     // treatment course
-    await v.page.fill('#nt-animal', 'PEN-3'); await v.page.selectOption('#nt-location', 'Cat Room 2'); await v.page.fill('#nt-pen', '7');
+    await v.page.fill('#nt-initials', 'jx'); await v.page.fill('#nt-animal', 'PEN-3'); await v.page.selectOption('#nt-location', 'Cat Room 2'); await v.page.fill('#nt-pen', '7');
     await v.page.fill('#nt-treatment', 'flush site'); await v.page.click('#nt-submit');
     await v.page.waitForFunction(() => window.__db.nurse_treatments.length === 1);
     t.ok((await v.db()).nurse_treatments[0].location === 'Cat Room 2 / 7', 'a treatment course keeps the pen too');

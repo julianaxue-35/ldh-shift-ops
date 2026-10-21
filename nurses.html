@@ -194,6 +194,7 @@
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-welfare" style="font-size:0.78rem; font-weight:700;">Welfare nurse initials for today</label>
       <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
+    <div style="margin:0 0 12px;"><button type="button" class="secondary ask-vet-btn" data-col="welfare">Task for vets</button></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -229,6 +230,7 @@
     <h2 class="nurse-col-title processing">Processing nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-processing" style="font-size:0.78rem; font-weight:700;">Processing nurse initials for today</label>
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
+    <div style="margin:0 0 12px;"><button type="button" class="secondary ask-vet-btn" data-col="processing">Task for vets</button></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="bulk-bar-processing" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
@@ -563,7 +565,7 @@
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
         ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}" data-src="nr" data-rid="${esc(r.id)}">Send to AA</button>` : ''}
-        ${r.kind === 'fiv' || r.kind === 'blood' ? `<button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>` : ''}
+        <button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>
         <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
         <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
@@ -727,7 +729,7 @@
       <div class="attn-item noga-item">
         <div style="display:flex; gap:8px; align-items:flex-start;">${r.done ? '' : rowPickBox('misc', r, isProcessingMisc(r) ? 'processing' : 'welfare', r.task === 'uv')}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
           <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note && r.task !== 'med_label' ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div>${r.task === 'med_label' && r.note ? `<div class="med-label-text">${esc(r.note)}</div>` : ''}</div></div>
-        ${r.done ? '' : r.task === 'med_label' ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>` : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
+        ${r.done ? '' : r.task === 'med_label' ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>` : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
   function renderNoga() {
@@ -770,6 +772,27 @@
      From a Miscellaneous task the task is also closed; from an FIV/blood nurse request the request is left alone
      (the nurse still ticks off the animals) because one request can cover several animals.
      ============================================================ */
+  // Put a task on the vet board. Same animal already has a case in that pen on this shift (unique title+location+shift): reopen it if
+  // it is finished, otherwise add this to the open case and lift it to the sooner window.
+  async function sendTaskToVets(row) {
+    let { error } = await sb.from('tasks').insert(row);
+    /* Same animal already has a case in that pen on this shift (unique title+location+shift): reopen it if it is
+       finished, otherwise add the result to the open case and lift it to the sooner window. */
+    if (error && error.code === '23505') {
+      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+      const old = found && found[0];
+      if (old && !old.done) {
+        const sooner = (LDHLogic.normTier(old.urgency) === 'red_flag' || row.urgency === 'red_flag') ? 'red_flag' : LDHLogic.normTier(old.urgency);
+        ({ error } = await sb.from('tasks').update({ problem: [old.problem, row.problem].filter(Boolean).join(' — '), urgency: sooner }).eq('id', old.id));
+      } else if (old) {
+        ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
+          created_at: new Date().toISOString(), completed_at: null, completed_by_role: null, claimed_by: null, claimed_at: null,
+          vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null, note: null, treatment: null, plan: null
+        })).eq('id', old.id));
+      }
+    }
+    return error;
+  }
   function openBackModal(src) {
     document.querySelectorAll('.back-modal-overlay').forEach(el => el.remove());
     const r = src.row, isMisc = src.src === 'misc';
@@ -820,27 +843,73 @@
       result, action: overlay.querySelector('.back-action').value, window: overlay.querySelector('.back-window').value
     });
     row.problem += ' (sent by ' + initials + ')';
-    let { error } = await sb.from('tasks').insert(row);
-    /* Same animal already has a case in that pen on this shift (unique title+location+shift): reopen it if it is
-       finished, otherwise add the result to the open case and lift it to the sooner window. */
-    if (error && error.code === '23505') {
-      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
-      const old = found && found[0];
-      if (old && !old.done) {
-        const sooner = (LDHLogic.normTier(old.urgency) === 'red_flag' || row.urgency === 'red_flag') ? 'red_flag' : LDHLogic.normTier(old.urgency);
-        ({ error } = await sb.from('tasks').update({ problem: [old.problem, row.problem].filter(Boolean).join(' — '), urgency: sooner }).eq('id', old.id));
-      } else if (old) {
-        ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
-          created_at: new Date().toISOString(), completed_at: null, completed_by_role: null, claimed_by: null, claimed_at: null,
-          vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null, note: null, treatment: null, plan: null
-        })).eq('id', old.id));
-      }
-    }
+    const error = await sendTaskToVets(row);
     if (error) { ok.disabled = false; return fail('Could not send to the vets: ' + error.message); }
     if (isMisc) {
       const { error: e2 } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString(), result_note: result, returned_at: new Date().toISOString() }).eq('id', r.id);
       if (e2) alert('Sent to the vets, but the task could not be closed here: ' + e2.message);
     }
+    overlay.remove();
+    loadAll();
+  });
+
+  /* ---- a nurse asks a vet to do something (not tied to an existing task) ---- */
+  function openAskVetModal(col) {
+    document.querySelectorAll('.ask-modal-overlay').forEach(el => el.remove());
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="oc-modal-overlay ask-modal-overlay" data-col="${esc(col)}">
+        <div class="oc-modal done-modal">
+          <h3 class="done-modal-title">Task for vets</h3>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Animal ID</label>
+          <input class="ask-animal" placeholder="Animal ID">
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Space</label>
+          <select class="ask-room">${LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('')}</select>
+          <label class="ask-pen-label" style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Pen # <span class="ask-pen-hint" style="font-weight:400;"></span></label>
+          <input class="ask-pen" placeholder="Pen #" maxlength="40">
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the vets</label>
+          <textarea class="ask-text" rows="3" placeholder="e.g. please check the eye, it looks worse"></textarea>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Vet to</label>
+          <select class="ask-action">${['other', 'interpret', 'upload'].map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_ACTIONS[k])}</option>`).join('')}</select>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Needed within</label>
+          <select class="ask-window">${Object.keys(LDHLogic.BACK_WINDOWS).map(k => `<option value="${esc(k)}" ${k === '12_24h' ? 'selected' : ''}>${esc(LDHLogic.BACK_WINDOWS[k])}</option>`).join('')}</select>
+          <p class="oc-modal-error ask-error"></p>
+          <div class="oc-modal-actions">
+            <button type="button" class="oc-modal-cancel ask-cancel">Cancel</button>
+            <button type="button" class="oc-modal-submit ask-confirm">Send to vets</button>
+          </div>
+        </div>
+      </div>`;
+    const overlay = wrap.firstElementChild;
+    const room = overlay.querySelector('.ask-room'), pen = overlay.querySelector('.ask-pen'), hint = overlay.querySelector('.ask-pen-hint');
+    const sync = () => { const off = LDHLogic.OFFSITE_NAMES.includes(room.value); pen.placeholder = off ? 'Detail, e.g. foster name' : 'Pen #'; hint.textContent = off ? '(foster / rescue detail)' : ''; };
+    room.addEventListener('change', sync); sync();
+    document.body.appendChild(overlay);
+  }
+  document.addEventListener('click', async (e) => {
+    const open = e.target.closest('.ask-vet-btn');
+    if (open) { openAskVetModal(open.dataset.col); return; }
+    const cancel = e.target.closest('.ask-cancel');
+    if (cancel) { cancel.closest('.ask-modal-overlay').remove(); return; }
+    const ok = e.target.closest('.ask-confirm'); if (!ok) return;
+    const overlay = ok.closest('.ask-modal-overlay');
+    const err = overlay.querySelector('.ask-error');
+    const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
+    const animalId = overlay.querySelector('.ask-animal').value.trim();
+    const text = overlay.querySelector('.ask-text').value.trim();
+    if (!animalId) return fail('Enter the animal ID.');
+    if (!text) return fail('Write the task for the vets.');
+    const initials = myInitials(overlay.dataset.col);
+    if (!initials) return fail('Enter your initials first.');
+    const roomName = overlay.querySelector('.ask-room').value, extra = overlay.querySelector('.ask-pen').value.trim();
+    const off = LDHLogic.OFFSITE_NAMES.includes(roomName);
+    ok.disabled = true;
+    const row = LDHLogic.nurseAskTask({
+      animalId, location: !off && extra ? roomName + ' / ' + extra : roomName, locationDetail: off ? extra : '',
+      text, action: overlay.querySelector('.ask-action').value, window: overlay.querySelector('.ask-window').value, initials
+    });
+    const error = await sendTaskToVets(row);
+    if (error) { ok.disabled = false; return fail('Could not send to the vets: ' + error.message); }
     overlay.remove();
     loadAll();
   });
