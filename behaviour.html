@@ -214,6 +214,7 @@
         <section class="bh-lane" data-lane="dog"><h3>Dog assist <button type="button" class="secondary bh-add" data-lane="dog">+ Task</button></h3><div id="lane-dog"></div></section>
       </div>
     </div>
+    <section class="card" id="bh-stats"><h2>What the Behaviour team has done</h2><div id="bh-stats-body"></div></section>
       <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
     <div class="card faq-card faq-modal" id="faq">
       <button type="button" class="faq-close" aria-label="Close FAQ">&times;</button>
@@ -221,6 +222,7 @@
       <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
+      <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, quarter and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
       <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
       <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
       <details><summary>How do I give a task to someone else on the team?</summary><div><p>Each lane has an <b>add task</b> button. The TL can give a task to an assist, and an assist can give one back to the TL. Choose the animal, the space and pen, the kind of task, the time frame and a reason, and pick who it is for (only the lanes that suit the species are offered).</p></div></details>
@@ -267,10 +269,44 @@
     alertSound.play();
     if (!flashTimer) { let on = false; flashTimer = setInterval(() => { on = !on; document.title = on ? '\uD83D\uDD14 NEW TASK \u2014 Behaviour' : BASE_TITLE; }, 1000); }
   }
+  /* ---- What the team has done: today's ring + totals for the week / month / quarter / year. Finished cases are deleted after
+     7 days, so each one is counted (kind and date only, no animal) in a log the database keeps. ---- */
+  let BH_COUNTS = null;   // null = the database function is not there yet
+  async function loadCounts() {
+    try {
+      const since = LDHLogic.localISO(new Date(new Date().getFullYear(), 0, 1));
+      const { data, error } = await sb.rpc('behaviour_daily_counts', { p_since: since });
+      BH_COUNTS = error ? null : (data || []).map(r => ({ day: String(r.day).slice(0, 10), cat: r.cat, n: Number(r.n) }));
+    } catch (e) { BH_COUNTS = null; }
+  }
+  function ringSvg(today, typical) {
+    const r = 46, stroke = 12, c = 2 * Math.PI * r;
+    const frac = typical > 0 ? Math.min(today / typical, 1) : (today > 0 ? 1 : 0);
+    return `<svg viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="${today} cases done today">
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="rgba(128,128,128,.25)" stroke-width="${stroke}"/>
+      <circle cx="60" cy="60" r="${r}" fill="none" stroke="#7c5cbf" stroke-width="${stroke}" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${(c * (1 - frac)).toFixed(1)}" transform="rotate(-90 60 60)"/>
+      <text x="60" y="58" text-anchor="middle" font-size="26" font-weight="700" fill="currentColor">${today}</text>
+      <text x="60" y="78" text-anchor="middle" font-size="10" fill="currentColor" opacity=".7">CASES TODAY</text>
+    </svg>`;
+  }
+  function renderStats() {
+    const el = $('bh-stats-body');
+    if (!BH_COUNTS) { el.innerHTML = '<p class="empty-state">The totals will appear here once the latest database update has been run.</p>'; return; }
+    const s = LDHLogic.behaviourStats(BH_COUNTS, Date.now());
+    const typical = s.cases.month.avg || s.cases.week.avg || s.cases.year.avg;
+    const P = [['week', 'This week'], ['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']];
+    el.innerHTML = `<div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
+      <div style="text-align:center;">${ringSvg(s.cases.today, typical)}<div style="font-size:0.78rem; opacity:.8; max-width:150px;">The ring fills as today nears a usual working day (${typical || 0} cases).</div></div>
+      <table style="flex:1; min-width:280px; font-size:0.9rem; border-collapse:collapse;">
+        <tr style="opacity:.7; text-align:right;"><th style="text-align:left;">&nbsp;</th><th>Cases done</th><th>Cases / working day</th><th>Courthold</th><th>Incident reviews</th></tr>
+        ${P.map(([k, label]) => `<tr data-period="${k}" style="text-align:right; border-top:1px solid var(--border);"><td style="text-align:left; padding:6px 0;">${label}</td><td><b>${s.cases[k].total}</b></td><td><b>${s.cases[k].avg}</b></td><td><b>${s.courthold[k].total}</b></td><td><b>${s.incident_review[k].total}</b></td></tr>`).join('')}
+      </table></div>`;
+  }
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
     if (!error) { ROWS = data || []; checkForNewTasks(); }
     render();
+    await loadCounts(); renderStats();
   }
   function filtered() {
     const k = $('f-kind').value, w = $('f-window').value, c = $('f-court').checked;
