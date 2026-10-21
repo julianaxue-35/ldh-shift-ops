@@ -326,6 +326,31 @@
       </div>
     </section>
 
+    <section class="card nurse-card" id="bh-bar" style="background:#f6f1fd; border-left-color:#7c5cbf;">
+      <h2 style="color:#5b3fa0;">Behaviour request</h2>
+      <p class="subtle">Courthold reassessment, owner surrender history with concerns, aggression / incident review or a behaviour review. The behaviour team sees it straight away.</p>
+      <div class="nr-form">
+        <label>Task<select id="bk-kind">
+          <option value="courthold">Courthold reassessment</option>
+          <option value="surrender_history">Owner surrender history with concerns</option>
+          <option value="incident_review">Aggression / incident review</option>
+          <option value="behaviour_review">Behaviour review</option>
+          <option value="other">Other</option></select></label>
+        <label>Animal ID<input id="bk-animal" placeholder="Animal ID"></label>
+        <label>Space<select id="bk-room"></select></label>
+        <label>Pen / detail<input id="bk-pen" placeholder="Pen #"></label>
+        <label>Needed within<select id="bk-window">
+          <option value="30_60m">Within 30–60 minutes</option>
+          <option value="today">Within today</option>
+          <option value="48h">Within 48 hours</option></select></label>
+        <label>Reason (required for reviews)<textarea id="bk-reason" rows="2" placeholder="Why are you flagging this animal? Or describe another issue."></textarea></label>
+        <label>Your initials<input id="bk-initials" maxlength="4" placeholder="e.g. AB"></label>
+        <label style="display:flex; gap:6px; align-items:center;"><input type="checkbox" id="bk-tl" style="width:auto;"> Send straight to the Behaviour TL</label>
+        <button id="bk-submit" type="button">Send to behaviour</button>
+      </div>
+      <p id="bk-error" class="oc-modal-error"></p>
+    </section>
+
     <div class="kpi-row">
       <section class="card completion-card">
         <div class="completion-donut" id="completion-donut"></div>
@@ -878,6 +903,33 @@
   applyNrDefaultLocation();
   renderRedFlagForm();
   updateLocationFields();
+
+  /* ---- Behaviour request (2026-10-21) ---- */
+  (function () {
+    const KEY = 'ldh_behaviour_initials_v1', $ = id => document.getElementById(id);
+    $('bk-room').innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    $('bk-initials').value = OpsCore.readInitials(KEY);
+    $('bk-initials').addEventListener('change', () => OpsCore.saveInitials(KEY, $('bk-initials').value));
+    $('bk-submit').addEventListener('click', async () => {
+      const er = $('bk-error'), fail = m => { er.textContent = m; er.style.display = 'block'; };
+      er.style.display = 'none';
+      const kind = $('bk-kind').value, room = $('bk-room').value, pen = $('bk-pen').value.trim();
+      const location = LDHLogic.OFFSITE_NAMES.includes(room) || !pen ? room : room + ' / ' + pen;
+      const msg = LDHLogic.behaviourValidate({ kind, animalId: $('bk-animal').value, location, reason: $('bk-reason').value });
+      if (msg) return fail(msg);
+      const who = $('bk-initials').value.trim().toUpperCase();
+      if (!who) return fail('Enter your initials.');
+      const btn = $('bk-submit'); btn.disabled = true;
+      const lane = $('bk-tl').checked ? 'tl' : 'incoming';
+      const { error } = await sb.from('behaviour_tasks').insert({ kind, animal_id: $('bk-animal').value.trim(), location, lane,
+        due_window: $('bk-window').value, reason: $('bk-reason').value.trim() || null, courthold: kind === 'courthold', flagged_by: who,
+        history: [{ at: new Date().toISOString(), by: who, from: 'new', to: lane }] });
+      btn.disabled = false;
+      if (error) return fail('Could not send: ' + error.message);
+      OpsCore.saveInitials(KEY, who);
+      ['bk-animal', 'bk-pen', 'bk-reason'].forEach(id => { $(id).value = ''; }); $('bk-tl').checked = false;
+    });
+  })();
 
   /* ---------- auth (OpsCore) ---------- */
   (async function () {
