@@ -4,31 +4,34 @@ const t = require('./check')('vet-nurse-pen');
 (async () => {
   const v = await open({}, 'vets.html');
   try {
-    await v.page.waitForSelector('#mt-location option', { state: 'attached' });
-    // miscellaneous task
-    await v.page.fill('#mt-animal', 'PEN-1'); await v.page.fill('#mt-initials', 'jx');
-    await v.page.selectOption('#mt-location', 'Pound 1');
-    t.ok(await v.page.isVisible('#mt-pen'), 'a Pen # box sits next to the space');
-    await v.page.fill('#mt-pen', '12');
-    await v.page.click('#mt-submit');
+    await v.page.waitForSelector('#send-request .sc-panel[data-to="nurses"] [data-f="room"] option', { state: 'attached' });
+    const F = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
+    // one-animal task
+    await v.page.fill(F('animal'), 'PEN-1'); await v.page.fill('#send-request [data-f="initials"]', 'jx');
+    await v.page.selectOption(F('kind'), 'blood');
+    await v.page.selectOption(F('room'), 'Pound 1');
+    t.ok(await v.page.isVisible(F('pen')), 'a Pen box sits next to the space');
+    await v.page.fill(F('pen'), '12');
+    await v.page.click('[data-send="nurses"]');
     await v.page.waitForFunction(() => window.__db.noga_requests.length === 1);
     let row = (await v.db()).noga_requests[0];
     t.ok(row.animal_id === 'PEN-1' && row.location === 'Pound 1 / 12', 'the task is saved as "space / pen" like the flag board: ' + row.location);
     t.ok(/Pound 1 \/ 12/.test(await v.page.textContent('#misc-list')), 'and the vet sees it in the list');
-    t.ok((await v.page.inputValue('#mt-pen')) === '', 'the pen clears for the next one');
-    // no pen: just the space, as before
-    await v.page.fill('#mt-animal', 'PEN-2'); await v.page.fill('#mt-initials', 'jx'); await v.page.click('#mt-submit');
+    t.ok((await v.page.inputValue(F('pen'))) === '', 'the pen clears for the next one');
+    // no pen: just the space
+    await v.page.fill(F('animal'), 'PEN-2'); await v.page.click('[data-send="nurses"]');
     await v.page.waitForFunction(() => window.__db.noga_requests.length === 2);
     t.ok((await v.db()).noga_requests[1].location === 'Pound 1', 'leaving the pen blank still works');
-    // offsite animals have a detail, not a pen
-    const off = await v.page.$$eval('#mt-location option', os => os.map(o => o.value).find(x => /offsite|foster|rescue|pathway/i.test(x)));
-    if (off) {
-      await v.page.selectOption('#mt-location', off);
-      t.ok(!(await v.page.isVisible('#mt-pen')) && await v.page.isVisible('#mt-detail'), 'offsite hides the pen and asks for the foster / rescue detail');
-    }
+    // offsite animals take a detail (kept in location_detail), not a pen
+    await v.page.fill(F('animal'), 'PEN-5'); await v.page.selectOption(F('room'), 'Vet clinic'); await v.page.fill(F('pen'), 'ward 2');
+    await v.page.click('[data-send="nurses"]');
+    await v.page.waitForFunction(() => window.__db.noga_requests.length === 3);
+    row = (await v.db()).noga_requests[2];
+    t.ok(row.location === 'Vet clinic' && row.location_detail === 'ward 2', 'offsite keeps the detail separately: ' + row.location + ' / ' + row.location_detail);
     // treatment course
-    await v.page.fill('#nt-initials', 'jx'); await v.page.fill('#nt-animal', 'PEN-3'); await v.page.selectOption('#nt-location', 'Cat Room 2'); await v.page.fill('#nt-pen', '7');
-    await v.page.fill('#nt-treatment', 'flush site'); await v.page.click('#nt-submit');
+    await v.page.selectOption(F('kind'), 'course');
+    await v.page.fill(F('animal'), 'PEN-3'); await v.page.selectOption(F('room'), 'Cat Room 2'); await v.page.fill(F('pen'), '7');
+    await v.page.fill(F('treatment'), 'flush site'); await v.page.click('[data-send="nurses"]');
     await v.page.waitForFunction(() => window.__db.nurse_treatments.length === 1);
     t.ok((await v.db()).nurse_treatments[0].location === 'Cat Room 2 / 7', 'a treatment course keeps the pen too');
     t.ok(/Cat Room 2 \/ 7/.test(await v.page.textContent('#nt-courses')), 'and shows it in the courses list');

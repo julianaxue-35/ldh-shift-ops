@@ -6,8 +6,8 @@ const PAGES = [
   ['admission-aa.html', /Entered in ShelterMate/, /PRIORITY/],
   ['shelter-board.html', /Waiting for vet/, /Behaviour team found/],
   ['index.html', /Behaviour task/, /Send straight to the Behaviour TL/],
-  ['vets.html', /Task for behaviour/, /Send to Behaviour/],
-  ['nurses.html', /Task for behaviour/, /initials/]
+  ['vets.html', /Send a request/, /Send to Behaviour/],
+  ['nurses.html', /Send a request/, /initials/]
 ];
 (async () => {
   for (const [file, a, b] of PAGES) {

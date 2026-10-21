@@ -22,6 +22,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/ops-core.js"></script>
+<script src="lib/send-card.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="lib/report7.js"></script>
 <style>
@@ -194,7 +195,7 @@
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-welfare" style="font-size:0.78rem; font-weight:700;">Welfare nurse initials for today</label>
       <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
-    <div style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;"><button type="button" class="secondary ask-vet-btn" data-col="welfare">Task for vets</button><button type="button" class="secondary bt-open">Task for behaviour</button></div>
+    <div style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;"><button type="button" class="secondary send-card-open" data-col="welfare">Send a request</button></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -230,7 +231,7 @@
     <h2 class="nurse-col-title processing">Processing nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-processing" style="font-size:0.78rem; font-weight:700;">Processing nurse initials for today</label>
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
-    <div style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;"><button type="button" class="secondary ask-vet-btn" data-col="processing">Task for vets</button><button type="button" class="secondary bt-open">Task for behaviour</button></div>
+    <div style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;"><button type="button" class="secondary send-card-open" data-col="processing">Send a request</button></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="bulk-bar-processing" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
@@ -340,7 +341,7 @@
       <details><summary>I did an FIV test or bloods — how do I get the vet to look at the result?</summary><div><p>Press <b>Send back to vet</b> on the task (on FIV and blood requests as well as miscellaneous tasks). Then:</p><ol><li>Write the <b>result / comment</b>, e.g. "FIV negative, FeLV negative" or "bloods run, printout attached to cage".</li><li>Choose <b>Vet to</b>: interpret results, upload results to ShelterMate, or other.</li><li>Choose <b>Needed within</b>: 2 hours, or 12–24 hours.</li><li>Press <b>Send to vets</b>.</li></ol><p>The vets get it as a request on their board. A miscellaneous task is closed automatically; an FIV / blood request keeps its count, so keep ticking animals off as usual.</p></div></details>
       <details><summary>What if the animal ID is missing?</summary><div><p>Head-count requests ("3 cats to FIV test") have no single animal, so the form asks you for the animal ID of the one you are sending back.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
-      <details><summary>How do I ask the Behaviour team to look at an animal?</summary><div><p>Press <b>Task for behaviour</b> (on either column). Choose the task, animal ID, space and pen, <b>Needed within</b> and a reason (required for a behaviour review and an incident review), enter your <b>initials</b> and send. It lands on the Behaviour page in Incoming. Tick <i>Send straight to the Behaviour TL</i> to skip Incoming. Initials are remembered on this device for the day.</p></div></details>
+      <details><summary>How do I ask the vets or the Behaviour team for something?</summary><div><p>Press <b>Send a request</b> (on either column). Pick <b>Vets</b> or <b>Behaviour</b> at the top, then fill it in top to bottom: <b>What</b>, animal ID, space, pen or detail, <b>Needed within</b>, then your reason or note. Your <b>initials</b> are filled in from your column. For the vets, <i>Task for the vets</i> needs a note saying what you want; <i>Interpret results</i> and <i>Upload results to ShelterMate</i> can be sent without one. For Behaviour, a reason is required for a behaviour review and an incident review; tick <i>Send straight to the Behaviour TL</i> to skip Incoming.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
       <details><summary>What is disease tracking and why do nurses see it?</summary><div><p>Flagged animals with a suspected condition (cat flu, kennel cough, diarrhoea, vomiting, eye, skin, wounds, other) are counted per space against its cages. It lets the team spot a cluster early and act on cleaning, isolation and vaccination. You help most by telling shelter staff or the vet when you notice several animals with the same signs in one space, and by making sure a condition is chosen when an animal is flagged.</p></div></details>
     </div>
@@ -776,25 +777,7 @@
      ============================================================ */
   // Put a task on the vet board. Same animal already has a case in that pen on this shift (unique title+location+shift): reopen it if
   // it is finished, otherwise add this to the open case and lift it to the sooner window.
-  async function sendTaskToVets(row) {
-    let { error } = await sb.from('tasks').insert(row);
-    /* Same animal already has a case in that pen on this shift (unique title+location+shift): reopen it if it is
-       finished, otherwise add the result to the open case and lift it to the sooner window. */
-    if (error && error.code === '23505') {
-      const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
-      const old = found && found[0];
-      if (old && !old.done) {
-        const sooner = (LDHLogic.normTier(old.urgency) === 'red_flag' || row.urgency === 'red_flag') ? 'red_flag' : LDHLogic.normTier(old.urgency);
-        ({ error } = await sb.from('tasks').update({ problem: [old.problem, row.problem].filter(Boolean).join(' — '), urgency: sooner }).eq('id', old.id));
-      } else if (old) {
-        ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
-          created_at: new Date().toISOString(), completed_at: null, completed_by_role: null, claimed_by: null, claimed_at: null,
-          vet_done_at: null, med_chart_done: false, med_label: null, med_done_by: null, med_done_at: null, note: null, treatment: null, plan: null
-        })).eq('id', old.id));
-      }
-    }
-    return error;
-  }
+  const sendTaskToVets = (row) => OpsCore.sendTaskToVets(sb, row);
   function openBackModal(src) {
     document.querySelectorAll('.back-modal-overlay').forEach(el => el.remove());
     const r = src.row, isMisc = src.src === 'misc';
@@ -855,65 +838,12 @@
     loadAll();
   });
 
-  /* ---- a nurse asks a vet to do something (not tied to an existing task) ---- */
-  function openAskVetModal(col) {
-    document.querySelectorAll('.ask-modal-overlay').forEach(el => el.remove());
-    const wrap = document.createElement('div');
-    wrap.innerHTML = `
-      <div class="oc-modal-overlay ask-modal-overlay" data-col="${esc(col)}">
-        <div class="oc-modal done-modal">
-          <h3 class="done-modal-title">Task for vets</h3>
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Animal ID</label>
-          <input class="ask-animal" placeholder="Animal ID">
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Space</label>
-          <select class="ask-room">${LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('')}</select>
-          <label class="ask-pen-label" style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Pen # <span class="ask-pen-hint" style="font-weight:400;"></span></label>
-          <input class="ask-pen" placeholder="Pen #" maxlength="40">
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the vets</label>
-          <textarea class="ask-text" rows="3" placeholder="e.g. please check the eye, it looks worse"></textarea>
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Vet to</label>
-          <select class="ask-action">${['other', 'interpret', 'upload'].map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_ACTIONS[k])}</option>`).join('')}</select>
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Needed within</label>
-          <select class="ask-window">${Object.keys(LDHLogic.BACK_WINDOWS).map(k => `<option value="${esc(k)}" ${k === '12_24h' ? 'selected' : ''}>${esc(LDHLogic.BACK_WINDOWS[k])}</option>`).join('')}</select>
-          <p class="oc-modal-error ask-error"></p>
-          <div class="oc-modal-actions">
-            <button type="button" class="oc-modal-cancel ask-cancel">Cancel</button>
-            <button type="button" class="oc-modal-submit ask-confirm">Send to vets</button>
-          </div>
-        </div>
-      </div>`;
-    const overlay = wrap.firstElementChild;
-    const room = overlay.querySelector('.ask-room'), pen = overlay.querySelector('.ask-pen'), hint = overlay.querySelector('.ask-pen-hint');
-    const sync = () => { const off = LDHLogic.OFFSITE_NAMES.includes(room.value); pen.placeholder = off ? 'Detail, e.g. foster name' : 'Pen #'; hint.textContent = off ? '(foster / rescue detail)' : ''; };
-    room.addEventListener('change', sync); sync();
-    document.body.appendChild(overlay);
-  }
-  document.addEventListener('click', async (e) => {
-    const open = e.target.closest('.ask-vet-btn');
-    if (open) { openAskVetModal(open.dataset.col); return; }
-    const cancel = e.target.closest('.ask-cancel');
-    if (cancel) { cancel.closest('.ask-modal-overlay').remove(); return; }
-    const ok = e.target.closest('.ask-confirm'); if (!ok) return;
-    const overlay = ok.closest('.ask-modal-overlay');
-    const err = overlay.querySelector('.ask-error');
-    const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
-    const animalId = overlay.querySelector('.ask-animal').value.trim();
-    const text = overlay.querySelector('.ask-text').value.trim();
-    if (!animalId) return fail('Enter the animal ID.');
-    if (!text) return fail('Write the task for the vets.');
-    const initials = myInitials(overlay.dataset.col);
-    if (!initials) return fail('Enter your initials first.');
-    const roomName = overlay.querySelector('.ask-room').value, extra = overlay.querySelector('.ask-pen').value.trim();
-    const off = LDHLogic.OFFSITE_NAMES.includes(roomName);
-    ok.disabled = true;
-    const row = LDHLogic.nurseAskTask({
-      animalId, location: !off && extra ? roomName + ' / ' + extra : roomName, locationDetail: off ? extra : '',
-      text, action: overlay.querySelector('.ask-action').value, window: overlay.querySelector('.ask-window').value, initials
-    });
-    const error = await sendTaskToVets(row);
-    if (error) { ok.disabled = false; return fail('Could not send to the vets: ' + error.message); }
-    overlay.remove();
-    loadAll();
+  /* ---- the one request card: a nurse asks the vets or the behaviour team for something (not tied to an existing task) ---- */
+  document.addEventListener('click', (e) => {
+    const open = e.target.closest('.send-card-open'); if (!open) return;
+    const col = open.dataset.col, box = document.getElementById(INITIAL_BOXES[col || 'welfare']);
+    SendCard.openModal({ sb, tabs: ['vets', 'behaviour'], vetsFrom: 'nurse', initials: cleanInitials(box.value),
+      saveInitials: (v) => { if (!cleanInitials(box.value)) { box.value = v; saveInitials(); } }, onSent: () => loadAll() });
   });
 
   document.getElementById('proc-misc-list').addEventListener('click', miscDoneClick);

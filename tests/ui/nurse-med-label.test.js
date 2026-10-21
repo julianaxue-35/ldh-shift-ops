@@ -23,8 +23,8 @@ const LABEL = 'Meloxicam, give 1 tablet orally once daily with food for 5 days, 
   } finally { await n.browser.close(); }
   const v = await open({}, 'vets.html');
   try {
-    await v.page.waitForSelector('#mt-task option', { state: 'attached' });
-    const opts = await v.page.$$eval('#mt-task option', os => os.map(o => o.value));
+    await v.page.waitForSelector('#send-request .sc-panel[data-to="nurses"] [data-f="kind"] option', { state: 'attached' });
+    const opts = await v.page.$$eval('#send-request .sc-panel[data-to="nurses"] [data-f="kind"] option', os => os.map(o => o.value));
     t.ok(opts.length > 3 && !opts.includes('med_label'), 'the vets\' own task form does not offer "Medication label" as a task type: ' + opts.join(','));
   } finally { await v.browser.close(); }
   t.done();
