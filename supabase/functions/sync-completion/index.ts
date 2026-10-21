@@ -210,8 +210,13 @@ function validateBehaviourSend(b, dayISO) {
   if (!/^[A-Z]{1,4}$/.test(by)) return { error: 'Initials (1 to 4 letters) are required.' };
   if (['30_60m', 'today', '48h'].indexOf(b.window) === -1) return { error: 'Pick a time frame.' };
   const location = typeof b.location === 'string' ? b.location.trim().slice(0, 80) : '';
-  return { row: { kind: 'behaviour_review', animal_id: id, location: location || 'Unknown', reason: reason, flagged_by: by,
+  const sp = typeof b.species === 'string' ? b.species.trim().toLowerCase() : '';
+  return { row: { kind: 'behaviour_review', animal_id: id, location: location || 'Unknown', species: sp === 'cat' || sp === 'dog' ? sp : null, reason: reason, flagged_by: by,
     due_window: b.window, attached_note: note, source_key: 'bh|' + dayISO + '|' + id } };
+}
+// A resend by anyone (same animal, same day) replaces the note, so say so in the card's history.
+function behaviourResendHistory(history, by, nowISO) {
+  return (Array.isArray(history) ? history : []).concat([{ at: nowISO, by: by, from: 'updated', to: 'note re-sent' }]);
 }
 // behaviour-validate-end
 
@@ -293,9 +298,13 @@ Deno.serve(async (req) => {
     const v = validateBehaviourSend(body.behaviour, day);
     if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
     const upd = async () => {
+      const cur = await supabase.from('behaviour_tasks').select('id,history').eq('source_key', v.row.source_key).eq('status', 'open').limit(1);
+      if (cur.error) return { n: 0, error: cur.error };
+      if (!cur.data || !cur.data.length) return { n: 0, error: null };
       const { data, error } = await supabase.from('behaviour_tasks')
-        .update({ reason: v.row.reason, attached_note: v.row.attached_note, due_window: v.row.due_window, location: v.row.location })
-        .eq('source_key', v.row.source_key).eq('status', 'open').select('id');
+        .update({ reason: v.row.reason, attached_note: v.row.attached_note, due_window: v.row.due_window, location: v.row.location,
+          species: v.row.species, flagged_by: v.row.flagged_by, history: behaviourResendHistory(cur.data[0].history, v.row.flagged_by, new Date().toISOString()) })
+        .eq('id', cur.data[0].id).eq('status', 'open').select('id');
       return { n: data ? data.length : 0, error };
     };
     let u = await upd();

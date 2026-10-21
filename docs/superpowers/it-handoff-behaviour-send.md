@@ -7,11 +7,13 @@ A vet can press **Send to Behaviour** on an animal in the Processing, Sick & Inj
 
 **Where it goes:** the existing Edge Function (`sync-completion`, new request shape `behaviour`), protected by the same shared code check as the Admission AA sends, into one new column, `behaviour_tasks.attached_note`, in the existing Supabase project. Only the signed-in dashboard (passcode) can read it; the offline-tool service account (`sync_writer`) cannot.
 
-**Who sees it:** the Behaviour page (read-only). The Shelter board never fetches the column.
+**Who sees it:** the Behaviour page (read-only). The Shelter board's own query never asks for the column, **but** the Shelter board listens for live updates on the same table, and Supabase's live-update message carries the whole changed row, so an open Shelter board screen receives the note in that message (visible in browser developer tools; it is never displayed). It is the same dashboard login, so nobody gains access they did not already have. If IT does not accept this, the note can be moved to its own table that is not in the live-update publication.
+
+**Microchip numbers:** the tools remove any "Microchip: …" line and any 15-digit number from the note before sending. A resend by a different vet on the same day replaces the note and records who re-sent it in the card's history.
 
 **When it is deleted (enforced by the database, not the web page):**
 1. the moment the Behaviour team ticks **Done** (a before-update trigger sets the column to null, whatever sent the update);
-2. otherwise after **7 days** (the existing cleanup trigger).
+2. otherwise within **7 days**: the cleanup runs whenever anyone adds or changes a behaviour task, so on a completely quiet stretch an old note can remain until the next activity.
 The team's Done comment is kept for 7 days and also shown on the Shelter board for 24 hours.
 
 **Not logged:** the Edge Function never logs the note text and never echoes it in an error message.

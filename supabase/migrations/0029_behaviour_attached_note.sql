@@ -5,6 +5,12 @@
 -- source_key = one open card per animal per Melbourne day per send (a re-send updates it). Run as ONE script. Safe to repeat.
 alter table public.behaviour_tasks add column if not exists attached_note text;
 alter table public.behaviour_tasks add column if not exists source_key text;
+-- the animal's own species, sent by the tool, so a cat with a blank or odd location is never offered Dog assist
+alter table public.behaviour_tasks add column if not exists species text;
+do $$ begin
+  alter table public.behaviour_tasks add constraint behaviour_tasks_species_check check (species is null or species in ('cat','dog'));
+exception when duplicate_object then null; end $$;
+-- NOTE: 0028 replaces behaviour_tasks_cleanup() without the 7-day note clear below; if 0028 is ever re-run, run this file again.
 create unique index if not exists behaviour_tasks_open_source_key on public.behaviour_tasks (source_key)
   where status = 'open' and source_key is not null;
 

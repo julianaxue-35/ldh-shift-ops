@@ -5,14 +5,14 @@ import path from 'node:path';
 
 const src = fs.readFileSync(path.resolve(import.meta.dirname, '../supabase/functions/sync-completion/index.ts'), 'utf8');
 const block = src.split('// behaviour-validate-start')[1].split('// behaviour-validate-end')[0];
-const { validateBehaviourSend } = new Function(block + '\nreturn { validateBehaviourSend };')();
+const { validateBehaviourSend, behaviourResendHistory } = new Function(block + '\nreturn { validateBehaviourSend, behaviourResendHistory };')();
 
 const ok = (over = {}) => ({ animal_id: 'beh-1', location: 'Cat Room 1 / 3', reason: 'Hissing at handling', sent_by: 'ab', window: 'today', note: 'Exam normal.\nDate: "x" 😀', ...over });
 
 test('a good request is accepted and normalised', () => {
   const r = validateBehaviourSend(ok(), '2026-10-21');
   assert.deepEqual(r.row, { kind: 'behaviour_review', animal_id: 'BEH-1', location: 'Cat Room 1 / 3', reason: 'Hissing at handling',
-    flagged_by: 'AB', due_window: 'today', attached_note: 'Exam normal.\nDate: "x" 😀', source_key: 'bh|2026-10-21|BEH-1' });
+    flagged_by: 'AB', species: null, due_window: 'today', attached_note: 'Exam normal.\nDate: "x" 😀', source_key: 'bh|2026-10-21|BEH-1' });
 });
 test('refuses missing ID, ID over 40, empty reason, empty note, bad request', () => {
   assert.match(validateBehaviourSend(ok({ animal_id: ' ' }), 'd').error, /animal/i);
@@ -32,4 +32,16 @@ test('window must be 30_60m, today or 48h; initials 1-4 letters or blank is refu
   assert.match(validateBehaviourSend(ok({ window: '1h' }), 'd').error, /time frame/i);
   assert.match(validateBehaviourSend(ok({ sent_by: '' }), 'd').error, /initials/i);
   assert.match(validateBehaviourSend(ok({ sent_by: '12' }), 'd').error, /initials/i);
+});
+
+test('species: cat and dog are kept, anything else is stored as null', () => {
+  assert.equal(validateBehaviourSend(ok({ species: 'Cat' }), 'd').row.species, 'cat');
+  assert.equal(validateBehaviourSend(ok({ species: 'dog' }), 'd').row.species, 'dog');
+  assert.equal(validateBehaviourSend(ok({ species: 'rabbit' }), 'd').row.species, null);
+});
+test('a resend by another vet is recorded in the history and changes who sent it', () => {
+  const h = behaviourResendHistory([{ at: 'a', by: 'AB', from: 'new', to: 'incoming' }], 'CD', '2026-10-21T01:00:00Z');
+  assert.deepEqual(h[1], { at: '2026-10-21T01:00:00Z', by: 'CD', from: 'updated', to: 'note re-sent' });
+  assert.equal(h.length, 2);
+  assert.deepEqual(behaviourResendHistory(null, 'CD', 't').length, 1);
 });

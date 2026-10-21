@@ -4,7 +4,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
 const row = (x) => Object.assign({ kind: 'behaviour_review', animal_id: 'BEH-1', location: 'Cat Room 1 / 3', lane: 'incoming', due_window: 'today', reason: 'hissing at staff', flagged_by: 'AB', status: 'open', history: [], created_at: ago(600e3) }, x);
 (async () => {
   const NOTE = 'WHOLE MEDICAL NOTE\nExam: calm. "quoted" \u{1F600}';
-  const b = await open({ behaviour_tasks: [row({ attached_note: NOTE }), row({ animal_id: 'BEH-2', location: 'Pound 2 / 4' })] }, 'behaviour.html');
+  const b = await open({ behaviour_tasks: [row({ attached_note: NOTE }), row({ animal_id: 'BEH-2', location: 'Pound 2 / 4' }), row({ animal_id: 'BEH-3', location: 'Unknown', species: 'cat' })] }, 'behaviour.html');
   try {
     await b.page.waitForSelector('.bh-card');
     t.ok(await b.page.locator('.bh-card[data-animal="BEH-1"] .bh-note').count() === 1, 'a card sent from a tool has a Medical note button');
@@ -16,6 +16,8 @@ const row = (x) => Object.assign({ kind: 'behaviour_review', animal_id: 'BEH-1',
     await b.page.click('.note-close');
     t.ok(await b.page.locator('.note-overlay').count() === 0, 'it closes');
 
+    const opts = await b.page.$$eval('.bh-card[data-animal="BEH-3"] .bh-move option', os => os.map(o => o.value).filter(Boolean));
+    t.ok(opts.join() === 'tl,cat', 'a cat with an unrecognised location is only offered TL or Cat assist: ' + opts);
     await b.page.fill('#bh-initials', 'jx'); await b.page.dispatchEvent('#bh-initials', 'change');
     await b.page.click('.bh-card[data-animal="BEH-1"] .bh-done');
     await b.page.fill('.done-note', 'calm with handling');

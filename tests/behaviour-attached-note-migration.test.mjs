@@ -60,3 +60,9 @@ test('0029: two open tasks cannot share a source_key (23505); a done one does no
 test('0029: tasks without a source_key (manual ones) never collide', async () => {
   const d = await db(); await d.exec(ins('', '', 'a')); assert.equal(await rejects(d, ins('', '', 'b')), null);
 });
+
+test('0029: species is cat, dog or empty; anything else is refused', async () => {
+  const d = await db();
+  await d.exec(ins('species=\'cat\'', 'sp1'));
+  assert.match(await rejects(d, ins('species=\'rabbit\'', 'sp2')) || '', /check/i);
+});
