@@ -194,7 +194,7 @@
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-welfare" style="font-size:0.78rem; font-weight:700;">Welfare nurse initials for today</label>
       <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
-    <div style="margin:0 0 12px;"><button type="button" class="secondary ask-vet-btn" data-col="welfare">Ask a vet to do something</button></div>
+    <div style="margin:0 0 12px;"><button type="button" class="secondary ask-vet-btn" data-col="welfare">Task for vets</button></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -230,7 +230,7 @@
     <h2 class="nurse-col-title processing">Processing nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-processing" style="font-size:0.78rem; font-weight:700;">Processing nurse initials for today</label>
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
-    <div style="margin:0 0 12px;"><button type="button" class="secondary ask-vet-btn" data-col="processing">Ask a vet to do something</button></div>
+    <div style="margin:0 0 12px;"><button type="button" class="secondary ask-vet-btn" data-col="processing">Task for vets</button></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="bulk-bar-processing" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
@@ -860,14 +860,14 @@
     wrap.innerHTML = `
       <div class="oc-modal-overlay ask-modal-overlay" data-col="${esc(col)}">
         <div class="oc-modal done-modal">
-          <h3 class="done-modal-title">Ask a vet to do something</h3>
+          <h3 class="done-modal-title">Task for vets</h3>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Animal ID</label>
           <input class="ask-animal" placeholder="Animal ID">
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Space</label>
           <select class="ask-room">${LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('')}</select>
           <label class="ask-pen-label" style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Pen # <span class="ask-pen-hint" style="font-weight:400;"></span></label>
           <input class="ask-pen" placeholder="Pen #" maxlength="40">
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">What do you need the vet to do?</label>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the vets</label>
           <textarea class="ask-text" rows="3" placeholder="e.g. please check the eye, it looks worse"></textarea>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Vet to</label>
           <select class="ask-action">${['other', 'interpret', 'upload'].map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_ACTIONS[k])}</option>`).join('')}</select>
@@ -898,7 +898,7 @@
     const animalId = overlay.querySelector('.ask-animal').value.trim();
     const text = overlay.querySelector('.ask-text').value.trim();
     if (!animalId) return fail('Enter the animal ID.');
-    if (!text) return fail('Write what you need the vet to do.');
+    if (!text) return fail('Write the task for the vets.');
     const initials = myInitials(overlay.dataset.col);
     if (!initials) return fail('Enter your initials first.');
     const roomName = overlay.querySelector('.ask-room').value, extra = overlay.querySelector('.ask-pen').value.trim();
