@@ -243,11 +243,17 @@
   </main>
 </div>
 <script>
+  // A script error used to leave buttons dead with no sign why; show it on the page so it can be reported.
+  function showScriptError(msg) { const el = document.getElementById('bh-error'); if (el) { el.textContent = 'Something went wrong on this page: ' + msg + ' (tell Juliana / take a screenshot)'; el.style.display = 'block'; } }
+  window.addEventListener('error', e => showScriptError(e.message));
+  window.addEventListener('unhandledrejection', e => showScriptError((e.reason && e.reason.message) || String(e.reason)));
   let sb = null, ROWS = [];
   const esc = OpsCore.esc, INIT_KEY = 'ldh_behaviour_initials_v1';
   const $ = id => document.getElementById(id);
   const initials = () => ($('bh-initials').value || '').trim().toUpperCase();
-  function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block'; return false; }
+  function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block';
+    const i = $('bh-initials'); i.scrollIntoView({ block: 'center' }); i.focus(); i.style.outline = '3px solid #d9534f'; setTimeout(() => { i.style.outline = ''; }, 3000);
+    alert('Enter your initials first (the box at the top left), then try again.'); return false; }
   const locText = (room, pen) => (!pen ? room : LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' \u2014 ' + pen : room + ' / ' + pen);
 
   /* New-task alert (same approach as the Nurses page): a banner that stays until dismissed, the shared alert sound
@@ -404,12 +410,12 @@
     /* ---- Done with a note ---- */
     const d = e.target.closest('.bh-done');
     if (d) {
-      if (!needInitials()) return;
       const card = d.closest('.bh-card');
       modal(`<div class="oc-modal-overlay done-overlay" data-id="${esc(card.dataset.id)}"><div class="oc-modal">
         <h3>Done — ${esc(card.dataset.animal)}</h3>
         <label>Note (what you found / the plan) — this shows on the Shelter board</label>
         <textarea class="done-note" rows="4"></textarea>
+        <label>Your initials</label><input class="done-initials" maxlength="4" value="${esc(initials())}">
         <p class="oc-modal-error done-error"></p>
         <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel done-cancel">Cancel</button><button type="button" class="oc-modal-submit done-confirm">Mark done</button></div></div></div>`, 'done-overlay');
       return;
@@ -431,9 +437,12 @@
     const ok = e.target.closest('.done-confirm');
     if (ok) {
       const o = ok.closest('.done-overlay'), note = o.querySelector('.done-note').value.trim(), er = o.querySelector('.done-error');
+      const ini = o.querySelector('.done-initials').value.trim().toUpperCase();
       if (!note) { er.textContent = 'Write a note — it goes back to the Shelter board.'; er.style.display = 'block'; return; }
+      if (!ini) { er.textContent = 'Enter your initials.'; er.style.display = 'block'; return; }
+      $('bh-initials').value = ini; OpsCore.saveInitials(INIT_KEY, ini);
       ok.disabled = true;
-      const err = await changeRow(o.dataset.id, { status: 'done', done_at: new Date().toISOString(), done_note: note, done_by: initials() }, { done: true });   // the database clears any attached note itself when a task becomes Done
+      const err = await changeRow(o.dataset.id, { status: 'done', done_at: new Date().toISOString(), done_note: note, done_by: ini }, { done: true });   // the database clears any attached note itself when a task becomes Done
       if (err) { ok.disabled = false; er.textContent = err; er.style.display = 'block'; return; }
       o.remove(); loadAll(); return;
     }
