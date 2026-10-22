@@ -19,9 +19,9 @@ const row = (x) => Object.assign({ kind: 'behaviour_review', animal_id: 'BEH-1',
     t.ok(await b.page.locator('#incoming-list .bh-card:has-text("BEH-3") .bh-court').count() === 1, 'courthold badge');
 
     const opts = id => b.page.$$eval(`.bh-card[data-animal="${id}"] .bh-move option`, os => os.map(o => o.value).filter(Boolean));
-    t.ok((await opts('BEH-1')).join() === 'tl,cat', 'a cat offers TL or Cat assist only: ' + await opts('BEH-1'));
-    t.ok((await opts('BEH-2')).join() === 'tl,dog', 'a dog offers TL or Dog assist only');
-    t.ok((await opts('BEH-3')).join() === 'tl,cat,dog', 'transport offers all three');
+    t.ok((await opts('BEH-1')).join() === 'tl,cat,trainer', 'a cat offers TL, Cat assist or the trainer: ' + await opts('BEH-1'));
+    t.ok((await opts('BEH-2')).join() === 'tl,dog,trainer', 'a dog offers TL, Dog assist or the trainer');
+    t.ok((await opts('BEH-3')).join() === 'tl,cat,dog,trainer', 'transport offers every lane');
 
     await b.page.selectOption('.bh-card[data-animal="BEH-1"] .bh-move', 'cat');
     t.ok(/initials/i.test(await b.page.textContent('#bh-error')), 'moving without initials is refused');
@@ -48,9 +48,9 @@ const row = (x) => Object.assign({ kind: 'behaviour_review', animal_id: 'BEH-1',
 
     await b.page.click('.bh-add[data-lane="tl"]');
     await b.page.fill('.add-animal', 'BEH-9'); await b.page.selectOption('.add-room', 'Cat Room 1'); await b.page.fill('.add-pen', '7');
-    t.ok((await b.page.$$eval('.add-to option', os => os.map(o => o.value))).join() === 'tl,cat', 'give-to follows the room (cat room: TL / Cat assist)');
+    t.ok((await b.page.$$eval('.add-to option', os => os.map(o => o.value))).join() === 'tl,cat,trainer', 'give-to follows the room (cat room: TL / Cat assist / trainer)');
     await b.page.selectOption('.add-room', 'Pound 3');
-    t.ok((await b.page.$$eval('.add-to option', os => os.map(o => o.value))).join() === 'tl,dog', 'pound: TL / Dog assist');
+    t.ok((await b.page.$$eval('.add-to option', os => os.map(o => o.value))).join() === 'tl,dog,trainer', 'pound: TL / Dog assist / trainer');
     await b.page.selectOption('.add-to', 'dog'); await b.page.selectOption('.add-kind', 'behaviour_review');
     await b.page.click('.add-confirm');
     t.ok(/reason/i.test(await b.page.textContent('.add-error')), 'review kinds need a reason');

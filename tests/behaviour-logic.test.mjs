@@ -10,9 +10,9 @@ test('behaviourSpecies: cat rooms/adoptions are cat, pounds are dog, the rest ei
 });
 
 test('behaviourLaneChoices: dogs and cats never cross', () => {
-  assert.deepEqual(L.behaviourLaneChoices('Cat Room 2 / 1'), ['tl', 'cat']);
-  assert.deepEqual(L.behaviourLaneChoices('Pound 2 / 4'), ['tl', 'dog']);
-  assert.deepEqual(L.behaviourLaneChoices('Transport'), ['tl', 'cat', 'dog']);
+  assert.deepEqual(L.behaviourLaneChoices('Cat Room 2 / 1'), ['tl', 'cat', 'trainer']);
+  assert.deepEqual(L.behaviourLaneChoices('Pound 2 / 4'), ['tl', 'dog', 'trainer']);
+  assert.deepEqual(L.behaviourLaneChoices('Transport'), ['tl', 'cat', 'dog', 'trainer']);
 });
 
 test('behaviourValidate: reason required for review kinds, text required for other', () => {
@@ -69,14 +69,14 @@ test('behaviourForAnimal: open tasks plus the latest done within 24h, matched ig
 test('behaviourSpecies: a free-text pen never turns a dog or cat into "either"', () => {
   for (const loc of ['Pound 2 / Run 4', 'Pound 1 / 10 (outside)']) assert.equal(L.behaviourSpecies(loc), 'dog', loc);
   for (const loc of ['Cat Room 1 / 12-13', 'Cat Room 2 / A12', 'Adoption 1 / 3 top']) assert.equal(L.behaviourSpecies(loc), 'cat', loc);
-  assert.deepEqual(L.behaviourLaneChoices('Pound 2 / Run 4'), ['tl', 'dog']);
+  assert.deepEqual(L.behaviourLaneChoices('Pound 2 / Run 4'), ['tl', 'dog', 'trainer']);
   assert.equal(L.behaviourSpecies('Transport / van 2'), 'either');
 });
 
 test('behaviourSpecies: an unrecognised location uses the animal\'s own species so a cat is never offered Dog assist', () => {
   for (const loc of ['Unknown', '', 'T', null]) {
     assert.equal(L.behaviourSpecies(loc, 'cat'), 'cat', String(loc)); assert.equal(L.behaviourSpecies(loc, 'dog'), 'dog', String(loc));
-    assert.deepEqual(L.behaviourLaneChoices(loc, 'cat'), ['tl', 'cat']); assert.deepEqual(L.behaviourLaneChoices(loc, 'dog'), ['tl', 'dog']);
+    assert.deepEqual(L.behaviourLaneChoices(loc, 'cat'), ['tl', 'cat', 'trainer']); assert.deepEqual(L.behaviourLaneChoices(loc, 'dog'), ['tl', 'dog', 'trainer']);
   }
   assert.equal(L.behaviourSpecies('Unknown', 'rabbit'), 'either'); assert.equal(L.behaviourSpecies('Unknown'), 'either');
   assert.equal(L.behaviourSpecies('Pound 2 / 4', 'cat'), 'dog');   // a recognised room wins

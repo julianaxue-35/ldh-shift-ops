@@ -12,6 +12,7 @@
 --   * Vet passcode: extra code for the Vet page only.
 --   * Nurse passcode: extra code for the Nurse page only.
 --   * Admission AA passcode: extra code for the Admission AA page only (run migration 0017 first).
+--   * Behaviour passcode: extra code for the Behaviour page only (run migration 0032 first).
 --
 -- Use a long LDH code (three or more words plus a number), because it is
 -- the only thing protecting the dashboard from the internet.
@@ -36,7 +37,13 @@ update public.role_passcodes
    set code_hash = extensions.crypt('REPLACE_WITH_AA_CODE', extensions.gen_salt('bf'))
  where role = 'aa';
 
+-- 4. Behaviour page passcode. Migration 0032 creates this role with a random code nobody knows.
+update public.role_passcodes
+   set code_hash = extensions.crypt('REPLACE_WITH_BEHAVIOUR_CODE', extensions.gen_salt('bf'))
+ where role = 'behaviour';
+
 -- Check: each line below should return true with your new codes.
 -- select public.check_passcode('vet', 'REPLACE_WITH_VET_CODE');
 -- select public.check_passcode('nurse', 'REPLACE_WITH_NURSE_CODE');
 -- select public.check_passcode('aa', 'REPLACE_WITH_AA_CODE');
+-- select public.check_passcode('behaviour', 'REPLACE_WITH_BEHAVIOUR_CODE');
