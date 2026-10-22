@@ -190,12 +190,13 @@
     </div>
     <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
 
+    <section class="card" id="send-request"></section>
+
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-welfare" style="font-size:0.78rem; font-weight:700;">Welfare nurse initials for today</label>
       <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
-    <div style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;"><button type="button" class="secondary send-card-open" data-col="welfare">Send a request</button></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -231,7 +232,6 @@
     <h2 class="nurse-col-title processing">Processing nurse</h2>
     <div class="col-initials" style="margin:0 0 12px;"><label for="initials-processing" style="font-size:0.78rem; font-weight:700;">Processing nurse initials for today</label>
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
-    <div style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;"><button type="button" class="secondary send-card-open" data-col="processing">Send a request</button></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="bulk-bar-processing" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
@@ -342,7 +342,7 @@
       <details><summary>What if the animal ID is missing?</summary><div><p>Head-count requests ("3 cats to FIV test") have no single animal, so the form asks you for the animal ID of the one you are sending back.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
       <details><summary>How long do finished tasks stay on the page?</summary><div><p>A miscellaneous task you tick done stays on the page for 24 hours (so you can check it) and is then removed from the database. It is still counted: the ring and the week / month / quarter / year totals keep every task you completed, and only the date and which nurse (Welfare or Processing) are kept, never the animal.</p></div></details>
-      <details><summary>How do I ask the vets or the Behaviour team for something?</summary><div><p>Press <b>Send a request</b> (on either column). Pick <b>Vets</b> or <b>Behaviour</b> at the top, then fill it in top to bottom: <b>What</b>, animal ID, space, pen or detail, <b>Needed within</b>, then your reason or note. Your <b>initials</b> are filled in from your column. For the vets, <i>Task for the vets</i> needs a note saying what you want; <i>Interpret results</i> and <i>Upload results to ShelterMate</i> can be sent without one. For Behaviour, a reason is required for a behaviour review and an incident review; tick <i>Send straight to the Behaviour TL</i> to skip Incoming.</p></div></details>
+      <details><summary>How do I ask the vets or the Behaviour team for something?</summary><div><p>Use the <b>Send a request</b> box at the very top of the page (above the Welfare and Processing nurse columns). Pick <b>Vets</b> or <b>Behaviour</b>, then fill it in top to bottom: <b>What</b>, animal ID, space, pen or detail, <b>Needed within</b>, then your reason or note. Type your <b>initials</b> in the box (it remembers them for the day). For the vets, <i>Task for the vets</i> needs a note saying what you want; <i>Interpret results</i> and <i>Upload results to ShelterMate</i> can be sent without one. For Behaviour, a reason is required for a behaviour review and an incident review; tick <i>Send straight to the Behaviour TL</i> to skip Incoming.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
       <details><summary>What is disease tracking and why do nurses see it?</summary><div><p>Flagged animals with a suspected condition (cat flu, kennel cough, diarrhoea, vomiting, eye, skin, wounds, other) are counted per space against its cages. It lets the team spot a cluster early and act on cleaning, isolation and vaccination. You help most by telling shelter staff or the vet when you notice several animals with the same signs in one space, and by making sure a condition is chosen when an animal is flagged.</p></div></details>
     </div>
@@ -839,14 +839,6 @@
     loadAll();
   });
 
-  /* ---- the one request card: a nurse asks the vets or the behaviour team for something (not tied to an existing task) ---- */
-  document.addEventListener('click', (e) => {
-    const open = e.target.closest('.send-card-open'); if (!open) return;
-    const col = open.dataset.col, box = document.getElementById(INITIAL_BOXES[col || 'welfare']);
-    SendCard.openModal({ sb, tabs: ['vets', 'behaviour'], vetsFrom: 'nurse', initials: cleanInitials(box.value),
-      saveInitials: (v) => { if (!cleanInitials(box.value)) { box.value = v; saveInitials(); } }, onSent: () => loadAll() });
-  });
-
   document.getElementById('proc-misc-list').addEventListener('click', miscDoneClick);
   /* ============================================================
      Memo board
@@ -1267,6 +1259,12 @@
   (async function () {
     const { sb: client } = await OpsCore.init({ page: 'nurses', gateRole: 'nurse' });
     sb = client;
+    // ONE request card for the whole page (not one per nurse column): a nurse asks the vets or the Behaviour team for something.
+    // Initials: this card remembers its own for the day, starting from whichever nurse column has initials in it.
+    const REQ_KEY = 'ldh_nurse_request_initials_v1';
+    SendCard.mount(document.getElementById('send-request'), { sb, tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
+      initials: OpsCore.readInitials(REQ_KEY) || cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
+      saveInitials: (v) => OpsCore.saveInitials(REQ_KEY, v), onSent: () => loadAll() });
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
     OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos', 'vacc_list'], loadAll);
