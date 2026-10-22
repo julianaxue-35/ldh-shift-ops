@@ -157,7 +157,7 @@
   .bh-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
   .bh-col { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
   .bh-lane { background: var(--card-bg); border: 1px solid var(--border); border-top-width: 5px; border-radius: 14px; box-shadow: var(--shadow-card); padding: 14px 16px; min-width: 0; }
-  .bh-lane[data-lane="tl"] { border-top-color: #7c5cbf; } .bh-lane[data-lane="cat"] { border-top-color: #c98a1a; } .bh-lane[data-lane="dog"] { border-top-color: #3b6ea5; }
+  .bh-lane[data-lane="tl"] { border-top-color: #7c5cbf; } .bh-lane[data-lane="cat"] { border-top-color: #c98a1a; } .bh-lane[data-lane="dog"] { border-top-color: #3b6ea5; } .bh-lane[data-lane="trainer"] { border-top-color: #2f8f5b; }
   .bh-lane > h3 { margin: 0 0 10px; font-size: 15px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .bh-lane > h3 .bh-add { margin-left: auto; padding: 4px 10px; font-size: 0.75rem; }
   .bh-card { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; background: var(--card-bg); }
@@ -185,7 +185,7 @@
     <div id="ops-nav" style="margin-bottom:18px;"></div>
     <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Your initials (kept on this device today)</label>
     <input id="bh-initials" maxlength="4" placeholder="e.g. AB" style="margin-bottom:12px;">
-    <p class="hint">Requests from shelter staff arrive in Incoming. Move each to the Behaviour TL or the right assist (cats stay with cat assist, dogs with dog assist), then tick Done with a note about what you found.</p>
+    <p class="hint">Requests from shelter staff arrive in Incoming. Move each to the Behaviour TL, the Behaviour trainer or the right assist (cats stay with cat assist, dogs with dog assist), then tick Done with a note about what you found.</p>
     <span id="signout-link">Sign out</span>
   </aside>
   <main>
@@ -208,7 +208,8 @@
     <section class="card" id="incoming"><h2>Incoming <span id="incoming-count" class="box-count"></span></h2><div id="incoming-list"></div></section>
 
     <div class="bh-cols">
-      <div class="bh-col"><section class="bh-lane" data-lane="tl"><h3>Behaviour TL <button type="button" class="secondary bh-add" data-lane="tl">+ Task</button></h3><div id="lane-tl"></div></section></div>
+      <div class="bh-col"><section class="bh-lane" data-lane="tl"><h3>Behaviour TL <button type="button" class="secondary bh-add" data-lane="tl">+ Task</button></h3><div id="lane-tl"></div></section>
+        <section class="bh-lane" data-lane="trainer"><h3>Behaviour trainer <button type="button" class="secondary bh-add" data-lane="trainer">+ Task</button></h3><div id="lane-trainer"></div></section></div>
       <div class="bh-col">
         <section class="bh-lane" data-lane="cat"><h3>Cat assist <button type="button" class="secondary bh-add" data-lane="cat">+ Task</button></h3><div id="lane-cat"></div></section>
         <section class="bh-lane" data-lane="dog"><h3>Dog assist <button type="button" class="secondary bh-add" data-lane="dog">+ Task</button></h3><div id="lane-dog"></div></section>
@@ -224,7 +225,7 @@
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
       <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, quarter and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
       <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
-      <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
+      <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). The <b>Behaviour trainer</b> lane takes cats and dogs. Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
       <details><summary>How do I give a task to someone else on the team?</summary><div><p>Each lane has an <b>add task</b> button. The TL can give a task to an assist, and an assist can give one back to the TL. Choose the animal, the space and pen, the kind of task, the time frame and a reason, and pick who it is for (only the lanes that suit the species are offered).</p></div></details>
       <details><summary>What do the time frames and red cards mean?</summary><div><p>A card shows how long is left. <b>30&ndash;60 min</b> is due an hour after it was sent, <b>within today</b> is due by the end of today, and <b>within 48 hours</b> is due two days after it was sent. Past the time it turns red and says <i>overdue by &hellip;</i>. Cards are sorted with the soonest due first. Use the filters at the top to show one kind, one time frame or courthold only.</p></div></details>
       <details><summary>How do I finish a task?</summary><div><p>Press <b>Done</b>, write a note (what you found and the plan; it is required) and confirm. The card leaves your board, and the note, your initials and the time show on that animal&rsquo;s card on the <b>Shelter board</b> for 24 hours. Done tasks are deleted from the database after 7 days.</p></div></details>
@@ -333,7 +334,7 @@
       Object.entries(LDHLogic.BEHAVIOUR_WINDOWS).forEach(([k, v]) => $('f-window').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
       $('f-kind').dataset.ready = '1';
     }
-    ['incoming', 'tl', 'cat', 'dog'].forEach(lane => {
+    ['incoming', 'tl', 'trainer', 'cat', 'dog'].forEach(lane => {
       const els = rows.filter(r => r.lane === lane).sort((a, b) => LDHLogic.behaviourDue(a) - LDHLogic.behaviourDue(b));
       const host = lane === 'incoming' ? $('incoming-list') : $('lane-' + lane);
       host.innerHTML = els.map(r => cardHtml(r, now)).join('') || '<p class="empty-state">Nothing here.</p>';
@@ -442,7 +443,7 @@
 
   /* ---- Request to vets ---- */
   (async function () {
-    const { sb: client } = await OpsCore.init({ page: 'behaviour' });
+    const { sb: client } = await OpsCore.init({ page: 'behaviour', gateRole: 'behaviour' });
     sb = client;
     $('bh-initials').value = OpsCore.readInitials(INIT_KEY);
     $('app-root').style.display = 'grid';

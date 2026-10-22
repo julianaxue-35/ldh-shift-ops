@@ -3,7 +3,7 @@ const path = require('path');
 const pageUrl = (name) => 'file://' + path.resolve(__dirname, '../../' + (name || 'index.html'));
 // Node-side mirror of the STUB's own PASSCODES (below) — open() runs outside
 // the page, so it needs its own copy to auto-clear the vets/nurses entry gate.
-const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test' };
+const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test', behaviour: 'behaviour-test' };
 
 // In-memory stand-in for the Supabase client. Runs inside the page.
 const STUB = `
@@ -111,7 +111,7 @@ const STUB = `
     authInit = true;
     authSession = window.__forceLoggedOut ? null : { user: { id: 'u1' } };
   }
-  const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test' };   // mirrors role_passcodes seed (0010_round3.sql)
+  const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test', behaviour: 'behaviour-test' };   // mirrors role_passcodes seed (0010_round3.sql)
   window.supabase = { createClient: () => ({
     auth: {
       getSession: async () => { ensureAuthInit(); return { data: { session: authSession } }; },

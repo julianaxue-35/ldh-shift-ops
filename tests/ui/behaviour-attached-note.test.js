@@ -17,7 +17,7 @@ const row = (x) => Object.assign({ kind: 'behaviour_review', animal_id: 'BEH-1',
     t.ok(await b.page.locator('.note-overlay').count() === 0, 'it closes');
 
     const opts = await b.page.$$eval('.bh-card[data-animal="BEH-3"] .bh-move option', os => os.map(o => o.value).filter(Boolean));
-    t.ok(opts.join() === 'tl,cat', 'a cat with an unrecognised location is only offered TL or Cat assist: ' + opts);
+    t.ok(opts.join() === 'tl,cat,trainer', 'a cat with an unrecognised location is offered TL, Cat assist or the trainer (never Dog assist): ' + opts);
     await b.page.fill('#bh-initials', 'jx'); await b.page.dispatchEvent('#bh-initials', 'change');
     await b.page.click('.bh-card[data-animal="BEH-1"] .bh-done');
     await b.page.fill('.done-note', 'calm with handling');
