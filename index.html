@@ -973,7 +973,7 @@
       if (!who) return fail('Enter your initials (top of this card) so the team knows who sent it.');
       const btn = $('bk-submit'); btn.disabled = true;
       const lane = $('bk-tl').checked ? 'tl' : 'incoming';
-      const { error } = await sb.from('behaviour_tasks').insert({ kind, animal_id: $('bk-animal').value.trim(), location, lane,
+      const { error } = await sb.from('behaviour_tasks').insert({ requested_by_role: 'staff', kind, animal_id: $('bk-animal').value.trim(), location, lane,
         due_window: $('bk-window').value, reason: $('bk-reason').value.trim() || null, courthold: kind === 'courthold', flagged_by: who,
         history: [{ at: new Date().toISOString(), by: who, from: 'new', to: lane }] });
       btn.disabled = false;

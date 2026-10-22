@@ -211,7 +211,7 @@ function validateBehaviourSend(b, dayISO) {
   if (['30_60m', 'today', '48h'].indexOf(b.window) === -1) return { error: 'Pick a time frame.' };
   const location = typeof b.location === 'string' ? b.location.trim().slice(0, 80) : '';
   const sp = typeof b.species === 'string' ? b.species.trim().toLowerCase() : '';
-  return { row: { kind: 'behaviour_review', animal_id: id, location: location || 'Unknown', species: sp === 'cat' || sp === 'dog' ? sp : null, reason: reason, flagged_by: by,
+  return { row: { kind: 'behaviour_review', requested_by_role: 'vets', animal_id: id, location: location || 'Unknown', species: sp === 'cat' || sp === 'dog' ? sp : null, reason: reason, flagged_by: by,
     due_window: b.window, attached_note: note, source_key: 'bh|' + dayISO + '|' + id } };
 }
 // A resend by anyone (same animal, same day) replaces the note, so say so in the card's history.

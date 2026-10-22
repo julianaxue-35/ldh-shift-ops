@@ -11,7 +11,7 @@ const ok = (over = {}) => ({ animal_id: 'beh-1', location: 'Cat Room 1 / 3', rea
 
 test('a good request is accepted and normalised', () => {
   const r = validateBehaviourSend(ok(), '2026-10-21');
-  assert.deepEqual(r.row, { kind: 'behaviour_review', animal_id: 'BEH-1', location: 'Cat Room 1 / 3', reason: 'Hissing at handling',
+  assert.deepEqual(r.row, { kind: 'behaviour_review', requested_by_role: 'vets', animal_id: 'BEH-1', location: 'Cat Room 1 / 3', reason: 'Hissing at handling',
     flagged_by: 'AB', species: null, due_window: 'today', attached_note: 'Exam normal.\nDate: "x" 😀', source_key: 'bh|2026-10-21|BEH-1' });
 });
 test('refuses missing ID, ID over 40, empty reason, empty note, bad request', () => {
