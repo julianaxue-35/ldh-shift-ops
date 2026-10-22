@@ -247,7 +247,9 @@
   const esc = OpsCore.esc, INIT_KEY = 'ldh_behaviour_initials_v1';
   const $ = id => document.getElementById(id);
   const initials = () => ($('bh-initials').value || '').trim().toUpperCase();
-  function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block'; return false; }
+  function needInitials() { if (initials()) { $('bh-error').style.display = 'none'; return true; } $('bh-error').textContent = 'Enter your initials first (top left).'; $('bh-error').style.display = 'block';
+    const i = $('bh-initials'); i.scrollIntoView({ block: 'center' }); i.focus(); i.style.outline = '3px solid #d9534f'; setTimeout(() => { i.style.outline = ''; }, 3000);
+    alert('Enter your initials first (the box at the top left), then try again.'); return false; }
   const locText = (room, pen) => (!pen ? room : LDHLogic.OFFSITE_NAMES.includes(room) ? room + ' \u2014 ' + pen : room + ' / ' + pen);
 
   /* New-task alert (same approach as the Nurses page): a banner that stays until dismissed, the shared alert sound
