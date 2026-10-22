@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/ops-core.js"></script>
 <script src="lib/send-card.js"></script>
+<script src="lib/behaviour-feedback.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="lib/report7.js"></script>
 <style>
@@ -191,6 +192,7 @@
     <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
 
     <section class="card" id="send-request"></section>
+    <section class="card" id="behaviour-plans" style="display:none;"></section>
 
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
@@ -342,6 +344,7 @@
       <details><summary>What if the animal ID is missing?</summary><div><p>Head-count requests ("3 cats to FIV test") have no single animal, so the form asks you for the animal ID of the one you are sending back.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
       <details><summary>How long do finished tasks stay on the page?</summary><div><p>A miscellaneous task you tick done stays on the page for 24 hours (so you can check it, and press <b>Put back</b> if you ticked it by mistake) and is then removed from the database. It is still counted: the ring and the week / month / quarter / year totals keep every task you completed, and only the date and which nurse (Welfare or Processing) are kept, never the animal.</p></div></details>
+      <details><summary>The Behaviour team finished something I asked for — where is the plan?</summary><div><p>In the <b>Behaviour team plans</b> card under <b>Send a request</b>. When Behaviour ticks a task Done, the page rings (the red BEHAVIOUR PLAN banner and sound) and the plan they wrote shows there with who decided and when. It covers tasks given to Behaviour from the Send a request box on this page, and stays for 24 hours, so copy anything you need into the animal's notes. While a task is still open the same card says where it is up to. The Shelter board also shows the plan against the animal for 24 hours.</p></div></details>
       <details><summary>How do I ask the vets or the Behaviour team for something?</summary><div><p>Use the <b>Send a request</b> box at the very top of the page (above the Welfare and Processing nurse columns). Pick <b>Vets</b> or <b>Behaviour</b>, then fill it in top to bottom: <b>What</b>, animal ID, space, pen or detail, <b>Needed within</b>, then your reason or note. Type your <b>initials</b> in the box (it remembers them for the day). For the vets, <i>Task for the vets</i> needs a note saying what you want; <i>Interpret results</i> and <i>Upload results to ShelterMate</i> can be sent without one. For Behaviour, a reason is required for a behaviour review and an incident review; tick <i>Send straight to the Behaviour TL</i> to skip Incoming.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
       <details><summary>What is disease tracking and why do nurses see it?</summary><div><p>Flagged animals with a suspected condition (cat flu, kennel cough, diarrhoea, vomiting, eye, skin, wounds, other) are counted per space against its cages. It lets the team spot a cluster early and act on cleaning, isolation and vaccination. You help most by telling shelter staff or the vet when you notice several animals with the same signs in one space, and by making sure a condition is chosen when an animal is flagged.</p></div></details>
@@ -1245,6 +1248,15 @@
       </div>`;
     }).join('');
   }
+  let BF = null;   // the Behaviour team's plans for what the nurses asked
+  // The Behaviour team ticked one of our tasks Done: same banner, sound and tab flash as a new task.
+  function showPlanBanner(rows) {
+    document.getElementById('new-item-banner-text').textContent = '\uD83D\uDD14 BEHAVIOUR PLAN \u2014 ' + rows.map(r => r.animal_id).join(', ') + ' \u2014 see Behaviour team plans.';
+    document.getElementById('new-item-banner').style.display = 'flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    playAlertTone();
+    flashTitle();
+  }
   async function loadAll() {
     const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
@@ -1260,6 +1272,7 @@
     vaccPull();
     if (!window.__onDutySynced) { window.__onDutySynced = true; syncOnDuty(); }
     checkForNewItems();
+    if (BF) BF.refresh();
     renderAll();
   }
 
@@ -1269,12 +1282,13 @@
     // ONE request card for the whole page (not one per nurse column): a nurse asks the vets or the Behaviour team for something.
     // Initials: this card remembers its own for the day, starting from whichever nurse column has initials in it.
     const REQ_KEY = 'ldh_nurse_request_initials_v1';
-    SendCard.mount(document.getElementById('send-request'), { sb, tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
+    BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });
+    SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
       initials: OpsCore.readInitials(REQ_KEY) || cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
       saveInitials: (v) => OpsCore.saveInitials(REQ_KEY, v), onSent: () => loadAll() });
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos', 'vacc_list'], loadAll);
+    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos', 'vacc_list', 'behaviour_tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
   })();
 </script>

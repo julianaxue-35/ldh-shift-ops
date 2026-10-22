@@ -24,6 +24,7 @@
 <script src="lib/animal-history-view.js"></script>
 <script src="lib/ops-core.js"></script>
 <script src="lib/send-card.js"></script>
+<script src="lib/behaviour-feedback.js"></script>
 <style>
   :root {
     --bg: #F4F6FB;
@@ -226,6 +227,7 @@
     </section>
 
     <section class="card" id="send-request"></section>
+    <section class="card" id="behaviour-plans" style="display:none;"></section>
 
     <p class="subtle" id="kpi-date" style="margin:-8px 0 0;"></p>
     <div class="kpi-row">
@@ -313,6 +315,7 @@
       <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p><p>While this page is open, every new request — including a result sent back — raises a red <b>NEW REQUEST</b> banner with one count (for example “3 new requests sent through”), flashes the tab title and beeps. The sound is on by default; browsers need one tap on the page before they will play it, and the sound button at the top mutes it.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
       <details><summary>The Behaviour team asked me for something — where is it?</summary><div><p>Requests from the Behaviour team (shelter stress medication, a post adoption med pack, or another request) arrive on the vet board like any other request, with a note that says it came from Behaviour and a courthold mention if it applies. Shelter stress medication and post adoption packs wait for the nurse&rsquo;s label like other medication requests.</p></div></details>
+      <details><summary>The Behaviour team finished something I asked for — where is the plan?</summary><div><p>In the <b>Behaviour team plans</b> card under <b>Send a request</b>. When Behaviour ticks a task Done, the page rings (the red BEHAVIOUR PLAN banner and sound) and the plan they wrote shows there with who decided and when. It covers tasks given to Behaviour from this page and from the Send to Behaviour button in your shift tools, and stays for 24 hours, so copy anything you need into the animal's notes. While a task is still open the same card says where it is up to. The Shelter board also shows the plan against the animal for 24 hours.</p></div></details>
       <details><summary>How do I ask the Behaviour team to look at an animal?</summary><div><p>In <b>Send a request</b> pick <b>Behaviour</b>. Fill it in top to bottom: <b>What</b>, animal ID, space, pen or detail, <b>Needed within</b>, and a reason (required for a behaviour review and an incident review), enter your <b>initials</b> and send. It lands on the Behaviour page in Incoming. Tick <i>Send straight to the Behaviour TL</i> if you want it to skip Incoming.</p></div></details>
       <details><summary>I am worried about an animal&rsquo;s behaviour while writing a note in a shift tool.</summary><div><p>In <b>Processing</b>, <b>Sick &amp; Injured</b> or <b>Surgery</b>, press <b>Send to Behaviour</b> on the animal&rsquo;s card. The animal goes to the Behaviour page with your <b>whole current note</b> attached. The note is <b>deleted from the database when the Behaviour team ticks Done</b> (or within 7 days). Their Done comment shows on the Shelter board.</p></div></details>
       <details><summary>Do I need to give my initials?</summary><div><p>Yes. Whenever you send something to the nurses or to Behaviour, you are asked for your initials. They are remembered on this device for the day.</p></div></details>
@@ -449,6 +452,15 @@
     if (fresh > 0) showRequestBanner(fresh, freshBeh);
   }
 
+  let BF = null;   // the Behaviour team's plans for what the vets asked
+  function showPlanBanner(rows) {
+    const ids = rows.map(r => r.animal_id).join(', ');
+    document.getElementById('new-item-banner-text').textContent = '\uD83D\uDD14 BEHAVIOUR PLAN \u2014 ' + ids + ' \u2014 see Behaviour team plans.';
+    document.getElementById('new-item-banner').style.display = 'flex';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    playAlertTone();
+    if (!titleFlashTimer) { let on = false; titleFlashTimer = setInterval(() => { on = !on; document.title = on ? '\uD83D\uDD14 BEHAVIOUR PLAN \u2014 Vets' : BASE_TITLE; }, 1000); }
+  }
   async function loadAll() {
     const [tasksRes, memosRes, ntRes, ndRes, rosterRes, ngRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
@@ -461,6 +473,7 @@
     NOGA_REQUESTS = ngRes.error ? [] : (ngRes.data || []);
     TASKS = tasksRes.data || [];
     checkForNewRequests();
+    if (BF) BF.refresh();
     MEMOS = memosRes.data || [];
     NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || [];
@@ -985,9 +998,10 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     // One request card, the same on every page: the vets ask the nurses (a treatment course or a one-animal task) or the behaviour team.
-    SendCard.mount(document.getElementById('send-request'), { sb, tabs: ['nurses', 'behaviour'], initials: storedVetInit(), saveInitials: rememberVetInit, onSent: () => loadAll() });
+    BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'vets', onDone: showPlanBanner });
+    SendCard.mount(document.getElementById('send-request'), { sb, role: 'vets', tabs: ['nurses', 'behaviour'], initials: storedVetInit(), saveInitials: rememberVetInit, onSent: () => loadAll() });
     await loadAll();
-    OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests'], loadAll);
+    OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'behaviour_tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {
       await sb.auth.signOut();
       location.reload();
