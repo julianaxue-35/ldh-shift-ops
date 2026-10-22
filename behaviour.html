@@ -215,6 +215,9 @@
         <section class="bh-lane" data-lane="dog"><h3>Dog assist <button type="button" class="secondary bh-add" data-lane="dog">+ Task</button></h3><div id="lane-dog"></div></section>
       </div>
     </div>
+    <section class="card" id="bh-completed"><h2>Completed <span id="completed-count" class="box-count"></span></h2>
+      <p class="subtle" style="margin:-8px 0 8px;">Finished cases stay here with their note for 24 hours, then are removed. Ticked by mistake? Put it back.</p>
+      <div id="completed-list"></div></section>
     <section class="card" id="bh-stats"><h2>What the Behaviour team has done</h2><div id="bh-stats-body"></div></section>
       <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
     <div class="card faq-card faq-modal" id="faq">
@@ -224,6 +227,7 @@
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
       <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, quarter and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
+      <details><summary>I ticked Done by mistake — can I put it back?</summary><div><p>Yes. Finished tasks stay in the <b>Completed</b> list near the bottom of the page, with their note, for <b>24 hours</b>. Press <b>Put back</b> (your initials are needed) and it returns to the lane it was in. After 24 hours it is removed, but it still counts in the totals. The medical note a vet attached is deleted as soon as a task is ticked Done, so it does not come back.</p></div></details>
       <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
       <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). The <b>Behaviour trainer</b> lane takes cats and dogs. Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
       <details><summary>How do I give a task to someone else on the team?</summary><div><p>Each lane has an <b>add task</b> button. The TL can give a task to an assist, and an assist can give one back to the TL. Choose the animal, the space and pen, the kind of task, the time frame and a reason, and pick who it is for (only the lanes that suit the species are offered).</p></div></details>
@@ -327,7 +331,21 @@
         <button type="button" class="bh-done">Done</button>
       </div></div>`;
   }
+  // Finished cases: kept 24 hours (the database removes them then), newest first, with the note and who finished it.
+  function completedRows() {
+    const cutoff = Date.now() - 24 * 3600 * 1000;
+    return ROWS.filter(r => r.status === 'done' && new Date(r.done_at || r.created_at).getTime() >= cutoff).sort((a, b) => new Date(b.done_at || 0) - new Date(a.done_at || 0));
+  }
+  function renderCompleted() {
+    const rows = completedRows(), hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    $('completed-count').textContent = rows.length || '';
+    $('completed-list').innerHTML = rows.map(r => `<div class="bh-done-row" data-id="${esc(r.id)}" style="padding:8px 0; border-top:1px solid var(--border);">
+      <div class="aname" style="font-size:0.9rem;"><b>${esc(r.animal_id)}</b> <span class="meta">${esc(r.location)} · ${esc(LDHLogic.BEHAVIOUR_KINDS[r.kind] || r.kind)} · done${r.done_by ? ' by ' + esc(r.done_by) : ''}${r.done_at ? ' at ' + esc(hm(r.done_at)) : ''}</span></div>
+      ${r.done_note ? `<div class="bh-reason">${esc(r.done_note)}</div>` : ''}
+      <div style="margin-top:4px;"><button type="button" class="secondary bh-putback" style="padding:4px 10px; font-size:0.78rem;">Put back</button></div></div>`).join('') || '<p class="empty-state">Nothing finished in the last 24 hours.</p>';
+  }
   function render() {
+    renderCompleted();
     const now = Date.now(), rows = filtered();
     if (!$('f-kind').dataset.ready) {
       Object.entries(LDHLogic.BEHAVIOUR_KINDS).forEach(([k, v]) => $('f-kind').insertAdjacentHTML('beforeend', `<option value="${k}">${esc(v)}</option>`));
@@ -367,6 +385,21 @@
     document.body.appendChild(w.firstElementChild); return document.querySelector('.' + cls);
   }
   document.addEventListener('click', async (e) => {
+    /* ---- put a finished task back on the open list (the medical note a vet attached was deleted when it was ticked Done and is not restored) ---- */
+    const pbk = e.target.closest('.bh-putback');
+    if (pbk) {
+      if (!needInitials()) return;
+      const row = ROWS.find(r => r.id === pbk.closest('.bh-done-row').dataset.id); if (!row) return;
+      pbk.disabled = true;
+      const history = (row.history || []).concat([{ at: new Date().toISOString(), by: initials(), from: 'done', to: 'open' }]);
+      const { data, error } = await sb.from('behaviour_tasks').update({ status: 'open', done_at: null, done_note: null, done_by: null, history }).eq('id', row.id).eq('status', 'done').select();
+      if (error || !data || !data.length) {
+        pbk.disabled = false;
+        $('bh-error').textContent = error ? (error.code === '23505' ? 'A newer task for this animal is already open, so this one cannot be put back.' : 'Could not put it back: ' + error.message) : 'That task has already been removed or put back.';
+        $('bh-error').style.display = 'block'; return;
+      }
+      $('bh-error').style.display = 'none'; loadAll(); return;
+    }
     /* ---- Done with a note ---- */
     const d = e.target.closest('.bh-done');
     if (d) {
