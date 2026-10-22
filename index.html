@@ -630,6 +630,7 @@
     for (const title of ids) { if (!(await submitOne(title))) allOk = false; }
     btn.disabled = false;
     if (!allOk) return;
+    OpsCore.toast();
     document.getElementById('req-title').value = '';
     document.getElementById('req-pen').value = '';
     document.getElementById('req-location-detail').value = '';
@@ -910,6 +911,7 @@
       }
       const { error } = await sb.from('nurse_requests').insert(payload);
       if (error) { alert('Could not log request: ' + error.message); return; }
+      OpsCore.toast();
       document.getElementById('nr-count').value = '1';
       applyNrDefaultLocation();
       document.getElementById('nr-note').value = '';
@@ -978,7 +980,7 @@
         history: [{ at: new Date().toISOString(), by: who, from: 'new', to: lane }] });
       btn.disabled = false;
       if (error) return fail('Could not send: ' + error.message);
-      OpsCore.saveInitials(KEY, who);
+      OpsCore.saveInitials(KEY, who); OpsCore.toast();
       ['bk-animal', 'bk-pen', 'bk-reason'].forEach(id => { $(id).value = ''; }); $('bk-tl').checked = false;
     });
   })();

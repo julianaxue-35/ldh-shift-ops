@@ -480,7 +480,7 @@
         due_window: q('.add-window'), reason: q('.add-reason') || null, courthold: q('.add-kind') === 'courthold', flagged_by: initials(),
         history: [{ at: new Date().toISOString(), by: initials(), from: 'new', to: q('.add-to') }] });
       if (error) { addOk.disabled = false; er.textContent = error.message; er.style.display = 'block'; return; }
-      o.remove(); loadAll();
+      o.remove(); OpsCore.toast(); loadAll();
     }
   });
 

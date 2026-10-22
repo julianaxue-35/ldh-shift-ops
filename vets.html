@@ -980,7 +980,7 @@
       note: 'Transferred to nurse — ' + (LDHLogic.MISC_TASK_LABELS[task] || task)
     }).eq('id', t.id);
     if (closeErr) alert('The nurse task was created, but the case could not be closed here: ' + closeErr.message);
-    overlay.remove();
+    overlay.remove(); OpsCore.toast();
     loadAll();
   });
 
