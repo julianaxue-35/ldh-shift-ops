@@ -12,6 +12,7 @@ async function labels(page, root) {
     t.ok(JSON.stringify(await p.page.$$eval('#send-request .sc-tab', bs => bs.map(b => b.textContent))) === '["Nurses","Behaviour"]', 'vets page: Nurses and Behaviour tabs');
     let l = await labels(p.page, '#send-request');
     t.ok(l[0] === 'What' && l[1] === 'Animal ID' && l[2] === 'Space' && l[3] === 'Pen / detail' && /^Reason/.test(l[l.length - 1]), 'vets page, Nurses: What, Animal ID, Space, Pen / detail ... Reason last: ' + l);
+    t.ok(/Dispense medication/.test(await p.page.textContent('#send-request .sc-panel[data-to="nurses"] [data-f="kind"] option:first-child')) && /dispense medication/i.test(await p.page.textContent('#send-request .sc-panel[data-to="nurses"] .sc-lead')), 'vets page, Nurses: dispensing medication / a treatment course is the first choice and is named in the card');
     await p.page.click('#send-request .sc-tab[data-sc="behaviour"]');
     l = await labels(p.page, '#send-request');
     t.ok(l.join() === 'What,Animal ID,Space,Pen / detail,Needed within,Reason', 'vets page, Behaviour: same order as the staff page: ' + l);
