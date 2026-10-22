@@ -220,11 +220,11 @@ function behaviourResendHistory(history, by, nowISO) {
 }
 // behaviour-validate-end
 
-// Completed Admission AA cards are removed within 24 hours (the AA also empties the list daily). Best effort.
+// Completed Admission AA cards are kept 7 days (so a note the AA missed can be put back), then removed. Best effort.
 async function purgeCompletedAa(supabase) {
   try {
     await supabase.from('aa_items').delete().not('completed_at', 'is', null)
-      .lt('completed_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+      .lt('completed_at', new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString());
   } catch (_e) { /* never block a send over housekeeping */ }
 }
 

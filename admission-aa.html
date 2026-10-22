@@ -195,7 +195,7 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <p class="hint">Enter each item in ShelterMate, then tick it off here. Ticked items are deleted from the database straight away. Anything left for 24 hours turns red.</p>
+    <p class="hint">Enter each item in ShelterMate, then tick it off here. Ticked items move to Completed, where you can put them back for 7 days. Anything left waiting for 24 hours turns red.</p>
     <p class="hint" id="aa-session-count" style="margin-top:14px;"></p>
     <span id="signout-link">Sign out</span>
   </aside>
@@ -235,8 +235,8 @@
       <details><summary>What does PRIORITY mean? What goes red?</summary><div><p>A vet can mark a note <b>PRIORITY &mdash; do first</b> (for example an animal waiting for a foster). Those cards have a red border, sit at the top and are announced in a banner. Every card also has a 24-hour clock: anything left for <b>24 hours turns red</b> and is counted as overdue at the top of the page.</p></div></details>
       <details><summary>A card changed after I opened it — what does &ldquo;updated&rdquo; mean?</summary><div><p>The vet edited the note and sent it again. The same card is updated rather than a new one added, and it shows <b>updated</b> with the time. Check what changed before you enter it. If you already entered the first version, enter the changes.</p></div></details>
       <h3 class="faq-group">Mistakes and tidying</h3>
-      <details><summary>I ticked something by mistake.</summary><div><p>Open <b>Completed</b> below the list and press <b>Put back</b> (for a multi-animal card, put back just that animal).</p></div></details>
-      <details><summary>How long are completed items kept?</summary><div><p>Nothing stays on this page more than <b>24 hours</b>. Press <b>Empty list</b> at the end of the day. Ticked items are deleted from the database straight away, and completed cards are removed within 24 hours.</p></div></details>
+      <details><summary>I ticked something by mistake.</summary><div><p>Open <b>Completed</b> below the list and press <b>Put back</b> (for a multi-animal card, put back just that animal). You have 7 days; type the animal ID in the box to find it.</p></div></details>
+      <details><summary>How long are completed items kept?</summary><div><p>Completed cards are kept for <b>7 days</b> (with the vet&rsquo;s note, so a note that was not entered can be put back) and then removed for good. Use the box above the list to find an animal ID. <b>Empty list</b> removes them all straight away.</p></div></details>
       <details><summary>What if the animal ID in the note is wrong or missing?</summary><div><p>The vet&rsquo;s tool will not send a note without an ID. If the ID was corrected after sending, the vet sends it again under the new ID and that makes a new card; the old one stays here until you remove it, so ask the vet which one to use.</p></div></details>
       <h3 class="faq-group">Numbers and who is on</h3>
       <details><summary>What are the rings and totals at the bottom?</summary><div><p><b>What the Admission AA has done</b> counts cards you have completed, and the average per working day this week, month, quarter and year. The ring fills as today gets close to a usual working day. It is only a look back; nothing here affects your list.</p></div></details>
@@ -251,7 +251,7 @@
   let ITEMS = [];
   let ON_DUTY = [];                      // today's nurse initials, set on the Nurses page
   let AA_COUNTS = null;                  // daily completion counts; null = the database update has not been run yet
-  let DONE = [];                         // completed cards (kept at most 24 h, newest first)
+  let DONE = [];                         // completed cards (kept at most 7 days, newest first)
   let doneThisSession = 0;               // a count only; no patient data is kept in the browser
 
   const openNotes = new Set();           // which note cards are expanded (ids only; survives re-renders)
@@ -291,19 +291,25 @@
       ${it.animal_ids.map(a => `<label style="display:flex; gap:8px; align-items:center; padding:3px 0;"><input type="checkbox" class="aa-animal" data-id="${esc(it.id)}" data-animal="${esc(a)}" ${done.has(a) ? 'checked' : ''} style="width:18px; height:18px; margin:0;"> <b>${esc(a)}</b></label>`).join('')}
     </div>`;
   }
-  function completedHtml() {
-    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const rows = DONE.map(it => `<div class="aa-done-row" data-id="${esc(it.id)}" style="padding:8px 0; border-top:1px solid var(--border);">
+  let DONE_Q = '';
+  const DONE_SHOWN = () => { const q = DONE_Q.trim().toLowerCase(); return q ? DONE.filter(it => it.animal_ids.some(a => String(a).toLowerCase().includes(q))) : DONE; };
+  function doneRowsHtml() {
+    const hm = iso => { const d = new Date(iso), t = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); return d.toDateString() === new Date().toDateString() ? t : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + t; };
+    const rows = DONE_SHOWN().map(it => `<div class="aa-done-row" data-id="${esc(it.id)}" style="padding:8px 0; border-top:1px solid var(--border);">
         <div class="aname" style="font-size:0.9rem;">${esc(it.animal_ids.join(', '))} <span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span> <span class="ameta">completed ${esc(hm(it.completed_at))}</span></div>
         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
           ${it.animal_ids.map(a => `<button type="button" class="secondary aa-putback" data-id="${esc(it.id)}" data-animal="${esc(a)}" style="padding:4px 10px; font-size:0.78rem;">Put ${it.animal_ids.length > 1 ? esc(a) + ' ' : ''}back</button>`).join('')}
         </div></div>`).join('');
+    return rows || '<p class="col-empty">' + (DONE_Q ? 'No completed card matches that ID.' : 'Nothing completed yet.') + '</p>';
+  }
+  function completedHtml() {
     return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
         <h2 style="margin:0;">Completed <span class="box-count">${DONE.length}</span></h2>
         ${DONE.length ? '<button type="button" class="secondary" id="aa-empty-done">Empty list</button>' : ''}
       </div>
-      <p class="subtle" style="margin:6px 0 0;">Newest first. Ticked by mistake? Put it back. Nothing stays here more than 24 hours: empty the list at the end of the day.</p>
-      ${rows || '<p class="col-empty">Nothing completed yet.</p>'}`;
+      <p class="subtle" style="margin:6px 0 0;">Newest first. Ticked by mistake, or the note was not entered? Put it back. Completed cards are kept for 7 days, then removed.</p>
+      ${DONE.length ? `<input id="aa-done-search" placeholder="Find an animal ID in the completed list" value="${esc(DONE_Q)}" style="margin:8px 0 0; max-width:340px;">` : ''}
+      <div id="aa-done-rows">${doneRowsHtml()}</div>`;
   }
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); }
@@ -435,6 +441,11 @@
     if (!(await saveDone(it, it.animal_ids.filter(a => set.has(a))))) { cb.checked = !cb.checked; cb.disabled = false; }
     else if (set.size === it.animal_ids.length) doneThisSession++;
   });
+  document.getElementById('aa-completed').addEventListener('input', (e) => {
+    if (!e.target.closest('#aa-done-search')) return;
+    DONE_Q = e.target.value;
+    document.getElementById('aa-done-rows').innerHTML = doneRowsHtml();
+  });
   document.getElementById('aa-completed').addEventListener('click', async (e) => {
     const pb = e.target.closest('.aa-putback');
     if (pb) {
@@ -500,8 +511,8 @@
     }
     warn.style.display = 'none';
     const all = data || [];
-    // anything completed more than 24 hours ago is removed, never shown
-    const cutoff = Date.now() - 24 * 3600 * 1000;
+    // anything completed more than 7 days ago is removed, never shown (kept 7 days so a note the AA missed can be put back)
+    const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
     const stale = all.filter(i => i.completed_at && new Date(i.completed_at).getTime() < cutoff);
     if (stale.length) sb.from('aa_items').delete().in('id', stale.map(i => i.id)).then(() => {}, () => {});
     ITEMS = all.filter(i => !i.completed_at);
