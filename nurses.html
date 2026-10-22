@@ -643,7 +643,7 @@
     // the card is with the Admission AA; now mark each ticked task done
     const now = new Date().toISOString(), problems = [];
     for (const p of mine) { const m = await markTaskDone(p, initials, now); if (m) problems.push(m); else picked.delete(p.src + ':' + p.id); }
-    btn.disabled = false;
+    btn.disabled = false; OpsCore.toast();
     document.getElementById('uv-bulk-result').value = '';
     if (problems.length) alert('The result was sent to the Admission AA, but ' + problems.length + ' task(s) could not be marked done here: ' + problems[0] + '. Tick them off yourself.');
     loadAll();
@@ -845,7 +845,7 @@
       const { error: e2 } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: new Date().toISOString(), result_note: result, returned_at: new Date().toISOString() }).eq('id', r.id);
       if (e2) alert('Sent to the vets, but the task could not be closed here: ' + e2.message);
     }
-    overlay.remove();
+    overlay.remove(); OpsCore.toast();
     loadAll();
   });
 
@@ -1063,6 +1063,7 @@
     }
     aaSource = null;
     ['aa-ids', 'aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
+    OpsCore.toast();
     const ok = document.getElementById('aa-sent'); ok.style.display = ''; setTimeout(() => { ok.style.display = 'none'; }, 4000);
   });
   syncAaFields();
@@ -1180,6 +1181,7 @@
     const { error } = await sb.from('aa_items').insert(rows);
     btn.disabled = false;
     if (error) { err.textContent = 'Could not send: ' + error.message; err.style.display = 'block'; return; }
+    OpsCore.toast();
     const gone = new Set(chosen.map(vaccKey));
     VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
     VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));

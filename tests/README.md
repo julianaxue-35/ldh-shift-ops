@@ -20,3 +20,4 @@ Never point tests at the live Supabase project; the browser tests use an in-memo
 - Completed lists (Oct 22): node `behaviour-completed-migration` (0033: finished cases kept 24 h); UI `completed-put-back` (Behaviour Completed list + Put back; Nurses Put back).
 - Behaviour plans fed back (Oct 22): UI `behaviour-feedback` (vets / nurses cards, ring on Done, requester stamped by every sender); node `behaviour-edge-validate` (row carries requested_by_role); migration 0034.
 - Shared card on the other pages (Oct 22): `lib/send-card.js`; UI `send-card-pages` (field order on Vets and Nurses pages), `behaviour-vet-request`, `nurse-ask-vet`, `task-for-behaviour`, `vet-initials`, `vet-nurse-pen`, `vets-new-task-first` rewritten for it.
+- Request-sent message (Oct 22): `OpsCore.toast()`; UI `submit-toast` (bottom-of-screen "Request submitted successfully" after the request card and Behaviour team tasks).
