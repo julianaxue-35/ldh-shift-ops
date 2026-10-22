@@ -21,14 +21,13 @@ async function labels(page, root) {
   // Nurses page: Vets and Behaviour tabs
   p = await open({}, 'nurses.html');
   try {
-    await p.page.waitForSelector('.send-card-open'); await p.page.click('#processing-col .send-card-open');
-    let l = await labels(p.page, '.sc-overlay');
+    await p.page.waitForSelector('#send-request .sc-tab');
+    let l = await labels(p.page, '#send-request');
     t.ok(l.join() === 'What,Animal ID,Space,Pen / detail,Needed within,Reason / note', 'nurses page, Vets: ' + l);
-    await p.page.click('.sc-overlay .sc-tab[data-sc="behaviour"]');
-    l = await labels(p.page, '.sc-overlay');
+    await p.page.click('#send-request .sc-tab[data-sc="behaviour"]');
+    l = await labels(p.page, '#send-request');
     t.ok(l.join() === 'What,Animal ID,Space,Pen / detail,Needed within,Reason', 'nurses page, Behaviour: ' + l);
-    t.ok((await p.page.$$eval('.sc-overlay [data-f="room"] option', os => os.map(o => o.value))).includes('Vet clinic'), 'nurses page: Vet clinic is a space');
-    await p.page.click('.sc-modal-x'); t.ok(await p.page.locator('.sc-overlay').count() === 0, 'the window closes with the cross');
+    t.ok((await p.page.$$eval('#send-request [data-f="room"] option', os => os.map(o => o.value))).includes('Vet clinic'), 'nurses page: Vet clinic is a space');
     t.ok(p.errors.length === 0, 'nurses page: no errors ' + p.errors.join('; '));
   } finally { await p.browser.close(); }
   t.done();

@@ -328,28 +328,15 @@
       </div>
 
       <div class="sr-panel" id="nurse-requests" data-to="nurses" hidden>
-        <p class="sr-lead">For vaccination on arrival, or one task for one animal (FIV test, bloods, microchip, ear swab, cat in fluids, medication label, other). Microchip, UV and treatment checks for foster or rescue animals are asked on the Vets tab.</p>
+        <p class="sr-lead">For vaccination on arrival. Other nurse tasks (bloods, FIV, ear swab, dispensing medication ...) are asked by the vets from the Vets page. Microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab.</p>
         <label class="nr-grp" style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 10px;">
           <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
         </label>
         <div class="sr-form" id="nr-form">
           <label>What<select id="nr-kind">
-            <optgroup label="On arrival">
-              <option value="vaccination">Vaccination</option>
-            </optgroup>
-            <optgroup label="Task for one animal">
-              <option value="task:fiv_test">FIV test</option>
-              <option value="task:blood">Blood test</option>
-              <option value="task:microchip">Microchip</option>
-              <option value="task:ear_swab">Ear swab</option>
-              <option value="task:ivft">Cat in fluids (IVFT)</option>
-              <option value="task:med_label">Medication label to make</option>
-              <option value="task:other">Other</option>
-            </optgroup>
+            <option value="vaccination">Vaccination</option>
           </select></label>
-          <label class="nr-one" style="display:none;">Animal ID<input id="nr-animal" placeholder="Animal ID"></label>
           <label>Space<select id="nr-location"></select></label>
-          <label class="nr-one" style="display:none;">Pen / detail<input id="nr-detail" placeholder="Pen # or detail (e.g. foster name)"></label>
           <label class="nr-grp">Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
           <label class="nr-grp">How many<input id="nr-count" type="number" min="1" value="1"></label>
           <label class="nr-grp">Needed within<select id="nr-window">
@@ -447,7 +434,7 @@
       <h2>FAQ — shelter staff</h2>
       <p class="subtle">Quick answers for logging requests and following a case.</p>
       <h3 class="faq-group">Logging requests</h3>
-      <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival, or one task for one animal (FIV test, bloods, microchip, ear swab, cat in fluids, medication label; microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
+      <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival (microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
       <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Pick a <b>Suspected condition</b> if you can, and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
       <details><summary>What do the tiers mean? When do I radio the vet instead?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>
@@ -896,39 +883,9 @@
     document.getElementById('nr-arrived-wrap').style.display = e.target.checked ? 'none' : '';
     document.getElementById('nr-expected-wrap').style.display = e.target.checked ? '' : 'none';
   });
-  // Group kinds (nurse_requests) show species / how many / needed within / arrival; one-animal tasks (noga_requests, the
-  // same list the vets page transfers into) show Animal ID and Pen / detail instead.
-  function nrIsTask() { return document.getElementById('nr-kind').value.indexOf('task:') === 0; }
-  function nrSyncKind() {
-    const one = nrIsTask();
-    document.querySelectorAll('#nr-form .nr-one').forEach(el => { el.style.display = one ? '' : 'none'; });
-    document.querySelectorAll('#nurse-requests .nr-grp').forEach(el => { el.style.display = one ? 'none' : ''; });
-    const sched = document.getElementById('nr-scheduled-toggle').checked;
-    document.getElementById('nr-arrived-wrap').style.display = one || sched ? 'none' : '';
-    document.getElementById('nr-expected-wrap').style.display = !one && sched ? '' : 'none';
-    document.getElementById('nr-note').placeholder = one ? 'e.g. bloods before surgery' : 'e.g. from transport van 2';
-  }
-  document.getElementById('nr-kind').addEventListener('change', nrSyncKind);
   document.getElementById('nr-submit').addEventListener('click', async () => {
     const _btn = document.getElementById('nr-submit'); _btn.disabled = true;
     try {
-      if (nrIsTask()) {
-        const animal = document.getElementById('nr-animal').value.trim();
-        const task = document.getElementById('nr-kind').value.slice(5);
-        const note = document.getElementById('nr-note').value.trim();
-        if (!animal) { alert('Enter the animal ID.'); return; }
-        if (task === 'other' && !note) { alert('Describe the task for the nurse.'); return; }
-        const room = document.getElementById('nr-location').value, detail = document.getElementById('nr-detail').value.trim();
-        const offsite = LDHLogic.OFFSITE_NAMES.includes(room);
-        const { error: tErr } = await sb.from('noga_requests').insert({
-          animal_id: animal, location: !offsite && detail ? room + ' / ' + detail : room, location_detail: offsite ? (detail || null) : null,
-          task, note: note || null, added_by: window.staffInitials() || 'Shelter Staff'
-        });
-        if (tErr) { alert('Could not send the task: ' + tErr.message); return; }
-        document.getElementById('nr-animal').value = ''; document.getElementById('nr-detail').value = ''; document.getElementById('nr-note').value = '';
-        loadAll();
-        return;
-      }
       const count = parseInt(document.getElementById('nr-count').value, 10);
       if (!count || count < 1) { alert('Enter how many animals.'); return; }
       const scheduled = document.getElementById('nr-scheduled-toggle').checked;

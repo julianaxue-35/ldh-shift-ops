@@ -456,7 +456,7 @@ const H = 3600 * 1000;
   try {
     t.ok(await m.page.locator('#nurse-misc').count() === 1 && await m.page.locator('#send-request .sc-panel[data-to="nurses"]').count() === 1, 'vets page lists nurse tasks and has the Send a request card');
     const NF = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
-    t.ok((await m.page.$$eval(NF('kind') + ' option', os => os.map(o => o.value))).join() === 'course,blood,ear_swab,fiv_test,ivft,microchip,uv,treatment,other', 'what list: treatment course, bloods, ear swab, FIV, cat in fluids IVFT, microchip, UV, treatment check, other');
+    t.ok((await m.page.$$eval(NF('kind') + ' option', os => os.map(o => o.value))).join() === 'dispense,course,blood,ear_swab,fiv_test,ivft,microchip,uv,treatment,other', 'what list: dispense medication, treatment course, bloods, ear swab, FIV, cat in fluids IVFT, microchip, UV, treatment check, other');
     await m.page.fill(NF('animal'), 'CAT-12');
     await m.page.selectOption(NF('room'), 'Cat Room 2');
     await m.page.selectOption(NF('kind'), 'ear_swab');

@@ -11,7 +11,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     t.ok(await v.page.locator('#vet-initials').count() === 0, 'no separate "vet initials for today" box on the vets page');
     t.ok(await v.page.isVisible('#send-request [data-f="initials"]'), 'the one request card has an initials box');
     // nurse task (one animal): blocked without initials
-    await v.page.selectOption(F('kind'), 'other');
+    await v.page.selectOption(F('kind'), 'blood');
     await v.page.fill(F('animal'), 'INI-1');
     await v.page.click('[data-send="nurses"]'); await v.page.waitForTimeout(200);
     t.ok((await v.db()).noga_requests.length === 0 && /initials/i.test(await msg()), 'a nurse task cannot be sent without initials');

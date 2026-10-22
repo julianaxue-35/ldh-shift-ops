@@ -32,6 +32,6 @@ async function run(pageName, opener, label, inline) {
 }
 (async () => {
   await run('vets.html', '#send-request .sc-tab[data-sc="behaviour"]', 'vets', true);
-  await run('nurses.html', '#welfare-col .send-card-open', 'nurses', false);
+  await run('nurses.html', '#send-request .sc-tab[data-sc="behaviour"]', 'nurses', true);
   t.done();
 })();
