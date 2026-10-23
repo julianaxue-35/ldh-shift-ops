@@ -148,6 +148,20 @@ const t = require('./check')('flag-form');
   await page.waitForTimeout(300);
   t.ok((await db()).tasks.filter(x => x.title === 'MED-1').length === 1, 'medication requests are never redirected to the nurses');
 
+  /* ---------- foster med plan + meds dispensed ---------- */
+  await page.selectOption('#req-type', 'foster');
+  t.ok(await page.isVisible('#req-x-medplan'), 'foster shows the med plan option');
+  await page.selectOption('#req-type', 'rescue');
+  t.ok(!(await page.isVisible('#req-x-medplan')), 'rescue does not show the foster med plan option');
+  await page.selectOption('#req-type', 'foster');
+  await page.fill('#req-title', 'FMP-1');
+  await page.check('#req-x-medplan');
+  await page.click('#req-submit');
+  await page.waitForTimeout(400);
+  d = await db();
+  t.ok(d.tasks.filter(x => x.title === 'FMP-1').length === 1 && /^Foster med plan added \u2014 meds dispensed/.test(d.tasks.find(x => x.title === 'FMP-1').problem), 'foster med plan goes to the vet board with its label');
+  t.ok(!(await page.isChecked('#req-x-medplan')), 'med plan tick is cleared after sending');
+
   /* ---------- litters + treatment check / due ---------- */
   await page.selectOption('#req-type', 'foster');
   await page.fill('#req-title', '1170123,124,126 - 128');
