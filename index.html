@@ -177,6 +177,12 @@
   .sr-panel[data-to="nurses"] .sr-send { background: #1c7387; color: #fff; }
   .sr-panel[data-to="behaviour"] .sr-send { background: #7c5cbf; color: #fff; }
   .sr-form .sr-span2 { grid-column: span 2; }
+  .req-x-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .req-x-opt { display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px 14px; font-size: 1.05rem; font-weight: 700; color: var(--text, inherit); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+  .req-x-opt input { width: 22px; height: 22px; margin: 0; flex: none; }
+  .req-x-opt:has(input:checked) { border-color: var(--violet, #7c5cbf); background: rgba(124,92,191,0.10); }
+  .req-x-medplan { grid-column: 1 / -1; }
+  .req-x-tag { font-size: 0.8rem; font-weight: 700; color: var(--violet, #7c5cbf); margin-left: auto; }
   @media (max-width: 640px) { .sr-form .sr-span2 { grid-column: auto; } }
   .nurse-card { background: #eef8fb; border-left: 5px solid #2a9db5; }
   .nurse-card h2 { color: #1c7387; }
@@ -308,14 +314,18 @@
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--critical);">Urgent cat birthing check — what is wrong? (goes straight to the top of the vet board)</div>
         <select id="req-birthing-reason" style="margin:0;"></select>
       </div>
-      <div id="req-nurse-extras" style="display:none; margin:10px 0 0; padding:10px 12px; border:1px solid var(--border); border-radius:12px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Send straight to the Processing nurse (skips the vet board): Microchip / UV (ticking both makes one task) and Treatment check / due, so one person checks the animal in one visit</div>
-        <div style="display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-microchip" style="width:auto; margin:0;"> Microchip</label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-uv" style="width:auto; margin:0;"> UV request</label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0;"><input type="checkbox" id="req-x-treatment" style="width:auto; margin:0;"> Treatment check / due</label>
-          <select id="req-x-species" style="margin:0; width:auto;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select>
-          <select id="req-x-window" style="margin:0; width:auto;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select>
+      <div id="req-nurse-extras" style="display:none; margin:12px 0 0; padding:14px 16px; border:2px solid var(--border); border-radius:12px;">
+        <div style="font-size:1rem; font-weight:800; margin-bottom:4px;">Also needed for this animal (tick any)</div>
+        <div style="font-size:0.9rem; color:var(--muted); margin-bottom:10px;">Microchip, UV and Treatment check go straight to the Processing nurse and skip the vet board. A foster med plan always goes to the vets.</div>
+        <div class="req-x-grid">
+          <label class="req-x-opt"><input type="checkbox" id="req-x-microchip"> Microchip</label>
+          <label class="req-x-opt"><input type="checkbox" id="req-x-uv"> UV request</label>
+          <label class="req-x-opt"><input type="checkbox" id="req-x-treatment"> Treatment check / due</label>
+          <label class="req-x-opt req-x-medplan" id="req-x-medplan-wrap"><input type="checkbox" id="req-x-medplan"> Foster med plan added + meds dispensed <span class="req-x-tag">goes to vets</span></label>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:12px; font-size:0.95rem;">
+          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Species <select id="req-x-species" style="margin:0; width:auto; font-size:1rem;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select></label>
+          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
         </div>
       </div>
       <div id="req-redflags-wrap" style="margin:12px 0 4px;">
@@ -509,6 +519,8 @@
   document.getElementById('req-type').addEventListener('change', () => {
     const tv = document.getElementById('req-type').value;
     document.getElementById('req-nurse-extras').style.display = (tv === 'foster' || tv === 'rescue') ? '' : 'none';
+    document.getElementById('req-x-medplan-wrap').style.display = tv === 'foster' ? '' : 'none';
+    if (tv !== 'foster') document.getElementById('req-x-medplan').checked = false;
     if (tv === 'foster') {
       document.getElementById('req-location').value = 'Pathway';
       updateLocationFields();
@@ -569,7 +581,9 @@
       condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
       done: false,
     };
-    const needsVet = (!asked.length && !wantTreatment) || allFlags().length > 0 || !!baseRow.condition || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
+    const wantMedPlan = reqType === 'foster' && document.getElementById('req-x-medplan').checked;
+    if (wantMedPlan) baseRow.problem = ['Foster med plan added \u2014 meds dispensed', baseRow.problem].filter(Boolean).join(' \u2014 ');
+    const needsVet = wantMedPlan || (!asked.length && !wantTreatment) || allFlags().length > 0 || !!baseRow.condition || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
 
     async function submitOne(title) {
       const row = Object.assign({}, baseRow, { title, sm_number: needsMed ? title : null });
@@ -639,7 +653,7 @@
     document.getElementById('req-urgency-pick').value = 'routine';
     document.getElementById('req-type').value = 'shelter';
     document.getElementById('req-nurse-extras').style.display = 'none';
-    ['req-x-microchip', 'req-x-uv', 'req-x-treatment'].forEach(id => { document.getElementById(id).checked = false; });
+    ['req-x-microchip', 'req-x-uv', 'req-x-treatment', 'req-x-medplan'].forEach(id => { document.getElementById(id).checked = false; });
     document.getElementById('req-x-window').value = '2h';
     document.getElementById('req-birthing-wrap').style.display = 'none';
     document.getElementById('req-birthing-reason').value = '';
