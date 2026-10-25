@@ -731,11 +731,17 @@
   // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
   const PROCESSING_MISC_KINDS = ['microchip', 'uv', 'treatment'];
   const AA_PREFILL_KIND = { fiv_test: 'fiv', microchip: 'microchip', uv: 'uv' };   // misc task -> Send-to-AA type
+  // When the task was handed to the nurses: a time today ("09:40"), or the day and time if it is older ("Sun 09:40")
+  function assignedAt(iso) {
+    if (!iso) return '(time not recorded)';
+    const d = new Date(iso);
+    return (d.toDateString() === new Date().toDateString() ? '' : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ') + fmtTime(iso);
+  }
   function miscRowHtml(r) {
     return `
       <div class="attn-item noga-item">
         <div style="display:flex; gap:8px; align-items:flex-start;">${r.done ? '' : rowPickBox('misc', r, isProcessingMisc(r) ? 'processing' : 'welfare', r.task === 'uv')}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)}${r.note && r.task !== 'med_label' ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div>${r.task === 'med_label' && r.note ? `<div class="med-label-text">${esc(r.note)}</div>` : ''}</div></div>
+          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)} · assigned ${esc(assignedAt(r.created_at))}${r.note && r.task !== 'med_label' ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div>${r.task === 'med_label' && r.note ? `<div class="med-label-text">${esc(r.note)}</div>` : ''}</div></div>
         ${r.done ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-putback" data-id="${esc(r.id)}">Put back</button></div>` : r.task === 'med_label' ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>` : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
       </div>`;
   }
@@ -782,7 +788,7 @@
 
   /* ============================================================
      Send back to vet (2026-10-16). The nurse records a result (FIV test, bloods...) and the vets get it as an
-     ordinary shelter request — Within 2 hours (Emergency column) or Within 12-24 hours (Urgent column).
+     ordinary shelter request — Within 2–4 hours (Emergency column) or Within 12-24 hours (Urgent column).
      From a Miscellaneous task the task is also closed; from an FIV/blood nurse request the request is left alone
      (the nurse still ticks off the animals) because one request can cover several animals.
      ============================================================ */

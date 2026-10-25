@@ -275,6 +275,7 @@
             <option value="rescue">Rescue request</option>
             <option value="medication">Medication</option>
             <option value="other">Other (describe in the note)</option>
+            <option value="admin">Admin / paperwork review (e.g. vet history)</option>
           </select></label>
           <label>Animal ID<input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)"></label>
           <label>Space<select id="req-location"></select></label>
@@ -282,7 +283,7 @@
           <label class="sr-span2">Needed within<select id="req-urgency-pick">
             <option value="routine">Request check — within 24–48 h</option>
             <option value="urgent">Urgent — within 12–24 h</option>
-            <option value="red_flag">Emergency — within 2 h (radio the vet now)</option>
+            <option value="red_flag">Emergency — within 2–4 h</option>
           </select></label>
           <label>Suspected condition (optional)
         <select id="req-condition">
@@ -305,7 +306,7 @@
           <div style="padding:6px 2px;">
             <p style="margin:4px 0;"><b>Request check (24–48 h) — green.</b> Can wait. Old-age changes, stable arthritis, overgrown nails, mild skin disease, mild cat flu and still eating.</p>
             <p style="margin:4px 0;"><b>Urgent (12–24 h) — yellow / orange.</b> Needs a vet look that day or the next. One vomit or loose stool but bright, limping but weight-bearing, not eating (cat 24 h+, dog 48 h+), a wound that may need stitches, repeated vomiting, anything you think is painful.</p>
-            <p style="margin:4px 0;"><b>Emergency (within 2 h) — red. Radio the vet team now; don't wait for this board.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
+            <p style="margin:4px 0;"><b>Emergency (within 2–4 h) — red.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
             <p style="margin:4px 0; color:var(--muted);">From the draft triage guide (not yet approved). It does not replace common sense and gut instinct.</p>
           </div>
         </details>
@@ -446,7 +447,7 @@
       <h3 class="faq-group">Logging requests</h3>
       <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival (microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
       <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Pick a <b>Suspected condition</b> if you can, and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
-      <details><summary>What do the tiers mean? When do I radio the vet instead?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
+      <details><summary>What do the tiers mean?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2–4 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>
       <details><summary>How do I ask the nurses for a vaccination, FIV test, blood test, microchip or UV check?</summary><div><p>In <b>Send a request</b>, pick <b>Nurses</b> at the top. Choose <b>What</b>, space, species, how many animals and <b>Needed within</b>. Tick <i>Not here yet</i> to schedule it for a later arrival. For a single foster / rescue animal you can also tick Microchip and / or UV on the <b>Vets</b> form — these go to the Processing nurse.</p></div></details>
       <h3 class="faq-group">Behaviour tasks and initials</h3>
@@ -544,8 +545,9 @@
     // number to enter (2026-09-26: she found the extra box redundant/
     // confusing next to the ID field right above it).
     const needsMed = document.getElementById('req-type').value === 'medication';
-    const isOther = document.getElementById('req-type').value === 'other';   // 'Other' is stored as an ordinary shelter request whose note says what is wanted
-    if (isOther && !document.getElementById('req-problem').value.trim()) { alert('Describe what you need the vets for.'); return; }
+    const isAdmin = document.getElementById('req-type').value === 'admin';   // stored as an ordinary shelter request whose note starts "Admin / paperwork review"
+    const isOther = document.getElementById('req-type').value === 'other' || isAdmin;   // 'Other' is stored as an ordinary shelter request whose note says what is wanted
+    if (isOther && !document.getElementById('req-problem').value.trim()) { alert(isAdmin ? 'Say what paperwork the vets need to review (e.g. vet history for A123456).' : 'Describe what you need the vets for.'); return; }
     const isBirthing = document.getElementById('req-condition').value === 'cat_birthing';
     if (isBirthing && !birthingReason()) { alert('Choose the reason for the urgent cat birthing check.'); return; }
     const btn = document.getElementById('req-submit');
@@ -577,7 +579,7 @@
       urgency: LDHLogic.pickTier(document.getElementById('req-urgency-pick').value, allFlags()),
       red_flags: allFlags(),
       needs_medication: needsMed,
-      problem: [isBirthing ? 'Cat birthing — ' + LDHLogic.signLabel(birthingReason()) : '', document.getElementById('req-problem').value.trim()].filter(Boolean).join(' — ') || null,
+      problem: [isAdmin ? 'Admin / paperwork review' : '', isBirthing ? 'Cat birthing — ' + LDHLogic.signLabel(birthingReason()) : '', document.getElementById('req-problem').value.trim()].filter(Boolean).join(' — ') || null,
       condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
       done: false,
     };
