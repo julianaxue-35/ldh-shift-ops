@@ -215,6 +215,9 @@
         <section class="bh-lane" data-lane="dog"><h3>Dog assist <button type="button" class="secondary bh-add" data-lane="dog">+ Task</button></h3><div id="lane-dog"></div></section>
       </div>
     </div>
+    <section class="card" id="bh-waiting"><h2>Requested from the vets <span id="waiting-count" class="box-count"></span></h2>
+      <p class="subtle" style="margin:-8px 0 8px;">Requests the Behaviour team has sent to the vets that are still open, with how long they were given.</p>
+      <div id="waiting-list"></div></section>
     <section class="card" id="bh-completed"><h2>Completed <span id="completed-count" class="box-count"></span></h2>
       <p class="subtle" style="margin:-8px 0 8px;">Finished cases stay here with their note for 24 hours, then are removed. Ticked by mistake? Put it back.</p>
       <div id="completed-list"></div></section>
@@ -228,6 +231,7 @@
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
       <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, quarter and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
       <details><summary>Who sees my Done note?</summary><div><p>The team that asked. A task given to you from the Vets page (or a vet&rsquo;s Send to Behaviour button) shows your note on the <b>Vets page</b>; one from the Nurses page shows it on the <b>Nurses page</b>; each rings when you tick Done. The Shelter board shows it against the animal too. So write the plan clearly: what you found and what should happen next. Tasks from the shelter staff page are only shown on the Shelter board.</p></div></details>
+      <details><summary>How do I answer a task, or ask the vets to do something (e.g. start medication)?</summary><div><p>Press <b>Done</b> on the card and write your <b>comment</b>. Then choose: <b>Mark done</b> (the comment goes back to the vets and the Shelter board) or <b>Request a task back to the vets</b> (pick shelter stress medication, post adoption med pack or other, how soon: <b>Emergency</b> 2&ndash;4 h, <b>Urgent</b> 12&ndash;24 h or <b>Request check</b> 24&ndash;48 h, and add details). The request goes to the vet board with your comment, this task is finished, and the request shows under <b>Requested from the vets</b> on this page until a vet completes it.</p></div></details>
       <details><summary>I ticked Done by mistake — can I put it back?</summary><div><p>Yes. Finished tasks stay in the <b>Completed</b> list near the bottom of the page, with their note, for <b>24 hours</b>. Press <b>Put back</b> (your initials are needed) and it returns to the lane it was in. After 24 hours it is removed, but it still counts in the totals. The medical note a vet attached is deleted as soon as a task is ticked Done, so it does not come back.</p></div></details>
       <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
       <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). The <b>Behaviour trainer</b> lane takes cats and dogs. Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
@@ -317,7 +321,9 @@
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
     if (!error) { ROWS = data || []; checkForNewTasks(); }
-    render();
+    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').eq('done', false).order('created_at', { ascending: true });
+    if (!vr.error) WAITING = vr.data || [];
+    render(); renderWaiting();
     await loadCounts(); renderStats();
   }
   function filtered() {
@@ -342,6 +348,14 @@
   function completedRows() {
     const cutoff = Date.now() - 24 * 3600 * 1000;
     return ROWS.filter(r => r.status === 'done' && new Date(r.done_at || r.created_at).getTime() >= cutoff).sort((a, b) => new Date(b.done_at || 0) - new Date(a.done_at || 0));
+  }
+  let WAITING = [];
+  function renderWaiting() {
+    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    $('waiting-count').textContent = WAITING.length || '';
+    $('waiting-list').innerHTML = WAITING.map(t => { const tier = LDHLogic.normTier(t.urgency);
+      return `<div style="padding:8px 0; border-top:1px solid var(--border);"><div class="aname" style="font-size:0.9rem;"><b>${esc(t.title)}</b> <span class="meta">${esc(t.location)} · ${esc(LDHLogic.TIER_LABELS[tier])} ${esc(LDHLogic.TIER_TARGETS[tier])} · sent ${esc(hm(t.created_at))}${t.claimed_by ? ' · picked up by ' + esc(t.claimed_by) : ' · waiting for a vet'}</span></div>
+        <div class="bh-reason">${esc(t.problem || '')}</div></div>`; }).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
   }
   function renderCompleted() {
     const rows = completedRows(), hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -412,12 +426,17 @@
     if (d) {
       const card = d.closest('.bh-card');
       modal(`<div class="oc-modal-overlay done-overlay" data-id="${esc(card.dataset.id)}"><div class="oc-modal">
-        <h3>Done — ${esc(card.dataset.animal)}</h3>
-        <label>Note (what you found / the plan) — this shows on the Shelter board</label>
+        <h3>Comment — ${esc(card.dataset.animal)}</h3>
+        <label>Comment (what you found / the plan) — goes to the vets and the Shelter board</label>
         <textarea class="done-note" rows="4"></textarea>
         <label>Your initials</label><input class="done-initials" maxlength="4" value="${esc(initials())}">
+        <div class="done-req" style="display:none; border-top:1px solid var(--border); margin-top:10px; padding-top:8px;">
+          <label>What do you need the vets to do?</label><select class="req-type">${Object.entries(LDHLogic.BEHAVIOUR_VET_TYPES).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
+          <label>Needed within</label><select class="req-urgency">${[['red_flag', 'Emergency'], ['urgent', 'Urgent'], ['routine', 'Request check']].map(([k, v]) => `<option value="${k}"${k === 'urgent' ? ' selected' : ''}>${v} — ${esc(LDHLogic.TIER_TARGETS[k])}</option>`).join('')}</select>
+          <label>Details for the vets (e.g. drug, dose if known)</label><textarea class="req-detail" rows="2"></textarea>
+        </div>
         <p class="oc-modal-error done-error"></p>
-        <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel done-cancel">Cancel</button><button type="button" class="oc-modal-submit done-confirm">Mark done</button></div></div></div>`, 'done-overlay');
+        <div class="oc-modal-actions"><button type="button" class="oc-modal-cancel done-cancel">Cancel</button><button type="button" class="oc-modal-cancel done-request">Request a task back to the vets</button><button type="button" class="oc-modal-submit done-confirm">Mark done</button></div></div></div>`, 'done-overlay');
       return;
     }
     /* ---- the medical note a vet attached (read-only; the database deletes it when this task is Done) ---- */
@@ -434,6 +453,26 @@
     }
     if (e.target.closest('.note-close')) { document.querySelector('.note-overlay').remove(); return; }
     if (e.target.closest('.done-cancel')) { document.querySelector('.done-overlay').remove(); return; }
+    /* ---- comment, then ask the vets for a task: opens the request fields, the second press sends it ---- */
+    const rq = e.target.closest('.done-request');
+    if (rq) {
+      const o = rq.closest('.done-overlay'), box = o.querySelector('.done-req'), er = o.querySelector('.done-error');
+      if (box.style.display === 'none') { box.style.display = ''; rq.textContent = 'Send request to vets and finish'; rq.classList.add('oc-modal-submit'); return; }
+      const note = o.querySelector('.done-note').value.trim(), ini = o.querySelector('.done-initials').value.trim().toUpperCase();
+      if (!note) { er.textContent = 'Write a comment first — the vets see it with the request.'; er.style.display = 'block'; return; }
+      if (!ini) { er.textContent = 'Enter your initials.'; er.style.display = 'block'; return; }
+      const r = ROWS.find(x => x.id === o.dataset.id); if (!r) { er.textContent = 'Task not found.'; er.style.display = 'block'; return; }
+      const type = o.querySelector('.req-type').value, urgency = o.querySelector('.req-urgency').value, detail = o.querySelector('.req-detail').value.trim();
+      $('bh-initials').value = ini; OpsCore.saveInitials(INIT_KEY, ini);
+      rq.disabled = true;
+      const sendErr = await OpsCore.sendTaskToVets(sb, LDHLogic.behaviourVetRequest({ type, urgency, animalId: r.animal_id, location: r.location, courthold: r.courthold || r.kind === 'courthold',
+        note: [detail, 'Behaviour comment: ' + note].filter(Boolean).join(' \u2014 '), initials: ini }));
+      if (sendErr) { rq.disabled = false; er.textContent = 'Could not send to the vets: ' + sendErr.message; er.style.display = 'block'; return; }
+      const vetTxt = LDHLogic.BEHAVIOUR_VET_TYPES[type] + ' (' + LDHLogic.TIER_LABELS[urgency] + ', ' + LDHLogic.TIER_TARGETS[urgency] + ')';
+      const err = await changeRow(o.dataset.id, { status: 'done', done_at: new Date().toISOString(), done_note: note + ' \u2014 Requested from vets: ' + vetTxt, done_by: ini }, { done: true, vet_request: vetTxt });
+      if (err) { rq.disabled = false; er.textContent = 'The request reached the vets, but this task could not be finished: ' + err; er.style.display = 'block'; return; }
+      OpsCore.toast(); o.remove(); loadAll(); return;
+    }
     const ok = e.target.closest('.done-confirm');
     if (ok) {
       const o = ok.closest('.done-overlay'), note = o.querySelector('.done-note').value.trim(), er = o.querySelector('.done-error');
@@ -495,7 +534,7 @@
       saveInitials: v => { OpsCore.saveInitials(INIT_KEY, v); $('bh-initials').value = v; } });
     $('bh-initials').addEventListener('change', () => { const w = document.querySelector('#send-request [data-f="initials"]'); if (w) w.value = initials(); });
     await loadAll();
-    OpsCore.subscribe(['behaviour_tasks'], loadAll);
+    OpsCore.subscribe(['behaviour_tasks', 'tasks'], loadAll);
     setInterval(render, 60000);
     $('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
   })();
