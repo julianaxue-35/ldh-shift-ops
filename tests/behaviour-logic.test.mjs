@@ -48,6 +48,9 @@ test('behaviourVetRequest: medication types wait on the nurse label; courthold a
   assert.match(pack.problem, /post adoption med pack/i); assert.doesNotMatch(pack.problem, /COURTHOLD/);
   const other = L.behaviourVetRequest({ ...base, type: 'other' });
   assert.equal(other.type, 'shelter'); assert.equal(other.needs_medication, false);
+  assert.equal(med.urgency, 'urgent');   // default
+  for (const u of ['red_flag', 'urgent', 'routine']) assert.equal(L.behaviourVetRequest({ ...base, type: 'other', urgency: u }).urgency, u);
+  assert.equal(L.behaviourVetRequest({ ...base, type: 'other', urgency: 'bogus' }).urgency, 'urgent');
 });
 
 test('behaviourForAnimal: open tasks plus the latest done within 24h, matched ignoring spaces/case', () => {

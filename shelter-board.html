@@ -251,6 +251,7 @@
       // label on the dark pill: "Pen 12" in a known room; the raw location text if the room isn't recognised
       const penLabel = r.code === 'OTHER' ? (t.location || 'No location')
         : r.code === 'PATHWAY' ? (t.location_detail || 'Foster')
+        : r.code === 'OFFICE' ? (t.location_detail || 'Paperwork')
         : (r.pen ? 'Pen ' + r.pen : 'Pen not given');
       (byRoom[r.code] ??= []).push({ t, stage: LDHLogic.boardStage(t, now), pen: r.pen, penLabel });
     });
