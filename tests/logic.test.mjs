@@ -121,7 +121,7 @@ test('CONDITION_LABELS covers every condition value the flag form can save', () 
 });
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {
-  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport', 'Rabbit Room', 'Pathway', 'Offsite', 'Vet clinic']);
+  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport', 'Rabbit Room', 'Pathway', 'Offsite', 'Vet clinic', 'Office']);
 });
 
 test('summariseConditions counts every condition, ignores unknown values, and groups flagged cases by space', () => {
@@ -256,8 +256,8 @@ test('TIER_LABELS use the new wording; stored values unchanged', () => {
 });
 
 test('Offsite: unmapped space, but never counted as an unmapped-space warning', () => {
-  assert.equal(L.LOCATIONS[L.LOCATIONS.length - 1], 'Vet clinic');
-  assert.deepEqual(L.OFFSITE_NAMES, ['Offsite', 'Pathway', 'Vet clinic']);
+  assert.equal(L.LOCATIONS[L.LOCATIONS.length - 1], 'Office');
+  assert.deepEqual(L.OFFSITE_NAMES, ['Offsite', 'Pathway', 'Vet clinic', 'Office']);
   const since = new Date(NOW - 3 * 24 * H);
   const r = L.buildSurvey([trow('O1', 'Offsite', 'cat_flu', 1 * H), trow('O2', 'Offsite — foster home', 'cat_flu', 1 * H), trow('V1', 'Vet clinic — ward 2', 'cat_flu', 1 * H),
     trow('E1', 'Mystery Room / 9', 'other', 1 * H)], LOC, since);

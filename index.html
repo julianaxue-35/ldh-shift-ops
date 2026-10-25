@@ -526,6 +526,10 @@
       document.getElementById('req-location').value = 'Pathway';
       updateLocationFields();
     }
+    if (tv === 'admin') {   // paperwork / vet history: no pen, the Office is the usual place (still changeable)
+      document.getElementById('req-location').value = 'Office';
+      updateLocationFields();
+    }
   });
   function updateLocationFields() {
     const isOffsite = LDHLogic.OFFSITE_NAMES.includes(document.getElementById('req-location').value);   // Offsite / Pathway: a detail (e.g. foster name) instead of a pen

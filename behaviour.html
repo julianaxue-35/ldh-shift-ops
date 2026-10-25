@@ -216,7 +216,7 @@
       </div>
     </div>
     <section class="card" id="bh-waiting"><h2>Requested from the vets <span id="waiting-count" class="box-count"></span></h2>
-      <p class="subtle" style="margin:-8px 0 8px;">Requests the Behaviour team has sent to the vets that are still open, with how long they were given.</p>
+      <p class="subtle" style="margin:-8px 0 8px;">Requests the Behaviour team has sent to the vets that are still open, with how long they were given. When a vet finishes one it moves to <b>Done by the vets</b> with their treatment and plan, for 24 hours.</p>
       <div id="waiting-list"></div></section>
     <section class="card" id="bh-completed"><h2>Completed <span id="completed-count" class="box-count"></span></h2>
       <p class="subtle" style="margin:-8px 0 8px;">Finished cases stay here with their note for 24 hours, then are removed. Ticked by mistake? Put it back.</p>
@@ -231,7 +231,7 @@
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
       <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, quarter and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
       <details><summary>Who sees my Done note?</summary><div><p>The team that asked. A task given to you from the Vets page (or a vet&rsquo;s Send to Behaviour button) shows your note on the <b>Vets page</b>; one from the Nurses page shows it on the <b>Nurses page</b>; each rings when you tick Done. The Shelter board shows it against the animal too. So write the plan clearly: what you found and what should happen next. Tasks from the shelter staff page are only shown on the Shelter board.</p></div></details>
-      <details><summary>How do I answer a task, or ask the vets to do something (e.g. start medication)?</summary><div><p>Press <b>Done</b> on the card and write your <b>comment</b>. Then choose: <b>Mark done</b> (the comment goes back to the vets and the Shelter board) or <b>Request a task back to the vets</b> (pick shelter stress medication, post adoption med pack or other, how soon: <b>Emergency</b> 2&ndash;4 h, <b>Urgent</b> 12&ndash;24 h or <b>Request check</b> 24&ndash;48 h, and add details). The request goes to the vet board with your comment, this task is finished, and the request shows under <b>Requested from the vets</b> on this page until a vet completes it.</p></div></details>
+      <details><summary>How do I answer a task, or ask the vets to do something (e.g. start medication)?</summary><div><p>Press <b>Done</b> on the card and write your <b>comment</b>. Then choose: <b>Mark done</b> (the comment goes back to the vets and the Shelter board) or <b>Request a task back to the vets</b> (pick shelter stress medication, post adoption med pack or other, how soon: <b>Emergency</b> 2&ndash;4 h, <b>Urgent</b> 12&ndash;24 h or <b>Request check</b> 24&ndash;48 h, and add details). The request goes to the vet board with your comment, this task is finished, and the request shows under <b>Requested from the vets</b> on this page until a vet completes it, then moves to <b>Done by the vets</b> with the vet&rsquo;s treatment and plan.</p></div></details>
       <details><summary>I ticked Done by mistake — can I put it back?</summary><div><p>Yes. Finished tasks stay in the <b>Completed</b> list near the bottom of the page, with their note, for <b>24 hours</b>. Press <b>Put back</b> (your initials are needed) and it returns to the lane it was in. After 24 hours it is removed, but it still counts in the totals. The medical note a vet attached is deleted as soon as a task is ticked Done, so it does not come back.</p></div></details>
       <details><summary>How will I know a new task has arrived?</summary><div><p>A red <b>NEW TASK</b> banner appears at the top, the page plays a short three-beep sound, and the browser tab title flashes. The banner stays until you press &times;. Browsers keep sound off until the page has been tapped once, so tap anywhere (or the <b>alert sound</b> button at the top) when you start your shift. The same button mutes the sound. Tasks already on the page when you open it do not ring.</p></div></details>
       <details><summary>How do I assign or move a task?</summary><div><p>Enter your <b>initials</b> in the left sidebar first (kept on this device for the day). On a card use <b>Assign to&hellip;</b> (from Incoming) or <b>Move to&hellip;</b> (from a lane). The <b>Behaviour trainer</b> lane takes cats and dogs. Cats can go to <b>Behaviour TL</b> or <b>Cat assist</b>; dogs to <b>Behaviour TL</b> or <b>Dog assist</b>. Cats and dogs never cross. Transport (and a location the board does not recognise) can go to any of the three, so check the species before you pick. Every move is recorded with your initials.</p></div></details>
@@ -321,7 +321,7 @@
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
     if (!error) { ROWS = data || []; checkForNewTasks(); }
-    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').eq('done', false).order('created_at', { ascending: true });
+    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').order('created_at', { ascending: true });   // open ones, plus those the vets finished (shown for 24 h)
     if (!vr.error) WAITING = vr.data || [];
     render(); renderWaiting();
     await loadCounts(); renderStats();
@@ -350,12 +350,21 @@
     return ROWS.filter(r => r.status === 'done' && new Date(r.done_at || r.created_at).getTime() >= cutoff).sort((a, b) => new Date(b.done_at || 0) - new Date(a.done_at || 0));
   }
   let WAITING = [];
+  // Open requests first; then the ones a vet has finished in the last 24 hours, with the vet's treatment, plan and note.
   function renderWaiting() {
-    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    $('waiting-count').textContent = WAITING.length || '';
-    $('waiting-list').innerHTML = WAITING.map(t => { const tier = LDHLogic.normTier(t.urgency);
-      return `<div style="padding:8px 0; border-top:1px solid var(--border);"><div class="aname" style="font-size:0.9rem;"><b>${esc(t.title)}</b> <span class="meta">${esc(t.location)} · ${esc(LDHLogic.TIER_LABELS[tier])} ${esc(LDHLogic.TIER_TARGETS[tier])} · sent ${esc(hm(t.created_at))}${t.claimed_by ? ' · picked up by ' + esc(t.claimed_by) : ' · waiting for a vet'}</span></div>
-        <div class="bh-reason">${esc(t.problem || '')}</div></div>`; }).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
+    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), now = Date.now();
+    const openR = WAITING.filter(t => !t.done);
+    const doneR = WAITING.filter(t => t.done && now - new Date(t.completed_at || t.created_at).getTime() < 24 * 3600000)
+      .sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0));
+    $('waiting-count').textContent = openR.length || '';
+    const line = (label, v) => v && String(v).trim() ? `<div class="bh-reason"><b>${label}:</b> ${esc(String(v).trim())}</div>` : '';
+    const head = (t, tail) => { const tier = LDHLogic.normTier(t.urgency);
+      return `<div class="aname" style="font-size:0.9rem;"><b>${esc(t.title)}</b> <span class="meta">${esc(t.location)} · ${esc(LDHLogic.TIER_LABELS[tier])} ${esc(LDHLogic.TIER_TARGETS[tier])} · sent ${esc(hm(t.created_at))}${tail}</span></div>`; };
+    const openHtml = openR.map(t => `<div style="padding:8px 0; border-top:1px solid var(--border);">${head(t, t.claimed_by ? ' · picked up by ' + esc(t.claimed_by) : ' · waiting for a vet')}
+        <div class="bh-reason">${esc(t.problem || '')}</div></div>`).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
+    const doneHtml = doneR.length ? `<h3 style="font-size:0.85rem; margin:14px 0 4px;">Done by the vets (last 24 h)</h3>` + doneR.map(t => `<div style="padding:8px 0; border-top:1px solid var(--border);">${head(t, ' · <b>done</b>' + (t.completed_at ? ' at ' + esc(hm(t.completed_at)) : ''))}
+        <div class="bh-reason">${esc(t.problem || '')}</div>${line('Treatment', t.treatment)}${line('Plan', t.plan)}${line('Vet note', t.note)}</div>`).join('') : '';
+    $('waiting-list').innerHTML = openHtml + doneHtml;
   }
   function renderCompleted() {
     const rows = completedRows(), hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
