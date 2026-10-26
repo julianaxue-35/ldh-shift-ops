@@ -65,7 +65,7 @@
     color: var(--ink);
     line-height: 1.5;
   }
-  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+  h1, h2, h3, h4 { font-weight: 800; line-height: 1.25; letter-spacing: -0.01em; }
 
   .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: calc(100vh); }
   .layout > main, .layout > aside { min-width: 0; }
@@ -75,15 +75,15 @@
   aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
   main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
-  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.55rem; font-weight: 800; }
   .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
   #search-box {
     border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px;
     background: var(--card-bg); font: inherit; font-size: 0.85rem; width: 220px;
   }
-  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
-  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
-  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  .card { background: var(--card-bg); border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(30,34,56,0.05), 0 6px 20px rgba(30,34,56,0.05); padding: 24px; }
+  .card h2 { margin: 0 0 6px; font-size: 1.1rem; font-weight: 800; color: var(--ink); }
+  .card p.subtle { font-size: 0.8rem; font-weight: 400; color: var(--muted); margin: 0 0 18px; }
   input, select, textarea {
     border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
     background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
@@ -139,6 +139,26 @@
   table.queue-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0 10px 10px; }
   table.queue-table td { padding: 10px; border-top: 1px solid rgba(30,34,56,0.06); }
   table.queue-table tr:first-child td { border-top: none; }
+  .case-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; font-size: 0.78rem; }
+  .case-tools-l { font-weight: 700; color: var(--muted); text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.05em; margin-right: 2px; }
+  .col-chip { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; background: #fff; font-weight: 600; cursor: pointer; }
+  .col-chip input { width: auto; margin: 0; }
+  .col-chip:has(input:checked) { background: #eef1ff; border-color: rgba(74,108,247,0.5); color: #2f4fd6; }
+  .case-tools-r { margin-left: auto; }
+  .case-tools-r button { margin: 0 0 0 4px; padding: 5px 12px; font-size: 0.75rem; }
+  .cases-table .col-shift, .cases-table .col-type, .cases-table .col-flagged { display: none; }
+  .cases-table.show-shift .col-shift, .cases-table.show-type .col-type, .cases-table.show-flagged .col-flagged { display: table-cell; }
+  .cases-table th.col-more, .cases-table td.col-more { width: 44px; text-align: right; }
+  .case-toggle { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; box-shadow: none; color: var(--muted); }
+  .case-toggle:hover { background: #f4f6fb; color: var(--ink); }
+  .case-toggle .chev::before { content: '\25BE'; display: inline-block; transition: transform .15s; }
+  .case-toggle[aria-expanded="true"] .chev::before { transform: rotate(180deg); }
+  .plan-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); display: inline-block; }
+  table.queue-table tr.case-drawer td { background: #f7f8fc; border-top: none; padding: 12px 16px 14px; }
+  table.queue-table tr.case-drawer[hidden] { display: none; }
+  .drawer-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; font-size: 0.85rem; }
+  .drawer-l { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 3px; }
+  @media (max-width: 640px) { .drawer-grid { grid-template-columns: 1fr; } }
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .req-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .req-grid2 { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
@@ -162,7 +182,7 @@
   .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
   /* One request card for vets / nurses / behaviour (2026-10-21): same field order, labels and look in every panel. */
   /* Send a request (2026-10-27): banner, 1 recipient cards, 2 request & location details */
-  #send-request { padding: 0; overflow: hidden; }
+  #send-request { padding: 0; overflow: clip; }
   .sr-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 20px 28px; color: #fff; background: linear-gradient(110deg, #1E2238 0%, #2d2f8f 100%); }
   .sr-banner .eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a9b4ff; }
   .sr-banner h2 { margin: 2px 0 0; font-size: 1.2rem; color: #fff; }
@@ -226,8 +246,18 @@
   .req-chip:has(input:checked) { background: var(--critical); border-color: var(--critical); color: #fff; }
   .req-chip:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
   @media (max-width: 760px) { .sr-body { padding: 18px 16px 22px; } .sr-banner { padding: 16px; } .sr-to { grid-template-columns: minmax(0, 1fr); } .sr-form { grid-template-columns: minmax(0, 1fr); } }
-  .sr-send { margin-top: 18px; padding: 13px 32px; font-size: 0.95rem; border-radius: 12px; }
-  .sr-panel[data-to="vets"] .sr-send { background: var(--blue, #4a6cf7); color: #fff; }
+  .sr-send { position: sticky; bottom: 16px; z-index: 5; margin-top: 18px; padding: 14px 36px; font-size: 1rem; border-radius: 12px; box-shadow: 0 6px 18px rgba(30,34,56,0.28); transition: transform .08s, box-shadow .15s, filter .15s; }
+  .sr-send:hover { filter: brightness(1.12); box-shadow: 0 8px 22px rgba(30,34,56,0.34); }
+  .sr-send:active { transform: translateY(1px) scale(0.99); box-shadow: 0 3px 10px rgba(30,34,56,0.3); filter: brightness(0.95); }
+  .sr-send:focus-visible { outline: 3px solid #fff; box-shadow: 0 0 0 6px var(--blue); }
+  .sr-send:disabled { filter: grayscale(0.4); box-shadow: none; }
+  .sr-panel[data-to="vets"] .sr-send { background: #4338ca; color: #fff; }
+  .sr-panel[data-to="nurses"] .sr-send { background: #1c7387; color: #fff; }
+  .sr-panel[data-to="behaviour"] .sr-send { background: #7c5cbf; color: #fff; }
+  #req-redflags-wrap .radio-note { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  #req-redflags-wrap.is-emergency .radio-note { background: var(--critical); color: #fff; font-weight: 700; font-size: 0.9rem; padding: 10px 14px; border-radius: 10px; margin-top: 8px; }
+  #req-redflags-wrap.is-emergency .radio-note::before { content: '\1F4FB  '; }
+  
   .sr-panel[data-to="nurses"] .sr-send { background: #1c7387; color: #fff; }
   .sr-panel[data-to="behaviour"] .sr-send { background: #7c5cbf; color: #fff; }
   .sr-form .sr-span2 { grid-column: span 2; }
@@ -270,6 +300,11 @@
     table.queue-table td::before { content: attr(data-label); flex: 0 0 72px; text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
     table.queue-table td:first-child { text-align: left; font-size: 0.95rem; }
     table.queue-table td:empty { display: none; }
+    table.queue-table tr.case-drawer { margin-top: -12px; border-top: none; border-radius: 0 0 10px 10px; background: #f7f8fc; }
+    table.queue-table tr.case-drawer td { display: block; text-align: left; }
+    .cases-table .col-shift, .cases-table .col-type, .cases-table .col-flagged { display: none; }
+    .cases-table.show-shift .col-shift, .cases-table.show-type .col-type, .cases-table.show-flagged .col-flagged { display: flex; }
+    table.queue-table td.col-more { justify-content: flex-end; width: 100%; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
@@ -316,8 +351,8 @@
       <div class="sr-head">
         <div class="sr-to" role="tablist" aria-label="Send to">
           <button type="button" role="tab" class="sr-tab" data-sr="vets" data-sub="Medical exam &amp; diagnosis" aria-selected="true">Vets</button>
-          <button type="button" role="tab" class="sr-tab" data-sr="nurses" data-sub="Nursing care &amp; treatments" aria-selected="false">Nurses</button>
-          <button type="button" role="tab" class="sr-tab" data-sr="behaviour" data-sub="Assessments &amp; enrichment" aria-selected="false">Behaviour</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="nurses" data-sub="Treatments and vaccines" aria-selected="false">Nurses</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="behaviour" data-sub="Behaviour assessment" aria-selected="false">Behaviour</button>
         </div>
       </div>
 
@@ -393,7 +428,7 @@
 </div>
         </details>
         <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:10px;"></div>
-        <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
+        <div class="radio-note">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
         <button id="req-submit" type="button" class="sr-send">Send to vets</button>
       </div>
@@ -474,13 +509,20 @@
 
     <section class="card" id="cases-list">
       <h2>Cases</h2>
-      <p class="subtle">Every case from flagged to completed, across all shifts.</p>
-      <div class="table-scroll"><table class="queue-table">
-        <thead><tr><th>Animal</th><th>Location</th><th>Shift</th><th>Type</th><th>Tier</th><th>Stage</th><th>Reason</th><th>Flagged</th><th>Time left</th><th>Plan</th></tr></thead>
+      <p class="subtle">Every case from flagged to completed, across all shifts. Tap a row's arrow for the reason and plan.</p>
+      <div class="case-tools no-print">
+        <span class="case-tools-l">Show columns</span>
+        <label class="col-chip"><input type="checkbox" data-col="shift"> Shift</label>
+        <label class="col-chip"><input type="checkbox" data-col="type"> Type</label>
+        <label class="col-chip"><input type="checkbox" data-col="flagged"> Flagged</label>
+        <span class="case-tools-r"><button type="button" class="secondary" id="cases-expand">Open all details</button> <button type="button" class="secondary" id="cases-collapse">Close all</button></span>
+      </div>
+      <div class="table-scroll"><table class="queue-table cases-table">
+        <thead><tr><th>Animal</th><th>Location</th><th class="col-shift">Shift</th><th class="col-type">Type</th><th>Tier</th><th>Stage</th><th class="col-flagged">Flagged</th><th>Time left</th><th class="col-more"></th></tr></thead>
         <tbody id="cases-open-tbody"></tbody>
       </table></div>
       <h3 style="font-size:0.85rem; margin:18px 0 8px;">Completed (last 24 h)</h3>
-      <div class="table-scroll"><table class="queue-table">
+      <div class="table-scroll"><table class="queue-table cases-table">
         <tbody id="cases-completed-tbody"></tbody>
       </table></div>
     </section>
@@ -863,24 +905,47 @@
       ? `<div class="reason-extra" style="font-size:0.78rem; color:#9a5b00; margin-top:3px;">+ ${esc(fmtTime(r.at))}${r.by ? ' ' + esc(r.by) : ''}: ${r.text ? esc(r.text) : '<i>no detail</i>'}</div>`
       : `<div class="reason-first">${r.text ? esc(r.text) : '<i style="color:var(--muted)">No reason given</i>'}</div>`).join('');
   }
+  const OPEN_CASES = new Set();   // case ids whose reason / plan drawer is open (kept across the 60 s refresh)
   function caseRowHtml(t, isCompleted) {
     const tier = LDHLogic.normTier(t.urgency);
     const stage = LDHLogic.stageOf(t, Date.now());
+    const open = OPEN_CASES.has(t.id);
+    const hasPlan = !!(t.note && t.note.trim());
     return `
-      <tr>
+      <tr class="case-row" data-case="${esc(t.id)}">
         <td data-label="Animal"><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${esc(t.title)}</strong>${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''}${flagHistoryHtml(t)}</td>
         <td data-label="Location">${esc(locationText(t))}</td>
-        <td data-label="Shift" style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
-        <td data-label="Type">${TYPE_LABELS[t.type] || t.type}</td>
+        <td data-label="Shift" class="col-shift" style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
+        <td data-label="Type" class="col-type">${TYPE_LABELS[t.type] || t.type}</td>
         <td data-label="Tier"><span class="status-pill ${tier}">${esc(LDHLogic.TIER_LABELS[tier])}</span></td>
         <td data-label="Stage"><span class="stage-pill stage-${stage}">${esc(STAGE_LABELS[stage] || stage)}</span>${stage === 'completed' && t.needs_medication && t.med_done_by ? ' — meds by ' + esc(t.med_done_by) : ''}</td>
-        <td data-label="Reason">${reasonCellHtml(t)}</td>
-        <td data-label="Flagged">${esc(fmtFlagged(t.created_at))}</td>
+        <td data-label="Flagged" class="col-flagged">${esc(fmtFlagged(t.created_at))}</td>
         <td data-label="Time left">${isCompleted ? '—' : statusChipHtml(t)}</td>
-        <td data-label="Plan">${t.note ? esc(t.note) : ''}</td>
-      </tr>`;
+        <td class="col-more"><button type="button" class="case-toggle" data-toggle="${esc(t.id)}" aria-expanded="${open}" aria-label="Show reason and plan for ${esc(t.title)}">${hasPlan ? '<i class="plan-dot" title="Has a plan"></i>' : ''}<span class="chev"></span></button></td>
+      </tr>
+      <tr class="case-drawer" data-drawer="${esc(t.id)}"${open ? '' : ' hidden'}><td colspan="20">
+        <div class="drawer-grid"><div><div class="drawer-l">Reason</div>${reasonCellHtml(t)}</div><div><div class="drawer-l">Plan</div>${hasPlan ? esc(t.note) : '<span class="subtle" style="margin:0;">No plan written yet</span>'}</div></div>
+      </td></tr>`;
   }
 
+  // Cases table: arrow opens a row's reason / plan; chips choose the extra columns (remembered on this device)
+  (function () {
+    const KEY = 'ldh_cases_cols_v1', tables = () => Array.from(document.querySelectorAll('table.cases-table'));
+    let cols = { shift: true, type: false, flagged: true };
+    try { Object.assign(cols, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+    const apply = () => { tables().forEach(tb => ['shift', 'type', 'flagged'].forEach(c => tb.classList.toggle('show-' + c, !!cols[c]))); document.querySelectorAll('[data-col]').forEach(cb => { cb.checked = !!cols[cb.dataset.col]; }); };
+    document.addEventListener('change', (e) => {
+      const cb = e.target.closest && e.target.closest('[data-col]'); if (!cb) return;
+      cols[cb.dataset.col] = cb.checked; try { localStorage.setItem(KEY, JSON.stringify(cols)); } catch (er) {} apply();
+    });
+    document.getElementById('cases-list').addEventListener('click', (e) => {
+      const t = e.target.closest('[data-toggle]');
+      if (t) { const id = t.dataset.toggle; OPEN_CASES.has(id) ? OPEN_CASES.delete(id) : OPEN_CASES.add(id); renderCases(); return; }
+      if (e.target.id === 'cases-expand') { document.querySelectorAll('.case-row').forEach(r => OPEN_CASES.add(r.dataset.case)); renderCases(); }
+      if (e.target.id === 'cases-collapse') { OPEN_CASES.clear(); renderCases(); }
+    });
+    window.__applyCaseCols = apply; apply();
+  })();
   function renderCases() {
     const q = document.getElementById('search-box').value.trim().toLowerCase();
     const pool = q ? TASKS.filter(t => t.title.toLowerCase().includes(q)) : TASKS;
@@ -891,6 +956,7 @@
     const doneBody = document.getElementById('cases-completed-tbody');
     doneBody.innerHTML = completed.length ? completed.map(t => caseRowHtml(t, true)).join('')
       : `<tr><td colspan="10"><p class="empty-state">Nothing completed in the last 24 hours.</p></td></tr>`;
+    if (window.__applyCaseCols) window.__applyCaseCols();
   }
 
   function renderAll() {
@@ -939,6 +1005,7 @@
   function updateTierPreview() {
     const pick = document.getElementById('req-urgency-pick'); pick.className = 'tier-' + LDHLogic.normTier(pick.value);
     const tier = LDHLogic.pickTier(pick.value, allFlags());
+    document.getElementById('req-redflags-wrap').classList.toggle('is-emergency', tier === 'red_flag');
     document.getElementById('req-tier-preview').textContent = LDHLogic.TIER_LABELS[tier] + ' — check ' + LDHLogic.TIER_TARGETS[tier];
   }
   function syncTriageCount() {
