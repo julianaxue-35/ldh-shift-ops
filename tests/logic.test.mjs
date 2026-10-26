@@ -743,3 +743,17 @@ test('timeBuckets / bucketCounts: days for week, month and quarter; months for t
   assert.equal(y.unit, 'month'); assert.equal(y.labels.length, 10); assert.equal(y.labels[0], 'Jan');
   assert.deepEqual(L.bucketCounts(['2026-03-05T09:00:00', '2026-03-20T09:00:00', '2026-10-01T09:00:00'], y).slice(2, 3), [2]);
 });
+
+test('dailyAverage: per working day (S&I every day, Processing Mon-Fri, Surgery Mon-Fri without public holidays); today counts once something is done', () => {
+  const wed = new Date('2026-10-28T10:00:00').getTime();   // Mon 26, Tue 27, Wed 28
+  const d = ['2026-10-26T09:00:00', '2026-10-26T10:00:00', '2026-10-27T09:00:00'];
+  assert.deepEqual(L.dailyAverage(d, 'week', wed, 'weekdays'), { avg: 1.5, days: 2, total: 3 }, 'today is not counted until something is done');
+  assert.equal(L.dailyAverage(d.concat(['2026-10-28T08:00:00']), 'week', wed, 'weekdays').days, 3);
+  const sun = new Date('2026-11-01T12:00:00').getTime();
+  assert.equal(L.dailyAverage(['2026-10-31T09:00:00'], 'week', sun, 'weekdays').days, 5, 'Mon-Fri only: the weekend is not a working day');
+  assert.equal(L.dailyAverage(['2026-10-31T09:00:00'], 'week', sun, 'every').days, 6, 'Sick & Injured counts Saturday; Sunday (today) only once something is done');
+  const wedNov = new Date('2026-11-04T12:00:00').getTime();   // Tue 3 Nov 2026 is the Melbourne Cup public holiday
+  assert.equal(L.dailyAverage(['2026-11-04T09:00:00'], 'month', wedNov, 'weekdays_no_holidays').days, 2, 'Mon 2 and Wed 4; the Cup day is skipped');
+  assert.equal(L.dailyAverage(['2026-11-04T09:00:00'], 'month', wedNov, 'weekdays').days, 3);
+  assert.equal(L.dailyAverage([], 'week', new Date('2026-10-26T06:00:00').getTime(), 'weekdays').avg, null, 'Monday morning, nothing done yet: no average yet');
+});

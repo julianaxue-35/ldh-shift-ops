@@ -20,10 +20,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261027c"></script>
-<script src="lib/surveillance-view.js?v=20261027c"></script>
-<script src="lib/trend-chart.js?v=20261027c"></script>
-<link rel="stylesheet" href="lib/surveillance.css?v=20261027c">
+<script src="lib/ldh-logic.js?v=20261027d"></script>
+<script src="lib/surveillance-view.js?v=20261027d"></script>
+<script src="lib/trend-chart.js?v=20261027d"></script>
+<link rel="stylesheet" href="lib/surveillance.css?v=20261027d">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -295,11 +295,10 @@
       <div id="baseline-banner"></div>
       <div class="no-print" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <select id="surv-window" style="margin:0; width:auto;">
-          <option value="today">Today</option>
-          <option value="3d" selected>Last 3 days</option>
-          <option value="7d">Last 7 days</option>
-          <option value="30d">Last 30 days</option>
+          <option value="week" selected>This week</option>
           <option value="month">This month</option>
+          <option value="quarter">This quarter</option>
+          <option value="year">This year</option>
         </select>
         <button class="secondary" id="report-export" style="margin:0;">Export report (PDF)</button>
         <span style="flex:1"></span>
@@ -375,7 +374,9 @@
   const C = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', violet: '#6250d6', ink: '#52514e' };
   const PERIODS = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter'], ['year', 'Year']];
   const seg = (id, opts, cur) => `<div class="seg no-print" data-seg="${id}">${opts.map(([k, l]) => `<button type="button" class="seg-b${String(k) === String(cur) ? ' on' : ''}" data-v="${k}">${l}</button>`).join('')}</div>`;
-  const kpi = (label, v, color) => `<div class="kpi"><div class="kpi-val" style="${color ? 'border-left:4px solid ' + color + ';padding-left:10px;' : ''}"><b>${v}</b></div><div class="kpi-label">${esc(label)}</div></div>`;
+  const kpi = (label, v, color, sub) => `<div class="kpi"><div class="kpi-val" style="${color ? 'border-left:4px solid ' + color + ';padding-left:10px;' : ''}"><b>${v}</b></div><div class="kpi-label">${esc(label)}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
+  // "2.4 a day" over the working days so far (Sick & Injured every day; Processing Mon-Fri; Surgery Mon-Fri, not public holidays).
+  const avgSub = (a) => a.avg == null ? 'no working days yet' : `<b>${a.avg}</b> a day <span class="subtle">· ${a.days} working day${a.days === 1 ? '' : 's'}</span>`;
   const PERIOD_NAME = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
 
   function renderPeriodTotals() {
@@ -384,9 +385,11 @@
     const mk = (k, name, color, dash) => ({ name, color, dash, values: LDHLogic.bucketCounts(dates(k), b, st.running) });
     const series = [mk('processing', 'Processing (examined)', C.blue), mk('sick_injured', 'Sick & Injured (attended)', C.orange), mk('surgery', 'Surgery', C.aqua), mk('total', 'Total animals', C.ink, true)];
     const inPeriod = (k) => LDHLogic.bucketCounts(dates(k), b, false).reduce((a, v) => a + v, 0);
+    const avg = (k) => avgSub(LDHLogic.dailyAverage(dates(k), st.period, Date.now(), LDHLogic.WORKING_DAYS[k]));
+    const allDates = dates('total');
     document.getElementById('period-totals-grid').innerHTML =
       `<div class="chart-controls">${seg('tot-period', PERIODS, st.period)}${seg('tot-run', [[0, b.unit === 'month' ? 'Per month' : 'Per day'], [1, 'Running total']], st.running ? 1 : 0)}</div>`
-      + `<div class="kpi-row">${kpi('Processing', inPeriod('processing'), C.blue)}${kpi('Sick & Injured', inPeriod('sick_injured'), C.orange)}${kpi('Surgery', inPeriod('surgery'), C.aqua)}${kpi('Total animals', inPeriod('total'), C.ink)}</div>`
+      + `<div class="kpi-row">${kpi('Processing', inPeriod('processing'), C.blue, avg('processing') + ' <span class="subtle">(Mon–Fri)</span>')}${kpi('Sick & Injured', inPeriod('sick_injured'), C.orange, avg('sick_injured') + ' <span class="subtle">(7 days)</span>')}${kpi('Surgery', inPeriod('surgery'), C.aqua, avg('surgery') + ' <span class="subtle">(Mon–Fri, no public holidays)</span>')}${kpi('Total animals', inPeriod('total'), C.ink)}</div>`
       + TrendChart.html({ labels: b.labels, series, title: 'Animals completed, ' + PERIOD_NAME[st.period].toLowerCase(), unitLabel: (st.running ? 'Running total of animals' : 'Animals completed ' + (b.unit === 'month' ? 'per month' : 'per day')) + ' · ' + PERIOD_NAME[st.period].toLowerCase() });
   }
 
@@ -404,7 +407,7 @@
     const t = LDHLogic.surgeryBreakdown(SURGERY_ROWS, now)[st.period];
     grid.innerHTML =
       `<div class="chart-controls">${seg('sur-period', PERIODS, st.period)}${seg('sur-kind', [['all', 'All'], ['routine', 'Routine'], ['other', 'Non-routine']], st.kind)}</div>`
-      + `<div class="kpi-row">${kpi('Total surgeries', t.total, C.ink)}${kpi('Routine (spey / castrate)', t.routine)}${kpi('Non-routine', t.nonRoutine)}</div>`
+      + `<div class="kpi-row">${kpi('Total surgeries', t.total, C.ink, avgSub(LDHLogic.dailyAverage(SURGERY_ROWS.map(r => r.done_at), st.period, now, LDHLogic.WORKING_DAYS.surgery)) + ' <span class="subtle">(Mon–Fri, no public holidays)</span>')}${kpi('Routine (spey / castrate)', t.routine)}${kpi('Non-routine', t.nonRoutine)}</div>`
       + TrendChart.html({ labels: b.labels, series, title: 'Surgeries by species, ' + PERIOD_NAME[st.period].toLowerCase(), unitLabel: 'Surgeries registered ' + (b.unit === 'month' ? 'per month' : 'per day') + ' · ' + PERIOD_NAME[st.period].toLowerCase() });
   }
 
@@ -562,21 +565,25 @@
 
   // ---- surveillance board ----
   let SURVEY_LOCATIONS = [], SURVEY_TASKS = [], SNAPSHOT_DATES = [], SURVEY_ERROR = null, SURVEY_ROWS_RETURNED = 0, SNAPSHOT_LAST = null;
-  const WINDOW_LABELS = { today: 'Today', '3d': 'Last 3 days', '7d': 'Last 7 days', '30d': 'Last 30 days', month: 'This month' };
+  const WINDOW_LABELS = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
 
   async function loadSurveyData() {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const since = new Date(Math.min(monthStart.getTime(), now.getTime() - 30 * 24 * 3600 * 1000));
-    const [loc, tk] = await Promise.all([
-      sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('tasks').select('title, location, condition, created_at').not('condition', 'is', null)
-        .gte('created_at', since.toISOString()).order('created_at', { ascending: false })
-    ]);
+    const since = new Date(new Date().getFullYear(), 0, 1);   // the whole year: the board can be set to this week / month / quarter / year
+    // The API hands back at most 1000 rows at a time, so a year of flagged requests is read a page at a time.
+    const pages = []; let tkError = null;
+    for (let from = 0; from < 10000; from += 1000) {
+      const r = await sb.from('tasks').select('title, location, condition, created_at').not('condition', 'is', null)
+        .gte('created_at', since.toISOString()).order('created_at', { ascending: false }).range(from, from + 999);
+      if (r.error) { tkError = r.error; break; }
+      pages.push(...(r.data || []));
+      if ((r.data || []).length < 1000) break;
+    }
+    const loc = await sb.from('locations').select('*').order('sort', { ascending: true });
+    const tk = { error: tkError, data: pages };
     SURVEY_ERROR = tk.error ? (tk.error.message || 'unknown error') : null;
     SURVEY_LOCATIONS = loc.data || [];
-    SURVEY_ROWS_RETURNED = (tk.data || []).length;
-    SURVEY_TASKS = (tk.data || []).filter(t => t.condition);
+    SURVEY_ROWS_RETURNED = pages.length >= 10000 ? 1000 : 0;   // only warn if even ten pages were not enough
+    SURVEY_TASKS = pages.filter(t => t.condition);
     // Baseline day count: read ONE space's 'any' rows (one per night, so at most ~400 for a year) — reading every space
     // would hit the API's 1000-row cap after about 80 days.
     SNAPSHOT_DATES = []; SNAPSHOT_LAST = null;
