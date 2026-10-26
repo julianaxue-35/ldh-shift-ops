@@ -59,7 +59,7 @@
   aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
   aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
   aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
-  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  main { padding: 28px 32px; display: flex; flex-direction: column; gap: 22px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
   .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
   .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
@@ -73,47 +73,77 @@
 
   .legend { display: flex; flex-wrap: wrap; gap: 6px 8px; }
   .status-pill { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; display: inline-block; }
-  .st-wait { background: rgba(255,159,67,0.22); color: #9a5b00; }
-  .st-seen { background: rgba(74,108,247,0.14); color: var(--blue); }
-  .st-meds { background: rgba(140,98,255,0.14); color: var(--violet); }
-  .st-done { background: rgba(34,154,99,0.12); color: var(--green); }
-  .st-urgent { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .status-pill::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
+  .st-wait { background: rgba(255,159,67,0.28); color: #8a5000; }
+  .st-seen { background: rgba(74,108,247,0.18); color: #2f4fd6; }
+  .st-meds { background: rgba(140,98,255,0.18); color: #6a3fe0; }
+  .st-done { background: rgba(34,154,99,0.16); color: #1b7a4f; }
+  .st-urgent { background: var(--critical); color: #fff; }
 
-  .group-h { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 4px 2px 0; }
-  .room-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+  /* Room tabs: one room at a time, so each patient gets room to breathe */
+  .tab-groups { display: flex; flex-wrap: wrap; gap: 14px 28px; }
+  .tab-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .group-h { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 0 2px; }
+  .tab-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .room-tab {
+    appearance: none; font: inherit; font-size: 0.8rem; font-weight: 600; color: var(--ink);
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 999px;
+    padding: 7px 8px 7px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+    box-shadow: var(--shadow-card); transition: background .12s, border-color .12s;
+  }
+  .room-tab:hover { border-color: rgba(30,34,56,0.3); }
+  .room-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .room-tab .n { font-size: 0.7rem; font-weight: 700; min-width: 22px; text-align: center; padding: 2px 7px; border-radius: 999px; background: var(--neutral-100); color: var(--muted); }
+  .room-tab .n.wait { background: rgba(255,159,67,0.25); color: #9a5b00; }
+  .room-tab .n.done { background: rgba(34,154,99,0.14); color: var(--green); }
+  .room-tab .n.urgent { background: var(--critical); color: #fff; }
+  .room-tab.quiet { color: var(--muted); font-weight: 500; box-shadow: none; background: transparent; }
+  .room-tab[aria-selected="true"] { background: var(--sidebar); color: #fff; border-color: var(--sidebar); }
+  .room-tab[aria-selected="true"] .n { background: rgba(255,255,255,0.18); color: #fff; }
+  .room-tab[aria-selected="true"] .n.urgent { background: var(--critical); }
+
+  .room-card[hidden] { display: none; }
   .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
-  .room-card { padding: 0; overflow: hidden; }
-  .room-head { display: flex; align-items: baseline; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
-  .room-head h2 { margin: 0; font-size: 0.95rem; }
+  .room-card { padding: 0; }
+  .room-head { display: flex; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+  .room-head h2 { margin: 0; font-size: 1.1rem; }
   .room-head .sub { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
-  .room-head .count { margin-left: auto; }
+  .room-head .count { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
   .room-card.empty { box-shadow: none; background: transparent; border-style: dashed; }
-  .room-card.empty .room-head { border-bottom: none; padding: 10px 18px; }
+  .room-card.empty .room-head { border-bottom: none; }
   .room-card.empty h2 { color: var(--muted); font-weight: 600; }
+  .cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; padding: 20px 24px 24px; align-items: start; }
 
-  .case { padding: 14px 18px; border-top: 1px solid rgba(30,34,56,0.06); border-left: 4px solid var(--amber); }
-  .room-head + .case { border-top: none; }
-  .case.seen { border-left-color: var(--blue); }
-  .case.meds { border-left-color: var(--violet); }
-  .case.done { border-left-color: var(--green); }
+  .case { background: var(--card-bg); border: 1px solid var(--border); border-left: 4px solid var(--amber); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .case.wait { background: linear-gradient(180deg, rgba(255,159,67,0.09), #fff 70px); }
+  .case.seen { border-left-color: var(--blue); background: linear-gradient(180deg, rgba(74,108,247,0.08), #fff 70px); }
+  .case.meds { border-left-color: var(--violet); background: linear-gradient(180deg, rgba(140,98,255,0.09), #fff 70px); }
+  .case.done { border-left-color: var(--green); background: linear-gradient(180deg, rgba(34,154,99,0.08), #fff 70px); }
+  .case.urgent { box-shadow: 0 0 0 2px rgba(208,59,59,0.55); }
   .case.done .case-body { opacity: 0.75; }
-  .case-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .pen { font-size: 0.8rem; font-weight: 700; background: var(--sidebar); color: #fff; border-radius: 10px; padding: 3px 10px; white-space: nowrap; }
+  .case-top { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+  .case-top .left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .case-top .right { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
-  .problem { font-weight: 700; margin: 8px 0 2px; font-size: 0.95rem; }
-  .field { margin: 6px 0 0; font-size: 0.85rem; }
-  .field .lbl { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 1px; }
+  .aid { font-size: 1.1rem; font-weight: 700; }
+  .pen { font-size: 0.72rem; font-weight: 700; background: var(--sidebar); color: #fff; border-radius: 8px; padding: 2px 9px; white-space: nowrap; }
+  .case-body { display: flex; flex-direction: column; gap: 10px; }
+  .problem { font-weight: 700; font-size: 0.95rem; margin: 0; }
+  .field { margin: 0; font-size: 0.85rem; line-height: 1.5; }
+  .field .lbl { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 2px; }
   .field .txt { white-space: pre-line; }
   .field .none { color: var(--muted); font-style: italic; }
-  .hist { font-size: 0.75rem; font-weight: 600; color: #9a5b00; background: rgba(255,159,67,0.14); border-radius: 8px; padding: 4px 10px; margin: 6px 0 2px; }
-  .case-top .left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .aid { font-size: 1.35rem; font-weight: 800; letter-spacing: 0.01em; color: var(--ink, #1e2238); }
-  .meta { font-size: 0.72rem; color: var(--muted); margin-top: 8px; }
+  .hist { font-size: 0.72rem; font-weight: 600; color: #9a5b00; background: rgba(255,159,67,0.14); border-radius: 8px; padding: 5px 10px; margin: 0; }
+  .meta { font-size: 0.7rem; color: var(--muted); padding-top: 10px; border-top: 1px solid rgba(30,34,56,0.06); }
   .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
   @media (max-width: 800px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
     main { padding: 16px; }
-    .room-grid { grid-template-columns: minmax(0, 1fr); }
+    .cases { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+    .room-head { padding: 14px; }
+    .tab-groups { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
+    .tab-row { flex-wrap: nowrap; }
+    .tab-group { flex: none; }
+    .room-tab { white-space: nowrap; flex: none; }
     #search-box { width: 100%; }
   }
 </style>
@@ -150,7 +180,7 @@
       <span class="status-pill st-done">Done (last 24 h)</span>
     </div>
 
-    <div id="board"></div>
+    <div id="board" style="display:flex; flex-direction:column; gap:20px;"></div>
     <p class="empty-state" id="board-error" style="display:none;"></p>
       <div id="faq-panel" class="faq-overlay" role="dialog" aria-label="FAQ">
     <div class="card faq-card faq-modal" id="faq">
@@ -223,7 +253,7 @@
     const histText = LDHLogic.flagHistoryText(LDHLogic.flagsBefore(HISTORY, t, Date.now()));
     const none = '<span class="none">Not written yet — vet to add</span>';
     const line = (title, v) => `<div class="field"><span class="lbl">${title}</span><span class="txt">${v && v.trim() ? esc(v.trim()) : none}</span></div>`;
-    return `<div class="case ${stage}" data-case="${esc(t.id)}">
+    return `<div class="case ${stage}${urgent ? ' urgent' : ''}" data-case="${esc(t.id)}">
       <div class="case-top"><span class="left"><span class="aid">${esc(t.title)}</span><span class="pen">${esc(penLabel)}</span></span>
         <span class="right">${urgent ? '<span class="status-pill st-urgent">Urgent</span>' : ''}<span class="status-pill ${cls}">${esc(pill)}</span></span></div>
       <div class="case-body">
@@ -255,28 +285,48 @@
         : (r.pen ? 'Pen ' + r.pen : 'Pen not given');
       (byRoom[r.code] ??= []).push({ t, stage: LDHLogic.boardStage(t, now), pen: r.pen, penLabel });
     });
-    let html = '', lastGrp = '', open_ = false;
-    LDHLogic.BOARD_ROOMS.forEach(room => {
-      const items = (byRoom[room.code] || []).slice().sort((a, b) =>
-        (a.stage === 'done') - (b.stage === 'done') || (parseInt(a.pen, 10) || 9999) - (parseInt(b.pen, 10) || 9999));
-      if (room.code === 'OTHER' && !items.length) return;           // catch-all only appears when needed
+    const rooms = LDHLogic.BOARD_ROOMS.filter(room => !['OTHER', 'TRANSPORT'].includes(room.code) || (byRoom[room.code] || []).length);
+    const itemsOf = room => (byRoom[room.code] || []).slice().sort((a, b) =>
+      (a.stage === 'done') - (b.stage === 'done') || (parseInt(a.pen, 10) || 9999) - (parseInt(b.pen, 10) || 9999));
+    const followOf = items => items.filter(i => i.stage !== 'done').length;
+    // keep the chosen room across refreshes; otherwise open the first room that still has animals to follow
+    if (!rooms.some(r => r.code === SELECTED)) {
+      SELECTED = (rooms.find(r => followOf(itemsOf(r))) || rooms.find(r => itemsOf(r).length) || rooms[0] || {}).code;
+    }
+    let tabs = '', panels = '', lastGrp = '', open_ = false;
+    rooms.forEach(room => {
+      const items = itemsOf(room), toFollow = followOf(items);
+      const title = room.code === 'OTHER' ? 'Other / location not matched' : room.code === 'TRANSPORT' ? 'Transport (dog or cat not given)' : (room.db || room.code);
+      const urgent = items.some(i => i.stage !== 'done' && LDHLogic.normTier(i.t.urgency) === 'red_flag');
       if (room.grp !== lastGrp) {
-        if (open_) html += '</div>';
-        html += `<div class="group-h">${esc(room.grp)}</div><div class="room-grid">`;
+        if (open_) tabs += '</div></div>';
+        tabs += `<div class="tab-group"><div class="group-h">${esc(room.grp)}</div><div class="tab-row" role="tablist">`;
         open_ = true; lastGrp = room.grp;
       }
-      const title = room.code === 'OTHER' ? 'Other / location not matched' : (room.db || room.code);
-      const toFollow = items.filter(i => i.stage !== 'done').length;
-      html += `<section class="card room-card${items.length ? '' : ' empty'}" data-room="${esc(room.code)}">
+      const nCls = urgent ? 'urgent' : toFollow ? 'wait' : items.length ? 'done' : '';
+      tabs += `<button type="button" role="tab" class="room-tab${items.length ? '' : ' quiet'}" data-tab="${esc(room.code)}" aria-selected="${room.code === SELECTED}">${esc(title)}<span class="n ${nCls}">${items.length ? (toFollow || '\u2713') : '0'}</span></button>`;
+      panels += `<section class="card room-card${items.length ? '' : ' empty'}" data-room="${esc(room.code)}"${room.code === SELECTED ? '' : ' hidden'}>
         <div class="room-head"><h2>${esc(title)}</h2><span class="sub">${esc(/^(CR|CA|P)\d$|^FIR$/.test(room.code) ? room.code : '')}</span>
-          <span class="count status-pill ${items.length ? (toFollow ? 'st-wait' : 'st-done') : 'st-done'}">${items.length ? (toFollow ? toFollow + ' to follow' : 'all done') : 'nothing flagged'}</span></div>
-        ${items.map(i => caseHtml(i.t, i.stage, i.penLabel)).join('')}
+          <span class="count">${items.length ? ['wait', 'seen', 'meds', 'done'].map(k => { const n = items.filter(i => i.stage === k).length; return n ? `<span class="status-pill ${STAGE_PILL[k][0]}">${n} ${esc(STAGE_PILL[k][1].replace('Waiting for vet', 'waiting').replace('Vet has picked up', 'picked up').replace('Waiting on medication', 'meds').replace('Done', 'done'))}</span>` : ''; }).join(' ') : '<span class="status-pill st-done">nothing flagged</span>'}</span></div>
+        ${items.length ? `<div class="cases">${items.map(i => caseHtml(i.t, i.stage, i.penLabel)).join('')}</div>` : ''}
       </section>`;
     });
-    if (open_) html += '</div>';
-    if (!html) html = '<section class="card"><p class="empty-state">' + 'Nothing flagged right now — all clear.' + '</p></section>';
-    document.getElementById('board').innerHTML = html;
+    if (open_) tabs += '</div></div>';
+    const html = rooms.length ? `<div class="tab-groups">${tabs}</div>${panels}`
+      : '<section class="card"><p class="empty-state">Nothing flagged right now \u2014 all clear.</p></section>';
+    const board = document.getElementById('board');
+    board.innerHTML = html;
   }
+
+  let SELECTED = '';
+  try { SELECTED = sessionStorage.getItem('board-room') || ''; } catch (e) {}
+  document.getElementById('board').addEventListener('click', ev => {
+    const tab = ev.target.closest('[data-tab]');
+    if (!tab) return;
+    SELECTED = tab.dataset.tab;
+    try { sessionStorage.setItem('board-room', SELECTED); } catch (e) {}
+    renderBoard();
+  });
 
   setInterval(renderBoard, 60000);   // stage chips / "completed in the last 24 h" roll over without a reload
 

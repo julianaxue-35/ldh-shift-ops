@@ -29,8 +29,8 @@ const H = 3600 * 1000;
   const b = await open(seed, 'shelter-board.html');
   try {
     const roomOrder = await b.page.$$eval('#board section.room-card', els => els.map(e => e.dataset.room));
-    t.ok(roomOrder.join(',') === 'CR1,CR2,CA1,CA2,FIR,CR3,ISO,TRANSPORT,P1,P2,P3,P4,RABBIT,PATHWAY,VETCLINIC,OTHER',
-      'every room shows, in walking order CR1, CR2, CA1, CA2, FIR, CR3 … Transport, P1-P4, Rabbit, Pathway (got ' + roomOrder.join(',') + ')');
+    t.ok(roomOrder.join(',') === 'CR1,CR2,CA1,CA2,FIR,CR3,ISO,CTRANSPORT,DTRANSPORT,P1,P2,P3,P4,RABBIT,PATHWAY,VETCLINIC,OFFICE,OTHER',
+      'every room shows, in walking order CR1, CR2, CA1, CA2, FIR, CR3 … Cat transport, Dog transport, P1-P4, Rabbit, Pathway, Vet clinic, Office (got ' + roomOrder.join(',') + ')');
     const room = code => b.page.locator(`#board section[data-room="${code}"]`);
     const txt = async code => (await room(code).textContent()).replace(/\s+/g, ' ');
     t.ok((await txt('CR1')).includes('Pen 12') && (await txt('CR1')).includes('Pen 30'), 'CR1 holds Cat Room 1 / 12 and the "CR1-30" spelling, as pens 12 and 30');

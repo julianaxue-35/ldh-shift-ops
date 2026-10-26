@@ -426,10 +426,10 @@
 
     <section class="card" id="disease-watch" style="display:none">
       <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
-        <h2 style="margin:0;">Disease watch — last 3 days</h2>
+        <h2 style="margin:0;">Disease watch — last month</h2>
         <a href="stats.html" style="font-size:0.8rem; color:var(--ink);">Full surveillance board →</a>
       </div>
-      <p class="subtle" style="margin:6px 0 12px;">Flagged cases in the last 3 days as a share of each space's cages (an animal counts once for each sign flagged). No threshold line yet — a baseline is being collected first.</p>
+      <p class="subtle" style="margin:6px 0 12px;">Flagged cases in the last 30 days as a share of each space's cages (an animal counts once for each sign flagged). No threshold line yet — a baseline is being collected first.</p>
       <div id="disease-watch-map"></div>
     </section>
 
@@ -461,7 +461,7 @@
       <details><summary>A case went back from "picked up" to "flagged" — why?</summary><div><p>Vets can <b>put a case back</b> if they are called away. It returns to its tier and any vet can pick it up. The time target keeps running from when it was first flagged.</p></div></details>
       <details><summary>What are the numbers and rings at the top?</summary><div><p>The big ring is tasks completed today across all shifts, with a ring per shift. Only today's checks are counted. Older unfinished list entries are shown separately as "older still open" so they don't inflate today's total.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
-      <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and pick a <b>Suspected condition</b>, that sign is counted. We track eight <b>reported signs</b>: cat flu (URI), kennel cough, diarrhoea / GI upset, vomiting, eye condition, skin condition, wounds / injury and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 3 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
+      <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and pick a <b>Suspected condition</b>, that sign is counted. We track eight <b>reported signs</b>: cat flu (URI), kennel cough, diarrhoea / GI upset, vomiting, eye condition, skin condition, wounds / injury and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 30 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
       <details><summary>Why do we track it?</summary><div><ul><li><b>Catch clusters early.</b> Several animals with the same sign in one space is the first clue to an outbreak, often before anyone has diagnosed anything.</li><li><b>Back decisions with numbers.</b> Moving animals, tightening cleaning or biosecurity, or isolating a room is easier to justify with a count.</li><li><b>Learn our own seasonal pattern.</b> A baseline is being collected for a full year because disease varies with the season. Once it is complete, each period is compared with the same time last year. Until then there is no "high" line.</li></ul></div></details>
       <details><summary>What do I need to do so the tracking is accurate?</summary><div><ul><li>Choose a <b>Suspected condition</b> every time you flag an animal. If you leave it blank the animal is flagged but is <b>not</b> counted in disease tracking.</li><li>Pick the right <b>space</b> and pen — counts are per space.</li><li>An animal counts once for the same sign, so there is no harm in re-flagging an animal that is still sick.</li><li>Only flagged animals are counted, so the rate reads lower than a full vet-exam prevalence. Compare it with our own baseline, not with older prevalence figures.</li></ul></div></details>
     </div>
@@ -890,7 +890,7 @@
     const d = new Date();
     return LDHLogic.localISO(d) + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
-  const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Transport' };
+  const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Dog transport' };
   function applyNrDefaultLocation() {
     document.getElementById('nr-location').value = NR_DEFAULT_LOCATION[document.getElementById('nr-species').value] || 'FIR Room';
   }
@@ -947,7 +947,7 @@
   function renderDiseaseWatch() {
     const card = document.getElementById('disease-watch');
     if (!LOCATION_ROWS.length) { card.style.display = 'none'; return; }
-    const survey = LDHLogic.buildSurvey(TASKS, LOCATION_ROWS, LDHLogic.windowStart('3d', Date.now()));
+    const survey = LDHLogic.buildSurvey(TASKS, LOCATION_ROWS, LDHLogic.windowStart('30d', Date.now()));
     document.getElementById('disease-watch-map').innerHTML = SurveillanceView.heatMapHtml(survey) + SurveillanceView.unmappedHtml(survey);
     card.style.display = 'block';
   }

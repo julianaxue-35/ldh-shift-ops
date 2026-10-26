@@ -121,7 +121,7 @@ test('CONDITION_LABELS covers every condition value the flag form can save', () 
 });
 
 test('locations list matches the Cranbourne spaces used by the flag form', () => {
-  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Transport', 'Rabbit Room', 'Pathway', 'Offsite', 'Vet clinic', 'Office']);
+  assert.deepEqual(L.LOCATIONS, ['Cat Room 1', 'Cat Room 2', 'Cat Room 3', 'Adoption 1', 'Adoption 2', 'FIR Room', 'Cat Isolation ward', 'Pound 1', 'Pound 2', 'Pound 3', 'Pound 4', 'Dog transport', 'Cat transport', 'Rabbit Room', 'Pathway', 'Offsite', 'Vet clinic', 'Office']);
 });
 
 test('summariseConditions counts every condition, ignores unknown values, and groups flagged cases by space', () => {

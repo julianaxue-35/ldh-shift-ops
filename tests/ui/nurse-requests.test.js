@@ -14,7 +14,7 @@ const t = require('./check')('nurse-requests');
 
     t.ok((await page.inputValue('#nr-location')) === 'FIR Room', 'cats default to FIR Room');
     await page.selectOption('#nr-species', 'dog');
-    t.ok((await page.inputValue('#nr-location')) === 'Transport', 'dogs default to Transport');
+    t.ok((await page.inputValue('#nr-location')) === 'Dog transport', 'dogs default to Dog transport');
     await page.selectOption('#nr-location', 'Pound 2');
     t.ok((await page.inputValue('#nr-location')) === 'Pound 2', 'another space can still be chosen');
     await page.selectOption('#nr-species', 'cat');
