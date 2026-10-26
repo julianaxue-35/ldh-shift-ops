@@ -177,6 +177,8 @@
   .aa-col[data-col="processing"] > h3 { color: #1f7a4d; }
   .aa-col[data-col="sick"] { border-top-color: #c98a1a; }
   .aa-col[data-col="sick"] > h3 { color: #b07a10; }
+  .aa-col[data-col="surgery"] { border-top-color: #0f766e; }
+  .aa-col[data-col="surgery"] > h3 { color: #0f766e; }
   .aa-col[data-col="charts"] { border-top-color: #3b6ea5; }
   .aa-col[data-col="tasks"] { border-top-color: #7c5cbf; }
   .aa-col > h3 { margin: 0 0 12px; font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -214,6 +216,8 @@
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
     <div id="aa-on-duty" style="margin:14px 0 0; font-size:0.9rem;"></div>
+    <div style="margin:10px 0 0; font-size:0.9rem;"><label for="aa-my-initials"><b>Your initials</b> (saved on every card you tick off; Surgery notes show them as &ldquo;Paperwork by&rdquo;)</label>
+      <input id="aa-my-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:110px; margin-left:8px; text-transform:uppercase;"></div>
     <div id="aa-priority-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#fff; border:2px solid #c0392b; color:#c0392b; font-weight:800;"></div>
     <div id="aa-overdue-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#c0392b; color:#fff; font-weight:700;"></div>
     <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
@@ -254,10 +258,18 @@
   let DONE = [];                         // completed cards (kept at most 7 days, newest first)
   let doneThisSession = 0;               // a count only; no patient data is kept in the browser
 
+  // The AA's own initials: remembered on this device for the day.
+  const AA_INIT_KEY = 'ldh_aa_my_initials_v1';
+  function myInitials() { return String((document.getElementById('aa-my-initials') || {}).value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); }
+  (function () {
+    const el = document.getElementById('aa-my-initials'); if (!el) return;
+    try { const o = JSON.parse(localStorage.getItem(AA_INIT_KEY) || '{}'); if (o.day === new Date().toLocaleDateString('en-CA')) el.value = o.v || ''; } catch (e) { /* convenience only */ }
+    el.addEventListener('input', () => { el.value = myInitials(); try { localStorage.setItem(AA_INIT_KEY, JSON.stringify({ day: new Date().toLocaleDateString('en-CA'), v: el.value })); } catch (e) { /* ignore */ } });
+  })();
   const openNotes = new Set();           // which note cards are expanded (ids only; survives re-renders)
   function extraHtml(it) {
     const p = it.payload || {};
-    if (it.kind === 'processing_note' || it.kind === 'si_note') {
+    if (it.kind === 'processing_note' || it.kind === 'si_note' || it.kind === 'surgery_note') {
       return `<div class="aa-extra">
           <button type="button" class="secondary aa-view" data-id="${esc(it.id)}">View notes</button>
           <button type="button" class="secondary aa-copy" data-id="${esc(it.id)}">Copy</button>
@@ -366,8 +378,9 @@
     const COLS = [
       { key: 'processing', title: 'Processing notes', has: i => i.kind === 'processing_note', empty: 'No Processing notes waiting.' },
       { key: 'sick', title: 'Sick & Injured notes', has: i => i.kind === 'si_note', empty: 'No Sick & Injured notes waiting.' },
+      { key: 'surgery', title: 'Surgery notes', has: i => i.kind === 'surgery_note', empty: 'No Surgery notes waiting.' },
       { key: 'charts', title: 'Medication charts to print', has: i => i.kind === 'med_chart', empty: 'No charts waiting.' },
-      { key: 'tasks', title: 'Tasks from nurses', has: i => i.kind !== 'processing_note' && i.kind !== 'si_note' && i.kind !== 'med_chart', empty: 'No tasks waiting.' }
+      { key: 'tasks', title: 'Tasks from nurses', has: i => i.kind !== 'processing_note' && i.kind !== 'si_note' && i.kind !== 'surgery_note' && i.kind !== 'med_chart', empty: 'No tasks waiting.' }
     ];
     document.getElementById('aa-list').innerHTML = (sorted.length ? '' : '<p class="empty-state">Nothing waiting. New items from the nurses will appear here with a sound.</p>')
       + '<div class="aa-cols">' + COLS.map(c => {
@@ -406,6 +419,7 @@
     const btn = e.target.closest('.aa-done'); if (!btn) return;
     const it = ITEMS.find(x => x.id === btn.dataset.id);
     if (!it) return;
+    if (it.kind === 'surgery_note' && !myInitials()) { alert('Type your initials in the box at the top of the page first, so they go on the Surgery note as "Paperwork by".'); document.getElementById('aa-my-initials').focus(); return; }
     const question = it.kind === 'med_chart'
       ? 'Have you printed the medication chart for ' + it.animal_ids.join(', ') + '?'
       : 'Have you entered ' + it.animal_ids.join(', ') + ' in ShelterMate?';
@@ -418,7 +432,9 @@
   // if the vet updated the card since, her tick must not swallow the correction.
   async function saveDone(it, doneIds) {
     const complete = it.animal_ids.every(a => doneIds.indexOf(a) !== -1);
-    let q = sb.from('aa_items').update({ done_ids: doneIds, completed_at: complete ? new Date().toISOString() : null }).eq('id', it.id).is('completed_at', null);
+    const upd = { done_ids: doneIds, completed_at: complete ? new Date().toISOString() : null };
+    if (complete && myInitials()) upd.completed_by = myInitials();
+    let q = sb.from('aa_items').update(upd).eq('id', it.id).is('completed_at', null);
     q = it.updated_at ? q.eq('updated_at', it.updated_at) : q.is('updated_at', null);
     const { data: changed, error } = await q.select('id');
     if (error) { alert('Could not tick this off: ' + error.message); return false; }
@@ -452,7 +468,7 @@
       const it = DONE.find(x => x.id === pb.dataset.id); if (!it) return;
       pb.disabled = true;
       const left = (it.done_ids || []).filter(a => a !== pb.dataset.animal);
-      const { error } = await sb.from('aa_items').update({ completed_at: null, done_ids: left }).eq('id', it.id).not('completed_at', 'is', null);
+      const { error } = await sb.from('aa_items').update({ completed_at: null, done_ids: left, completed_by: null }).eq('id', it.id).not('completed_at', 'is', null);
       if (error) {
         pb.disabled = false;
         alert(error.code === '23505' ? 'A newer card for this animal is already waiting above, so this one cannot be put back. Finish that one first.' : 'Could not put it back: ' + error.message);

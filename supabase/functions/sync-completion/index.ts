@@ -87,7 +87,7 @@ function melbourneMidnightISO(): string {
 // aa-validate-start
 // Admission AA (Phase 2): a vet's shift tool sends a finished note / medication chart. Plain JavaScript on purpose
 // (no type annotations) so tests/aa-edge-validate.test.mjs can run exactly this block.
-const AA_NOTE_KINDS = ['processing_note', 'si_note', 'med_chart'];
+const AA_NOTE_KINDS = ['processing_note', 'si_note', 'surgery_note', 'med_chart'];
 function aaSourceKey(kind, dateISO, animalId) { return kind + '|' + dateISO + '|' + animalId; }
 function validateAaShare(a) {
   if (!a || typeof a !== 'object') return { error: 'Bad request.' };
@@ -113,6 +113,7 @@ function validateAaShare(a) {
     if (text.length > 20000) return { error: 'The note is too long (limit 20,000 characters).' };
     payload = { text: text };
     if (p.priority === true) payload.priority = true;          // the vet asked for this one to be done first (e.g. awaiting foster)
+    if (payload.priority && Number.isFinite(p.due_mins) && p.due_mins >= 5 && p.due_mins <= 240) payload.due_mins = Math.round(p.due_mins);   // "within 30-60 minutes"; the card counts down from this
     if (p.docx_b64 != null && p.docx_b64 !== '') {
       if (typeof p.docx_b64 !== 'string' || p.docx_b64.length > 1200000) return { error: 'The Word file is too large to send.' };
       if (!/^[A-Za-z0-9+\/=]+$/.test(p.docx_b64)) return { error: 'The Word file is not valid base64.' };
@@ -342,12 +343,15 @@ Deno.serve(async (req) => {
     if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
     await purgeCompletedAa(supabase);
     const pending: string[] = [];
+    const doneBy: Record<string, string> = {};   // who ticked each finished card off (the AA's initials), when they gave them
     for (const p of v.pairs) {
       const { data, error } = await supabase.from('aa_items').select('id').eq('kind', p.kind).contains('animal_ids', [p.id]).is('completed_at', null).limit(1);
       if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
-      if (data && data.length) pending.push(p.kind + '|' + p.id);
+      if (data && data.length) { pending.push(p.kind + '|' + p.id); continue; }
+      const { data: fin } = await supabase.from('aa_items').select('completed_by').eq('kind', p.kind).contains('animal_ids', [p.id]).not('completed_at', 'is', null).order('completed_at', { ascending: false }).limit(1);
+      if (fin && fin.length && fin[0].completed_by) doneBy[p.kind + '|' + p.id] = fin[0].completed_by;   // column missing (migration not run yet) = no initials, never an error
     }
-    return new Response(JSON.stringify({ ok: true, pending: pending }), { status: 200, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: true, pending: pending, done_by: doneBy }), { status: 200, headers: CORS_HEADERS });
   }
   // Shape 7 (2026-10-18): { aa: { kind, animal_id, location, sent_by, payload } } — a vet's shift tool shares a
   // finished note with the Admission AA page. One live card per kind + Melbourne day + animal: a resend UPDATES it.

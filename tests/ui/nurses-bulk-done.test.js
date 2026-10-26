@@ -22,11 +22,12 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
   const n = await open(seed, 'nurses.html');
   try {
     await n.page.fill('#initials-welfare', 'ab'); await n.page.fill('#initials-processing', 'cd');
+    await n.page.click('.sc-tab[data-sc="aa"]'); await n.page.fill('#send-request .sc-who [data-f="initials"]', 'ab');
 
     /* 1. sending to the AA from a task marks that task done */
     await n.page.locator('.noga-item', { hasText: 'FIV-1' }).locator('.aa-prefill').click();
-    await n.page.fill('#aa-result', 'FIV negative');
-    await n.page.click('#aa-send');
+    await n.page.fill('[data-to="aa"] [data-f="result"]', 'FIV negative');
+    await n.page.click('[data-send="aa"]');
     await n.page.waitForFunction(() => window.__db.aa_items.length === 1);
     await n.page.waitForTimeout(300);
     let db = await n.db();
@@ -34,8 +35,8 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     t.ok(db.aa_items[0].kind === 'fiv' && fiv.done === true && fiv.done_by === 'AB', 'sending a FIV result to the AA marks the FIV task done with the Welfare initials: ' + JSON.stringify([fiv.done, fiv.done_by]));
 
     await n.page.locator('.nr-item', { hasText: 'U-1' }).locator('.aa-prefill').click();
-    await n.page.fill('#aa-result', 'UV negative');
-    await n.page.click('#aa-send');
+    await n.page.fill('[data-to="aa"] [data-f="result"]', 'UV negative');
+    await n.page.click('[data-send="aa"]');
     await n.page.waitForFunction(() => window.__db.aa_items.length === 2);
     await n.page.waitForTimeout(300);
     db = await n.db();
@@ -43,9 +44,9 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
 
     /* a prefilled form that is changed to a different animal does not close the original task */
     await n.page.locator('.nr-item', { hasText: 'U-2' }).locator('.aa-prefill').click();
-    await n.page.fill('#aa-ids', 'SOMEONE-ELSE');
-    await n.page.fill('#aa-result', 'UV negative');
-    await n.page.click('#aa-send');
+    await n.page.fill('[data-to="aa"] [data-f="ids"]', 'SOMEONE-ELSE');
+    await n.page.fill('[data-to="aa"] [data-f="result"]', 'UV negative');
+    await n.page.click('[data-send="aa"]');
     await n.page.waitForFunction(() => window.__db.aa_items.length === 3);
     await n.page.waitForTimeout(300);
     db = await n.db();
