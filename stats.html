@@ -20,9 +20,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js"></script>
-<script src="lib/surveillance-view.js"></script>
-<link rel="stylesheet" href="lib/surveillance.css">
+<script src="lib/ldh-logic.js?v=20261027c"></script>
+<script src="lib/surveillance-view.js?v=20261027c"></script>
+<script src="lib/trend-chart.js?v=20261027c"></script>
+<link rel="stylesheet" href="lib/surveillance.css?v=20261027c">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -207,6 +208,20 @@
   @media (max-width: 700px) { .totals-grid { grid-template-columns: 1fr; } }
 
   .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .chart-controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .seg { display: inline-flex; border: 2px solid var(--border, #d6d9e0); border-radius: 12px; overflow: hidden; }
+  .seg-b { width: auto; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--ink, #222); padding: 7px 16px; font-weight: 600; cursor: pointer; }
+  .seg-b.on { background: #2a78d6; color: #fff; }
+  .tc-svg { width: 100%; height: auto; display: block; }
+  .tc-grid { stroke: rgba(30,34,56,0.1); stroke-width: 1; }
+  .tc-ax { font-size: 11px; fill: #52514e; }
+  .tc-legend { display: flex; gap: 8px 18px; flex-wrap: wrap; margin: 6px 0 4px; font-size: 0.82rem; }
+  .tc-key i { display: inline-block; width: 16px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tc-note { font-size: 0.72rem; color: #52514e; text-align: right; }
+  .tc-table { margin-top: 6px; font-size: 0.78rem; }
+  .tc-table summary { cursor: pointer; color: #52514e; }
+  .tc-scroll { overflow: auto; max-height: 280px; }
+  .tc-table table { border-collapse: collapse; } .tc-table th, .tc-table td { padding: 3px 10px; text-align: right; border-top: 1px solid rgba(30,34,56,0.08); } .tc-table th:first-child { text-align: left; }
   .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
   .trend-card .trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
   .trend-card .trend-title { font-size: 0.9rem; font-weight: 700; }
@@ -303,18 +318,18 @@
     <section class="card" id="period-totals">
       <h2>Totals — how much we've done</h2>
       <p class="subtle">Completed animals by shift, for shelter staff to see beyond just today.</p>
-      <div id="period-totals-grid" class="totals-grid"></div>
+      <div id="period-totals-grid"></div>
     </section>
 
     <section class="card" id="surgery-breakdown">
       <h2>Surgery — what we've done</h2>
       <p class="subtle">Cats, dogs and rabbits. <b>Routine</b> = spey and castrate; <b>non-routine</b> = everything else (dental, amputation and so on). Counted when a surgery is registered in the Surgery tool.</p>
-      <div id="surgery-breakdown-grid" class="totals-grid"></div>
+      <div id="surgery-breakdown-grid"></div>
     </section>
 
     <section class="card" id="trends-section">
       <h2>Annual &amp; monthly progress</h2>
-      <p class="subtle">Each category tracked on its own — cumulative, so the line only ever climbs.</p>
+      <p class="subtle">Every category on one graph: time along the bottom, animals up the side. Switch between a running total and per-day (or per-month) counts.</p>
       <div class="trend-grid" id="trend-grid"></div>
     </section>
   </main>
@@ -354,23 +369,43 @@
     const { data, error } = await sb.from('surgery_log').select('done_at, species, routine').gte('done_at', yearStart.toISOString());
     SURGERY_ROWS = error ? null : (data || []);
   }
+  /* ---- Activity line graphs (2026-10-27): Totals, Surgery and Annual & monthly progress ----
+     X axis = time (days; months for the year), Y axis = animals. One line per category. Week / Month / Quarter / Year buttons. */
+  const ST = { tot: { period: 'month', running: false }, sur: { period: 'month', kind: 'all' }, prog: { running: true } };
+  const C = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', violet: '#6250d6', ink: '#52514e' };
+  const PERIODS = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter'], ['year', 'Year']];
+  const seg = (id, opts, cur) => `<div class="seg no-print" data-seg="${id}">${opts.map(([k, l]) => `<button type="button" class="seg-b${String(k) === String(cur) ? ' on' : ''}" data-v="${k}">${l}</button>`).join('')}</div>`;
+  const kpi = (label, v, color) => `<div class="kpi"><div class="kpi-val" style="${color ? 'border-left:4px solid ' + color + ';padding-left:10px;' : ''}"><b>${v}</b></div><div class="kpi-label">${esc(label)}</div></div>`;
+  const PERIOD_NAME = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
+
+  function renderPeriodTotals() {
+    const st = ST.tot, b = LDHLogic.timeBuckets(st.period, Date.now());
+    const dates = (k) => YEAR_ROWS.filter(r => r.completed_at && (k === 'total' ? Object.prototype.hasOwnProperty.call(SHIFT_LABELS, r.shift) : r.shift === k)).map(r => r.completed_at);
+    const mk = (k, name, color, dash) => ({ name, color, dash, values: LDHLogic.bucketCounts(dates(k), b, st.running) });
+    const series = [mk('processing', 'Processing (examined)', C.blue), mk('sick_injured', 'Sick & Injured (attended)', C.orange), mk('surgery', 'Surgery', C.aqua), mk('total', 'Total animals', C.ink, true)];
+    const inPeriod = (k) => LDHLogic.bucketCounts(dates(k), b, false).reduce((a, v) => a + v, 0);
+    document.getElementById('period-totals-grid').innerHTML =
+      `<div class="chart-controls">${seg('tot-period', PERIODS, st.period)}${seg('tot-run', [[0, b.unit === 'month' ? 'Per month' : 'Per day'], [1, 'Running total']], st.running ? 1 : 0)}</div>`
+      + `<div class="kpi-row">${kpi('Processing', inPeriod('processing'), C.blue)}${kpi('Sick & Injured', inPeriod('sick_injured'), C.orange)}${kpi('Surgery', inPeriod('surgery'), C.aqua)}${kpi('Total animals', inPeriod('total'), C.ink)}</div>`
+      + TrendChart.html({ labels: b.labels, series, title: 'Animals completed, ' + PERIOD_NAME[st.period].toLowerCase(), unitLabel: (st.running ? 'Running total of animals' : 'Animals completed ' + (b.unit === 'month' ? 'per month' : 'per day')) + ' · ' + PERIOD_NAME[st.period].toLowerCase() });
+  }
+
   function renderSurgeryBreakdown() {
     const grid = document.getElementById('surgery-breakdown-grid');
     if (!SURGERY_ROWS) { grid.innerHTML = '<p class="subtle">The surgery numbers will appear here once the latest database update has been run.</p>'; return; }
-    const b = LDHLogic.surgeryBreakdown(SURGERY_ROWS, Date.now());
-    const LABELS = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
-    const SPECIES = [['cat', 'Cats'], ['dog', 'Dogs'], ['rabbit', 'Rabbits'], ['other', 'Other species']];
-    grid.innerHTML = ['week', 'month', 'quarter', 'year'].map(k => {
-      const t = b[k];
-      return `<div class="totals-period" data-period="${k}">
-        <h3>${LABELS[k]}</h3>
-        ${SPECIES.filter(([s]) => s !== 'other' || t.other.routine + t.other.other > 0).map(([s, label]) =>
-          `<div class="row" data-species="${s}"><span>${label}</span><b>${t[s].routine} routine \u00b7 ${t[s].other} non-routine</b></div>`).join('')}
-        <div class="row"><span>Routine (spey / castrate)</span><b>${t.routine}</b></div>
-        <div class="row"><span>Non-routine</span><b>${t.nonRoutine}</b></div>
-        <div class="row grand"><span>Total surgeries</span><b>${t.total}</b></div>
-      </div>`;
-    }).join('');
+    const st = ST.sur, now = Date.now(), b = LDHLogic.timeBuckets(st.period, now);
+    const keep = (r) => st.kind === 'all' || (st.kind === 'routine' ? !!r.routine : !r.routine);
+    const SPECIES = [['cat', 'Cats', C.blue], ['dog', 'Dogs', C.orange], ['rabbit', 'Rabbits', C.aqua]];
+    const known = SPECIES.map(x => x[0]);
+    const series = SPECIES.map(([k, name, color]) => ({ name, color, values: LDHLogic.bucketCounts(SURGERY_ROWS.filter(r => r.species === k && keep(r)).map(r => r.done_at), b, false) }));
+    const other = SURGERY_ROWS.filter(r => !known.includes(r.species) && keep(r));
+    if (other.length) series.push({ name: 'Other species', color: C.violet, values: LDHLogic.bucketCounts(other.map(r => r.done_at), b, false) });
+    series.push({ name: 'All surgeries', color: C.ink, dash: true, values: LDHLogic.bucketCounts(SURGERY_ROWS.filter(keep).map(r => r.done_at), b, false) });
+    const t = LDHLogic.surgeryBreakdown(SURGERY_ROWS, now)[st.period];
+    grid.innerHTML =
+      `<div class="chart-controls">${seg('sur-period', PERIODS, st.period)}${seg('sur-kind', [['all', 'All'], ['routine', 'Routine'], ['other', 'Non-routine']], st.kind)}</div>`
+      + `<div class="kpi-row">${kpi('Total surgeries', t.total, C.ink)}${kpi('Routine (spey / castrate)', t.routine)}${kpi('Non-routine', t.nonRoutine)}</div>`
+      + TrendChart.html({ labels: b.labels, series, title: 'Surgeries by species, ' + PERIOD_NAME[st.period].toLowerCase(), unitLabel: 'Surgeries registered ' + (b.unit === 'month' ? 'per month' : 'per day') + ' · ' + PERIOD_NAME[st.period].toLowerCase() });
   }
 
   async function loadTrends() {
@@ -437,36 +472,20 @@
     { key: 'attendant_flagged', title: 'Flagged by Shelter Staff, completed', color: 'var(--violet)' },
   ];
 
-  // 2026-09-29: same period-totals block as index.html, fed by the rows
-  // loadTrends() already fetched for the year — no extra query on this page.
-  function renderPeriodTotals() {
-    const totals = LDHLogic.periodTotals(YEAR_ROWS, Date.now());
-    const PERIOD_LABELS = { month: 'This month', quarter: 'This quarter', year: 'This year' };
-    document.getElementById('period-totals-grid').innerHTML = ['month', 'quarter', 'year'].map(key => {
-      const t = totals[key];
-      return `<div class="totals-period">
-        <h3>${PERIOD_LABELS[key]}</h3>
-        <div class="row"><span>Processing (examined)</span><b>${t.processing}</b></div>
-        <div class="row"><span>Sick &amp; Injured (attended)</span><b>${t.sick_injured}</b></div>
-        <div class="row"><span>Surgery</span><b>${t.surgery}</b></div>
-        <div class="row grand"><span>Total animals</span><b>${t.total}</b></div>
-      </div>`;
-    }).join('');
-  }
 
   function renderTrends() {
-    document.getElementById('trend-grid').innerHTML = TREND_CATEGORIES.map(c => `
-      <div class="trend-card">
-        <div class="trend-head">
-          <span class="trend-title" style="color:${c.color}">${c.title}</span>
-          <span><span class="trend-ytd" style="color:${c.color}">${(YEAR_SERIES[c.key].at(-1)) || 0}</span> <span class="trend-ytd-lbl">this year</span></span>
-        </div>
-        <h4 class="chart-subhead">Past 30 days</h4>
-        ${lineChartSvg(MONTH_SERIES[c.key], c.color, DAY_LABELS)}
-        <h4 class="chart-subhead">This year, by month</h4>
-        ${lineChartSvg(YEAR_SERIES[c.key], c.color, MONTH_LABELS)}
-      </div>
-    `).join('');
+    const now = Date.now(), run = ST.prog.running;
+    const CATS = [['surgery', 'Surgeries', C.blue], ['processing', 'Examinations (Processing)', C.aqua], ['sick_injured', 'Sick & Injured attended', C.orange], ['attendant_flagged', 'Flagged by Shelter Staff, completed', C.violet]];
+    const datesOf = (k) => YEAR_ROWS.filter(r => r.completed_at && (k === 'attendant_flagged' || r.shift === k)).map(r => r.completed_at);
+    const days = { unit: 'day', keys: [], labels: [] };
+    for (let i = 29; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate() - i); days.keys.push(LDHLogic.localDayKey(d)); days.labels.push(d.getDate() + ' ' + MONTH_NAMES[d.getMonth()]); }
+    const year = LDHLogic.timeBuckets('year', now);
+    const build = (bk) => CATS.map(([k, name, color]) => ({ name, color, values: LDHLogic.bucketCounts(datesOf(k), bk, run) }));
+    document.getElementById('trend-grid').innerHTML =
+      `<div class="chart-controls" style="grid-column:1/-1">${seg('prog-run', [[1, 'Running total'], [0, 'Per day / month']], run ? 1 : 0)}</div>`
+      + `<div class="kpi-row" style="grid-column:1/-1">${CATS.map(([k, name, color]) => kpi(name + ' · this year', datesOf(k).length, color)).join('')}</div>`
+      + `<div class="trend-card"><h4 class="chart-subhead">Past 30 days</h4>${TrendChart.html({ labels: days.labels, series: build(days), title: 'Past 30 days', unitLabel: run ? 'Running total of animals' : 'Animals per day' })}</div>`
+      + `<div class="trend-card"><h4 class="chart-subhead">This year, by month</h4>${TrendChart.html({ labels: year.labels, series: build(year), title: 'This year by month', unitLabel: run ? 'Running total of animals' : 'Animals per month' })}</div>`;
   }
 
   /* 2026-09-19: response rate by department — % of that month's flagged
@@ -600,6 +619,15 @@
     el('heat-notes').innerHTML = capNote + elseNote + SurveillanceView.unmappedHtml(survey) + SurveillanceView.caveatHtml();
   }
   document.getElementById('surv-window').addEventListener('change', renderSurvey);
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-b'); if (!b) return;
+    const id = b.parentElement.dataset.seg, v = b.dataset.v;
+    if (id === 'tot-period') { ST.tot.period = v; renderPeriodTotals(); }
+    else if (id === 'tot-run') { ST.tot.running = v === '1'; renderPeriodTotals(); }
+    else if (id === 'sur-period') { ST.sur.period = v; renderSurgeryBreakdown(); }
+    else if (id === 'sur-kind') { ST.sur.kind = v; renderSurgeryBreakdown(); }
+    else if (id === 'prog-run') { ST.prog.running = v === '1'; renderTrends(); }
+  });
 
   // The exported report always shows every condition's graph: open them all for printing, then put them back as they were.
   let condOpenState = null;
