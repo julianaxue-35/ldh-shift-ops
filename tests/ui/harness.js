@@ -47,7 +47,7 @@ const STUB = `
   }
   const listeners = [];
   function table(name) {
-    let op = null, payload = null, filters = [], orderCol = null, limitN = null, asc = true, single = false, conflictCols = ['id'];
+    let op = null, payload = null, filters = [], orderCol = null, limitN = null, rangeTo = null, rangeFrom = 0, asc = true, single = false, conflictCols = ['id'];
     const b = {
       select() { if (!op) op = 'select'; return b; },
       insert(rows) { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return b; },
@@ -56,6 +56,9 @@ const STUB = `
       delete() { op = 'delete'; return b; },
       eq(k, v) { filters.push(r => r[k] === v); return b; },
       gte(k, v) { filters.push(r => r[k] >= v); return b; },
+      neq(k, v) { filters.push(r => r[k] !== v); return b; },
+      like(k, pat) { return b.ilike(k, pat); },
+      range(from, to) { rangeFrom = from; rangeTo = to; return b; },
       lt(k, v) { filters.push(r => r[k] < v); return b; },
       in(k, vals) { filters.push(r => vals.indexOf(r[k]) !== -1); return b; },
       not(k, op, v) { if (op === 'is' && v === null) filters.push(r => r[k] != null); return b; },
@@ -91,7 +94,7 @@ const STUB = `
             });
           }
           else if (op === 'delete') { data = match(); data.forEach(r => rows.splice(rows.indexOf(r), 1)); }
-          else { data = match(); if (orderCol) data = data.slice().sort((x, y) => (x[orderCol] > y[orderCol] ? 1 : -1) * (asc ? 1 : -1)); if (limitN != null) data = data.slice(0, limitN); }
+          else { data = match(); if (orderCol) data = data.slice().sort((x, y) => (x[orderCol] > y[orderCol] ? 1 : -1) * (asc ? 1 : -1)); if (limitN != null) data = data.slice(0, limitN); if (rangeTo != null) data = data.slice(rangeFrom, rangeTo + 1); }
           if (op !== 'select') listeners.filter(l => l.table === name).forEach(l => setTimeout(l.cb, 0));
           const out = JSON.parse(JSON.stringify(data));
           res({ data: single ? out[0] : out, error: null });
