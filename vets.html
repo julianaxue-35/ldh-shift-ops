@@ -538,7 +538,7 @@
           ${canBump ? `<button type="button" class="secondary bump-btn" data-id="${esc(t.id)}">Bump to Urgent</button>` : ''}
           ${canPickUp ? `<button type="button" class="secondary pick-up-btn" data-id="${esc(t.id)}">Pick up →</button>` : ''}
           ${stage === 'picked_up' ? `<button type="button" class="secondary put-back-btn" data-id="${esc(t.id)}">Put back</button>` : ''}
-          ${canDone && !t.needs_medication ? `<button type="button" class="secondary transfer-btn" data-id="${esc(t.id)}">Transfer to nurse</button>` : ''}
+          ${canDone ? `<button type="button" class="secondary transfer-btn" data-id="${esc(t.id)}">Transfer to nurse</button>` : ''}
           ${canDone ? `<button type="button" class="secondary done-btn" data-id="${esc(t.id)}">DONE</button>` : ''}
         </div>
       </div>`;
@@ -709,11 +709,23 @@
             <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 12px;">
               <input type="checkbox" class="done-medchart" style="width:auto; margin:0;"> Med chart completed
             </label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 12px;">
+              <input type="checkbox" class="done-self" style="width:auto; margin:0;"> I dispensed it myself (no label for the nurse)
+            </label>
+            <div class="done-self-box" style="display:none; margin-bottom:12px;">
+              <label style="display:flex; align-items:center; gap:6px; font-size:0.85rem; margin:0 0 8px;">
+                <input type="checkbox" class="done-sm" style="width:auto; margin:0;"> Notes updated on ShelterMate
+              </label>
+              <input class="done-self-initials vet-init" maxlength="4" placeholder="Your initials" autocomplete="off" value="${esc(storedVetInit())}">
+              <p class="done-self-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:6px 0 0;">Tick "Notes updated on ShelterMate" and enter your initials.</p>
+            </div>
+            <div class="done-label-box">
             <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Medication label</label>
             <textarea class="done-medlabel" rows="4" placeholder="Drug, dose, frequency..."></textarea>
-            <p class="done-medlabel-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-6px 0 8px;">Enter the medication label.</p>
+            <p class="done-medlabel-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-6px 0 8px;">Enter the real medication label (drug, dose, frequency) \u2014 not "done".</p>
             <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
               ${LDHLogic.CHLORSIG_OPTIONS.map(o => `<button type="button" class="secondary chlorsig-btn" data-label="${esc(o.label)}" style="padding:6px 10px; font-size:0.72rem;">${esc(o.label)}</button>`).join('')}
+            </div>
             </div>
           ` : `<p style="font-size:0.88rem; margin:0 0 12px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
           <label style="font-size:0.78rem; font-weight:700; display:block; margin:0 0 6px;">Quick note (optional)</label>
@@ -820,8 +832,21 @@
       const quickNote = overlay.querySelector('.done-note').value.trim().slice(0, 500);
       if (t.needs_medication) {
         const chart = overlay.querySelector('.done-medchart').checked;
+        if (overlay.querySelector('.done-self').checked) {
+          // the vet dispensed it: no nurse label, but the notes must already be on ShelterMate
+          const who = vetInitFrom(overlay.querySelector('.done-self-initials'));
+          if (!overlay.querySelector('.done-sm').checked || !who) { overlay.querySelector('.done-self-error').style.display = 'block'; return; }
+          const nowIso = new Date().toISOString();
+          const { error } = await sb.from('tasks').update(Object.assign({
+            done: true, med_chart_done: chart, vet_done_at: nowIso, med_done_by: who, med_done_at: nowIso,
+            completed_by_role: 'vet_nurse', completed_at: nowIso
+          }, quickNote ? { note: quickNote } : {})).eq('id', id);
+          if (error) { alert('Could not complete: ' + error.message); return; }
+          overlay.remove(); OpsCore.toast(); loadAll();
+          return;
+        }
         const label = overlay.querySelector('.done-medlabel').value.trim();
-        if (!label) { overlay.querySelector('.done-medlabel-error').style.display = 'block'; return; }
+        if (!LDHLogic.isRealMedLabel(label)) { overlay.querySelector('.done-medlabel-error').style.display = 'block'; return; }
         const { error } = await sb.from('tasks').update(Object.assign({
           done: true, med_chart_done: chart, med_label: label, vet_done_at: new Date().toISOString()
         }, quickNote ? { note: quickNote } : {})).eq('id', id);
@@ -943,7 +968,7 @@
           <p style="font-size:0.85rem; margin:0 0 10px;">The Welfare nurse gets this under Miscellaneous tasks (microchip, UV and treatment checks go to the Processing nurse), and the case leaves the vet board.</p>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the nurse</label>
           <select class="transfer-task">${Object.keys(LDHLogic.MISC_TASK_LABELS).filter(k => k !== 'med_label' && k !== 'treatment').map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('')}</select>
-          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Note for the nurse (optional)</label>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">${t.needs_medication ? 'Medication label, or how many tablets / mL to dispense (required)' : 'Note for the nurse (optional)'}</label>
           <textarea class="transfer-note" rows="3" placeholder="${esc(t.problem || 'e.g. bloods before surgery')}"></textarea>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Your initials (the nurse sees them)</label>
           <input class="transfer-initials vet-init" maxlength="4" placeholder="e.g. JX" autocomplete="off" value="${esc(storedVetInit())}">
@@ -956,8 +981,15 @@
     document.body.appendChild(wrap.firstElementChild);
     // a request that asked for a microchip / UV check opens with that task already chosen
     const need = (/^Needs (microchip|UV|treatment)/i.exec(t.problem || '') || [])[1];
+    if (t.needs_medication) document.querySelector('.transfer-modal-overlay .transfer-task').value = 'dispense';
     if (need) document.querySelector('.transfer-modal-overlay .transfer-task').value = /microchip/i.test(need) ? 'microchip' : /treatment/i.test(need) ? 'treatment' : 'uv';
   }
+  document.addEventListener('change', (e) => {
+    const self = e.target.closest('.done-self'); if (!self) return;
+    const o = self.closest('.done-modal-overlay');
+    o.querySelector('.done-self-box').style.display = self.checked ? 'block' : 'none';
+    o.querySelector('.done-label-box').style.display = self.checked ? 'none' : 'block';
+  });
   document.addEventListener('click', async (e) => {
     const trBtn = e.target.closest('.transfer-btn');
     if (trBtn) { const t = TASKS.find(x => x.id === trBtn.dataset.id); if (t) openTransferModal(t); return; }
@@ -971,15 +1003,18 @@
     const who = vetInitFrom(overlay.querySelector('.transfer-initials')); if (!who) { alert('Enter your initials, so the nurse can see who asked.'); overlay.querySelector('.transfer-initials').focus(); return; }
     ok.disabled = true;
     const task = overlay.querySelector('.transfer-task').value;
-    const note = overlay.querySelector('.transfer-note').value.trim() || t.problem || null;
+    const typed = overlay.querySelector('.transfer-note').value.trim();
+    // a medication request needs the label (or how much to dispense) in the note, so the nurse never gets an empty card
+    if (t.needs_medication && !LDHLogic.isRealMedLabel(typed)) { alert('Type the medication label, or how many tablets / mL to dispense, in the note for the nurse.'); ok.disabled = false; overlay.querySelector('.transfer-note').focus(); return; }
+    const note = typed || t.problem || null;
     const { error } = await sb.from('noga_requests').insert({
       animal_id: t.title, location: t.location, location_detail: t.location_detail || null, task, note, added_by: who, source_task_id: t.id
     });
     if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
-    const { error: closeErr } = await sb.from('tasks').update({
+    const { error: closeErr } = await sb.from('tasks').update(Object.assign({
       done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString(),
       note: 'Transferred to nurse — ' + (LDHLogic.MISC_TASK_LABELS[task] || task)
-    }).eq('id', t.id);
+    }, t.needs_medication ? { med_done_by: who, med_done_at: new Date().toISOString() } : {})).eq('id', t.id);   // med_done_* stops the medication hold turning this into a blank nurse label card
     if (closeErr) alert('The nurse task was created, but the case could not be closed here: ' + closeErr.message);
     overlay.remove(); OpsCore.toast();
     loadAll();

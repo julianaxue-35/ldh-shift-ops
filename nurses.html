@@ -414,6 +414,7 @@
       <div class="med-label-text">${esc(t.med_label || '')}</div>
       <div class="med-label-actions">
         <button type="button" class="secondary med-copy-btn" data-id="${esc(t.id)}">Copy</button>
+        <button type="button" class="secondary med-back-btn" data-id="${esc(t.id)}">Send back to vet</button>
         <button type="button" class="med-done-btn" data-id="${esc(t.id)}">Done</button>
       </div>
     </div>`;
@@ -457,6 +458,19 @@
       const original = 'Copy';
       copyBtn.textContent = 'Copied';
       setTimeout(() => { copyBtn.textContent = original; }, 1500);
+      return;
+    }
+    const backBtn = e.target.closest('.med-back-btn');
+    if (backBtn) {
+      const t = TASKS.find(x => x.id === backBtn.dataset.id);
+      if (!t) return;
+      if (!confirm('Send ' + t.title + ' back to the vets? It leaves this list and returns to the vet queue.')) return;
+      // clearing vet_done_at puts the case back in the vet queue (stageOf), like a put-back
+      const { error } = await sb.from('tasks').update({
+        vet_done_at: null, med_label: null, med_chart_done: false, claimed_at: null, claimed_by: null, put_back_at: new Date().toISOString()
+      }).eq('id', t.id);
+      if (error) alert('Could not send back: ' + error.message);
+      loadAll();
       return;
     }
     const doneBtn = e.target.closest('.med-done-btn');
