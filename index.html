@@ -153,6 +153,15 @@
   .case-toggle:hover { background: #f4f6fb; color: var(--ink); }
   .case-toggle .chev::before { content: '\25BE'; display: inline-block; transition: transform .15s; }
   .case-toggle[aria-expanded="true"] .chev::before { transform: rotate(180deg); }
+  details.older-open { font-size: 0.72rem; color: var(--muted); margin: -4px 0 8px; }
+  details.older-open summary { cursor: pointer; font-weight: 600; }
+  details.older-open summary:hover { color: var(--ink); text-decoration: underline; }
+  details.older-open ul { list-style: none; margin: 6px 0 4px; padding: 6px 8px; max-height: 200px; overflow-y: auto; background: #f7f8fc; border-radius: 8px; }
+  details.older-open li { display: flex; flex-wrap: wrap; gap: 2px 8px; padding: 4px 0; border-top: 1px solid rgba(30,34,56,0.06); color: var(--ink); }
+  details.older-open li:first-child { border-top: none; }
+  details.older-open li span { color: var(--muted); }
+  details.older-open li .when { flex-basis: 100%; font-size: 0.68rem; }
+  details.older-open p { margin: 4px 0 0; }
   .plan-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); display: inline-block; }
   table.queue-table tr.case-drawer td { background: #f7f8fc; border-top: none; padding: 12px 16px 14px; }
   table.queue-table tr.case-drawer[hidden] { display: none; }
@@ -811,6 +820,8 @@
     document.getElementById('completion-fraction').textContent = `${done} of ${total}`;
   }
 
+  const OLDER_OPEN = new Set();   // shifts whose "older still open" list is open (kept across the 60 s refresh)
+  document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.matches && d.matches('details.older-open')) { d.open ? OLDER_OPEN.add(d.dataset.older) : OLDER_OPEN.delete(d.dataset.older); } }, true);
   function renderShiftProgress() {
     const container = document.getElementById('shift-progress-row');
     container.innerHTML = '';
@@ -820,7 +831,8 @@
       const total = items.length;
       const done = items.filter(t => t.done).length;
       const pct = total ? Math.round((done / total) * 100) : 0;
-      const older = LDHLogic.carriedOver(TASKS, Date.now()).filter(t => t.shift === shift).length;   // open rows from earlier days — not in today's count
+      const olderRows = LDHLogic.carriedOver(TASKS, Date.now()).filter(t => t.shift === shift && LDHLogic.isRequest(t)).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));   // real requests from earlier days still open (leftover offline-list entries are left out: they are usually just never ticked)
+      const older = olderRows.length;
       const roster = ROSTER[shift] || [];
       const card = document.createElement('section');
       card.className = 'card shift-card';
@@ -828,7 +840,9 @@
         <span class="shift-icon" style="background:${SHIFT_COLORS[shift]}">${SHIFT_ICONS[shift]}</span>
         <h2 style="color:${SHIFT_COLORS[shift]}">${SHIFT_LABELS[shift]}</h2>
         <div class="totals">${done} <span>/ ${total} processed today</span></div>
-        ${older ? `<div class="subtle" style="font-size:0.72rem; color:var(--muted); margin:-4px 0 8px;">+ ${older} older still open</div>` : ''}
+        ${older ? `<details class="older-open" data-older="${shift}"${OLDER_OPEN.has(shift) ? ' open' : ''}><summary>+ ${older} older still open</summary>
+          <ul>${olderRows.slice(0, 40).map(t => `<li><b>${esc(t.title)}</b><span>${esc(locationText(t))}</span><span class="when">${esc(fmtFlagged(t.created_at))} · ${Math.max(1, Math.round((Date.now() - new Date(t.created_at).getTime()) / 86400000))}d ago${t.type === 'check_recheck' ? ' · from the tool list' : ''}</span></li>`).join('')}${older > 40 ? `<li class="more">and ${older - 40} more</li>` : ''}</ul>
+          <p>Already finished? These stay until someone marks them done, so ask a vet or team leader to clear them.</p></details>` : ''}
         <div class="bar-track"><div class="bar-fill" style="width:${pct}%; background:${SHIFT_COLORS[shift]};"></div></div>
         <div class="onshift">On shift</div>
         <div>${roster.map(r => `<span class="chip roster-chip" data-id="${r.id}" title="Click to remove">${esc(r.staff_name)} ✕</span>`).join('') || '<span class="empty-state">Unassigned</span>'}</div>
