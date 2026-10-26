@@ -68,3 +68,12 @@
 @media print { .surv-pane { display: block !important; page-break-before: always; } .surv-pane:first-of-type { page-break-before: auto; } .surv-pane-title { display: block; } .surv-tabs { display: none; } .dcard, .kpi { break-inside: avoid; } }
 .dcard .heat-ranked td:first-child { min-width: 120px; }
 .dcard .heat-ranked th { white-space: nowrap; }
+
+.rk-list { display: flex; flex-direction: column; gap: 12px; }
+.rk-item { min-width: 0; }
+.rk-head { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-bottom: 2px; flex-wrap: wrap; }
+.rk-name { flex: 1 1 auto; }
+.rk-total { color: #52514e; font-size: 0.78rem; white-space: nowrap; }
+.rk-row { grid-template-columns: minmax(80px, 140px) 1fr 30px; margin: 2px 0 2px 20px; }
+.rk-none { margin-left: 20px; }
+.dcard .bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
