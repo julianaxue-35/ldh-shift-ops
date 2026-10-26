@@ -20,10 +20,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261027d"></script>
-<script src="lib/surveillance-view.js?v=20261027d"></script>
-<script src="lib/trend-chart.js?v=20261027d"></script>
-<link rel="stylesheet" href="lib/surveillance.css?v=20261027d">
+<script src="lib/ldh-logic.js?v=20261027e"></script>
+<script src="lib/surveillance-view.js?v=20261027e"></script>
+<script src="lib/trend-chart.js?v=20261027e"></script>
+<link rel="stylesheet" href="lib/surveillance.css?v=20261027e">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -221,6 +221,7 @@
   .tc-table { margin-top: 6px; font-size: 0.78rem; }
   .tc-table summary { cursor: pointer; color: #52514e; }
   .tc-scroll { overflow: auto; max-height: 280px; }
+  .tc-table tfoot th, .tc-table tfoot td { font-weight: 700; border-top: 2px solid rgba(30,34,56,0.25); }
   .tc-table table { border-collapse: collapse; } .tc-table th, .tc-table td { padding: 3px 10px; text-align: right; border-top: 1px solid rgba(30,34,56,0.08); } .tc-table th:first-child { text-align: left; }
   .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
   .trend-card .trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
@@ -326,11 +327,6 @@
       <div id="surgery-breakdown-grid"></div>
     </section>
 
-    <section class="card" id="trends-section">
-      <h2>Annual &amp; monthly progress</h2>
-      <p class="subtle">Every category on one graph: time along the bottom, animals up the side. Switch between a running total and per-day (or per-month) counts.</p>
-      <div class="trend-grid" id="trend-grid"></div>
-    </section>
   </main>
 </div>
 
@@ -368,7 +364,7 @@
     const { data, error } = await sb.from('surgery_log').select('done_at, species, routine').gte('done_at', yearStart.toISOString());
     SURGERY_ROWS = error ? null : (data || []);
   }
-  /* ---- Activity line graphs (2026-10-27): Totals, Surgery and Annual & monthly progress ----
+  /* ---- Activity line graphs (2026-10-27): Totals and Surgery ----
      X axis = time (days; months for the year), Y axis = animals. One line per category. Week / Month / Quarter / Year buttons. */
   const ST = { tot: { period: 'month', running: false }, sur: { period: 'month', kind: 'all' }, prog: { running: true } };
   const C = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', violet: '#6250d6', ink: '#52514e' };
@@ -382,7 +378,7 @@
   function renderPeriodTotals() {
     const st = ST.tot, b = LDHLogic.timeBuckets(st.period, Date.now());
     const dates = (k) => YEAR_ROWS.filter(r => r.completed_at && (k === 'total' ? Object.prototype.hasOwnProperty.call(SHIFT_LABELS, r.shift) : r.shift === k)).map(r => r.completed_at);
-    const mk = (k, name, color, dash) => ({ name, color, dash, values: LDHLogic.bucketCounts(dates(k), b, st.running) });
+    const mk = (k, name, color, dash) => ({ name, color, dash, values: LDHLogic.bucketCounts(dates(k), b, st.running), raw: LDHLogic.bucketCounts(dates(k), b, false) });
     const series = [mk('processing', 'Processing (examined)', C.blue), mk('sick_injured', 'Sick & Injured (attended)', C.orange), mk('surgery', 'Surgery', C.aqua), mk('total', 'Total animals', C.ink, true)];
     const inPeriod = (k) => LDHLogic.bucketCounts(dates(k), b, false).reduce((a, v) => a + v, 0);
     const avg = (k) => avgSub(LDHLogic.dailyAverage(dates(k), st.period, Date.now(), LDHLogic.WORKING_DAYS[k]));
@@ -476,20 +472,6 @@
   ];
 
 
-  function renderTrends() {
-    const now = Date.now(), run = ST.prog.running;
-    const CATS = [['surgery', 'Surgeries', C.blue], ['processing', 'Examinations (Processing)', C.aqua], ['sick_injured', 'Sick & Injured attended', C.orange], ['attendant_flagged', 'Flagged by Shelter Staff, completed', C.violet]];
-    const datesOf = (k) => YEAR_ROWS.filter(r => r.completed_at && (k === 'attendant_flagged' || r.shift === k)).map(r => r.completed_at);
-    const days = { unit: 'day', keys: [], labels: [] };
-    for (let i = 29; i >= 0; i--) { const d = new Date(now); d.setDate(d.getDate() - i); days.keys.push(LDHLogic.localDayKey(d)); days.labels.push(d.getDate() + ' ' + MONTH_NAMES[d.getMonth()]); }
-    const year = LDHLogic.timeBuckets('year', now);
-    const build = (bk) => CATS.map(([k, name, color]) => ({ name, color, values: LDHLogic.bucketCounts(datesOf(k), bk, run) }));
-    document.getElementById('trend-grid').innerHTML =
-      `<div class="chart-controls" style="grid-column:1/-1">${seg('prog-run', [[1, 'Running total'], [0, 'Per day / month']], run ? 1 : 0)}</div>`
-      + `<div class="kpi-row" style="grid-column:1/-1">${CATS.map(([k, name, color]) => kpi(name + ' · this year', datesOf(k).length, color)).join('')}</div>`
-      + `<div class="trend-card"><h4 class="chart-subhead">Past 30 days</h4>${TrendChart.html({ labels: days.labels, series: build(days), title: 'Past 30 days', unitLabel: run ? 'Running total of animals' : 'Animals per day' })}</div>`
-      + `<div class="trend-card"><h4 class="chart-subhead">This year, by month</h4>${TrendChart.html({ labels: year.labels, series: build(year), title: 'This year by month', unitLabel: run ? 'Running total of animals' : 'Animals per month' })}</div>`;
-  }
 
   /* 2026-09-19: response rate by department — % of that month's flagged
      cases actually completed, per shift, as a grouped bar chart. Different
@@ -633,7 +615,6 @@
     else if (id === 'tot-run') { ST.tot.running = v === '1'; renderPeriodTotals(); }
     else if (id === 'sur-period') { ST.sur.period = v; renderSurgeryBreakdown(); }
     else if (id === 'sur-kind') { ST.sur.kind = v; renderSurgeryBreakdown(); }
-    else if (id === 'prog-run') { ST.prog.running = v === '1'; renderTrends(); }
   });
 
   // The exported report always shows every condition's graph: open them all for printing, then put them back as they were.
@@ -693,7 +674,6 @@
     await loadResponseRates();
     await loadSurgeryLog();
     renderSurgeryBreakdown();
-    renderTrends();
     renderPeriodTotals();
     renderResponseRateChart();
     await loadSurveyData();
