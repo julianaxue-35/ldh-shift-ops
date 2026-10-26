@@ -111,7 +111,7 @@ const H = 3600 * 1000;
       t.ok(one[0].extra_reasons.length === 1, 'saying no to the prompt adds nothing');
       // a serious sign added later raises the case
       await idx.page.fill('#req-title', '9990050'); await idx.page.selectOption('#req-location', 'Cat Room 1'); await idx.page.fill('#req-pen', '3');
-      await idx.page.check('input.req-flag[value="bleeding_wound"]'); await idx.page.click('#req-submit'); await idx.page.waitForTimeout(400);
+      await idx.page.evaluate(() => { document.getElementById('triage-drawer').open = true; }); await idx.page.check('input.req-flag[value="bleeding_wound"]'); await idx.page.click('#req-submit'); await idx.page.waitForTimeout(400);
       one = await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050'));
       t.ok(one[0].urgency === 'red_flag' && one[0].red_flags.includes('bleeding_wound') && one[0].extra_reasons.length === 2, 'an emergency sign added later raises the case to Emergency');
       t.ok((await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050').length)) === 1, 'still just one case');
