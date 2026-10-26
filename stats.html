@@ -242,6 +242,8 @@
     .heat-tile { border: 1px solid #ccc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .page-head, #surveillance-section > h2 { display: none !important; }
     h3 { break-after: avoid; page-break-after: avoid; }
+    table.heat-rooms { break-inside: auto; }
+    .heat-rooms tr { break-inside: avoid; }
   }
 </style>
 </head>
@@ -291,6 +293,8 @@
       </div>
       <h3 style="font-size:0.85rem; margin:16px 0 8px;">Heat map — share of cages with a flagged animal</h3>
       <div id="heat-map"></div>
+      <h3 style="font-size:0.85rem; margin:16px 0 6px;">What was reported in each space</h3>
+      <div id="heat-rooms"></div>
       <h3 style="font-size:0.85rem; margin:16px 0 6px;">By group</h3>
       <div id="heat-groups"></div>
       <h3 style="font-size:0.85rem; margin:16px 0 6px;">Most commonly reported</h3>
@@ -578,18 +582,19 @@
       `<h1 style="font-size:1.2rem;margin:0 0 4px;">Disease surveillance report</h1><p style="margin:0 0 12px;">${esc(WINDOW_LABELS[key] || key)} · generated ${esc(new Date().toLocaleString('en-AU'))} · LDH Cranbourne</p>`;
     if (SURVEY_ERROR) {   // never show a clean all-zero board when the data did not load
       el('heat-map').innerHTML = `<p class="empty-state">Could not load the flagged requests: ${esc(SURVEY_ERROR)}</p>`;
-      ['heat-groups', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      ['heat-groups', 'heat-rooms', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
       return;
     }
     if (!SURVEY_LOCATIONS.length) {
       el('heat-map').innerHTML = '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
-      ['baseline-banner', 'heat-groups', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      ['baseline-banner', 'heat-groups', 'heat-rooms', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
       return;
     }
     const since = LDHLogic.windowStart(key, Date.now());
     const survey = LDHLogic.buildSurvey(SURVEY_TASKS, SURVEY_LOCATIONS, since);
     el('baseline-banner').innerHTML = SurveillanceView.baselineHtml(LDHLogic.baselineStatus(SNAPSHOT_DATES), SNAPSHOT_LAST);
     el('heat-map').innerHTML = SurveillanceView.heatMapHtml(survey);
+    el('heat-rooms').innerHTML = SurveillanceView.roomsHtml(survey);
     el('heat-groups').innerHTML = SurveillanceView.groupsHtml(survey);
     el('heat-ranked').innerHTML = SurveillanceView.rankedHtml(survey);
     const capNote = SURVEY_ROWS_RETURNED >= 1000 ? '<p class="subtle">Showing the most recent 1000 flagged requests — older ones in this window are not included.</p>' : '';

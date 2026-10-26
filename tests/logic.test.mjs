@@ -205,6 +205,19 @@ test('buildSurvey: cases (animal + sign), rates, leading sign, groups, ranking, 
   assert.equal(r.ranked[0].share, 40, '2 of 5 cases');
 });
 
+test('buildSurvey: each space lists every condition reported (with animal IDs) and its top 3', () => {
+  const since = new Date(NOW - 3 * 24 * H);
+  const tasks = [
+    trow('A1', 'Cat Room 1 / 4', 'cat_flu', 1 * H), trow('A2', 'Cat Room 1 / 5', 'cat_flu', 2 * H),
+    trow('A3', 'Cat Room 1 / 6', 'diarrhoea', 2 * H), trow('A4', 'Cat Room 1 / 7', 'vomiting', 2 * H),
+    trow('A5', 'Cat Room 1 / 8', 'eye_condition', 2 * H), trow('A6', 'Cat Room 1 / 9', 'diarrhoea', 3 * H)
+  ];
+  const s1 = L.buildSurvey(tasks, LOC, since).spaces.find(s => s.name === 'Cat Room 1');
+  assert.deepEqual(s1.conditions.map(c => [c.key, c.animals]), [['cat_flu', 2], ['diarrhoea', 2], ['vomiting', 1], ['eye_condition', 1]]);
+  assert.deepEqual(s1.conditions[0].ids, ['A1', 'A2']);
+  assert.deepEqual(s1.top3.map(c => c.key), ['cat_flu', 'diarrhoea', 'vomiting'], 'top 3 only; ties keep the usual sign order');
+  assert.deepEqual(L.buildSurvey([], LOC, since).spaces[0].top3, []);
+});
 test('buildSurvey with no data gives zero rates, not errors', () => {
   const r = L.buildSurvey([], LOC, new Date(NOW - 3 * 24 * H));
   assert.equal(r.totalCases, 0);
