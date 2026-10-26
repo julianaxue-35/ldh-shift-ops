@@ -469,7 +469,7 @@ const H = 3600 * 1000;
     t.ok((await m.page.textContent('#misc-list')).includes('CAT-12') && (await m.page.textContent('#misc-list')).includes('Ear swab'), 'the new task shows in the vets page list');
 
     t.ok(await m.page.locator('.attn-item', { hasText: 'XFER-1' }).locator('.transfer-btn').count() === 1, 'an open case has a Transfer to nurse button');
-    t.ok(await m.page.locator('.attn-item', { hasText: 'MEDCASE' }).locator('.transfer-btn').count() === 0, 'a medication case does not (it has its own nurse hand-off)');
+    t.ok(await m.page.locator('.attn-item', { hasText: 'MEDCASE' }).locator('.transfer-btn').count() === 1, 'a medication case has it too (a label / dispense note is required)');
     await m.page.locator('.attn-item', { hasText: 'XFER-1' }).locator('.transfer-btn').click();
     await m.page.selectOption('.transfer-task', 'blood');
     await m.page.fill('.transfer-initials', 'jx');
