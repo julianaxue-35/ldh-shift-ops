@@ -986,30 +986,59 @@
      Send to Admission AA (2026-10-17). One row in aa_items per send; the AA enters it in ShelterMate and ticks it off,
      which deletes it. The rules (one ID except vaccination, chip digits, initials) live in LDHLogic.aaBuildItem.
      ============================================================ */
-  // The Send to Admission AA form now lives in the one Send card (its "Admission AA" tab, with a comment box).
-  // The task the form was filled from: once its result is sent, that task is marked done (the form must still be about
-  // that same animal: if the nurse types a different ID the task is left open).
-  let aaSource = null, SEND = null;
-  function prefillAaSend(kind, ids, src) {
-    aaSource = src ? { src: src.src, id: src.id, animal: ids } : null;
-    if (SEND) SEND.prefillAa(kind, ids);
+  // "Send to AA" on a task (FIV, UV, microchip, microchip + UV) opens a window like "Send back to vet": the result, a comment
+  // box, and your initials. Sending closes the task it came from.
+  function openAaModal(b) {
+    document.querySelectorAll('.aa-modal-overlay').forEach(el => el.remove());
+    const kind = b.dataset.kind, animal = b.dataset.ids;
+    const src = b.dataset.src ? { src: b.dataset.src, id: b.dataset.rid } : null;
+    const task = src ? (src.src === 'nr' ? NURSE_REQUESTS.find(x => x.id === src.id) : NOGA_REQUESTS.find(x => x.id === src.id)) : null;
+    const fld = (label, inner) => `<label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">${label}</label>${inner}`;
+    const wantResult = kind === 'fiv' || kind === 'uv', wantChip = kind === 'microchip' || kind === 'microchip_uv', wantUv = kind === 'microchip_uv';
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="oc-modal-overlay aa-modal-overlay">
+        <div class="oc-modal done-modal">
+          <h3 class="done-modal-title">Send to Admission AA — ${esc(LDHLogic.AA_KINDS[kind] || kind)}</h3>
+          <p style="font-size:0.85rem; margin:0 0 10px;"><b>${esc(animal)}</b>${task ? ' — ' + esc(locationText(task)) : ''}</p>
+          ${wantChip ? fld('Microchip number', '<input class="aa-m-chip" inputmode="numeric" placeholder="Microchip number (15 digits)">') : ''}
+          ${wantUv ? fld('UV result', '<input class="aa-m-uv" placeholder="e.g. No fluorescence">') : ''}
+          ${fld(wantResult ? 'Result / comment' : 'Comment (optional)', `<textarea class="aa-m-text" rows="3" placeholder="${wantResult ? (kind === 'uv' ? 'e.g. No fluorescence' : 'e.g. FIV negative, FeLV negative') : 'anything the Admission AA should know'}"></textarea>`)}
+          <p class="oc-modal-error aa-m-error"></p>
+          <div class="oc-modal-actions">
+            <button type="button" class="oc-modal-cancel aa-m-cancel">Cancel</button>
+            <button type="button" class="oc-modal-submit aa-m-send">Send to Admission AA</button>
+          </div>
+        </div>
+      </div>`;
+    const overlay = wrap.firstElementChild;
+    overlay._ctx = { kind, animal, src, task, wantResult };
+    document.body.appendChild(overlay);
   }
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('.aa-prefill'); if (b) prefillAaSend(b.dataset.kind, b.dataset.ids, b.dataset.src ? { src: b.dataset.src, id: b.dataset.rid } : null);
-  });
-  async function afterAaSent(row) {
-    if (aaSource && row.animal_ids.length === 1 && row.animal_ids[0].toUpperCase() === String(aaSource.animal).trim().toUpperCase()) {
-      const task = aaSource.src === 'nr' ? NURSE_REQUESTS.find(x => x.id === aaSource.id) : NOGA_REQUESTS.find(x => x.id === aaSource.id);
-      if (task) {
-        const col = aaSource.src === 'nr' || isProcessingMisc(task) ? 'processing' : 'welfare';
-        const who = myInitials(col);
-        const m = await markTaskDone({ src: aaSource.src, id: aaSource.id }, who, new Date().toISOString());
-        if (m) alert('The result was sent to the Admission AA, but the task could not be marked done here: ' + m + '. Tick it off yourself.');
-        loadAll();
-      }
+  document.addEventListener('click', async (e) => {
+    const open = e.target.closest('.aa-prefill'); if (open) { openAaModal(open); return; }
+    const cancel = e.target.closest('.aa-m-cancel'); if (cancel) { cancel.closest('.aa-modal-overlay').remove(); return; }
+    const ok = e.target.closest('.aa-m-send'); if (!ok) return;
+    const overlay = ok.closest('.aa-modal-overlay'), { kind, animal, src, task, wantResult } = overlay._ctx;
+    const err = overlay.querySelector('.aa-m-error');
+    const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
+    const val = c => { const x = overlay.querySelector(c); return x ? x.value.trim() : ''; };
+    const col = src && (src.src === 'nr' || (task && isProcessingMisc(task))) ? 'processing' : 'welfare';
+    const initials = myInitials(col);
+    if (!initials) return fail('Enter your initials first.');
+    const text = val('.aa-m-text');
+    const built = LDHLogic.aaBuildItem({ kind, idsText: animal, result: wantResult ? text : '', chipNumber: val('.aa-m-chip'), uvResult: val('.aa-m-uv'), note: wantResult ? '' : text, initials });
+    if (built.error) return fail(built.error);
+    ok.disabled = true;
+    const { error } = await sb.from('aa_items').insert(built.row);
+    if (error) { ok.disabled = false; return fail('Could not send: ' + error.message); }
+    if (task) {
+      const m = await markTaskDone({ src: src.src, id: src.id }, initials, new Date().toISOString());
+      if (m) alert('The result was sent to the Admission AA, but the task could not be marked done here: ' + m + '. Tick it off yourself.');
     }
-    aaSource = null;
-  }
+    overlay.remove(); OpsCore.toast();
+    loadAll();
+  });
 
   /* ---- Vaccinations due (Report 7): upload, group by location, tick what was given, send to the Admission AA ----
      Only ID, location, kennel, treatment, due date and weight are kept (names and microchips never leave the file),
@@ -1228,7 +1257,7 @@
     // Initials: this card remembers its own for the day, starting from whichever nurse column has initials in it.
     const REQ_KEY = 'ldh_nurse_request_initials_v1';
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });
-    SEND = SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour', 'aa'], vetsFrom: 'nurse', onAaSent: afterAaSent,
+    SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
       initials: OpsCore.readInitials(REQ_KEY) || cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
       saveInitials: (v) => OpsCore.saveInitials(REQ_KEY, v), onSent: () => loadAll() });
     document.getElementById('app-root').style.display = 'grid';
