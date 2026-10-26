@@ -731,3 +731,15 @@ test('aaSortItems: priority cards come first, then overdue, then oldest', () => 
   assert.equal(L.aaIsPriority({ payload: { priority: 'yes' } }), false);
   assert.equal(L.aaIsPriority(null), false);
 });
+
+test('timeBuckets / bucketCounts: days for week, month and quarter; months for the year; running total', () => {
+  const now = new Date('2026-10-28T10:00:00').getTime();
+  const w = L.timeBuckets('week', now);
+  assert.deepEqual(w.keys, ['2026-10-26', '2026-10-27', '2026-10-28']);
+  assert.deepEqual(L.bucketCounts(['2026-10-26T09:00:00', '2026-10-26T11:00:00', '2026-10-27T01:00:00', '2026-09-01T01:00:00'], w), [2, 1, 0], 'dates outside the window are ignored');
+  assert.deepEqual(L.bucketCounts(['2026-10-26T09:00:00', '2026-10-27T01:00:00'], w, true), [1, 2, 2]);
+  assert.equal(L.timeBuckets('month', now).keys.length, 28);
+  const y = L.timeBuckets('year', now);
+  assert.equal(y.unit, 'month'); assert.equal(y.labels.length, 10); assert.equal(y.labels[0], 'Jan');
+  assert.deepEqual(L.bucketCounts(['2026-03-05T09:00:00', '2026-03-20T09:00:00', '2026-10-01T09:00:00'], y).slice(2, 3), [2]);
+});
