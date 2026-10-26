@@ -288,31 +288,9 @@
     </div>
     </div>
 
-    <section class="card" id="aa-send-card">
-      <h2>Send to Admission AA</h2>
-      <p class="subtle">The Admission AA enters it in ShelterMate and ticks it off. Your initials are recorded.</p>
-      <select id="aa-kind">
-        <option value="vaccination">Vaccination update</option>
-        <option value="microchip">Microchip</option>
-        <option value="microchip_uv">Microchip + UV</option>
-        <option value="uv">UV result</option>
-        <option value="fiv">FIV result</option>
-      </select>
-      <label id="aa-ids-label" for="aa-ids" style="font-size:0.78rem; font-weight:700;">Animal ID(s), several allowed</label>
-      <textarea id="aa-ids" rows="2" placeholder="e.g. A123, A124, A125"></textarea>
-      <div id="aa-f-result"><input id="aa-result" placeholder="Result, e.g. FIV negative"></div>
-      <div id="aa-f-chip"><input id="aa-chip" inputmode="numeric" placeholder="Microchip number (15 digits)"></div>
-      <div id="aa-f-uv"><input id="aa-uv" placeholder="UV result, e.g. No fluorescence"></div>
-      <div id="aa-f-vacc"><input id="aa-vaccine" placeholder="Vaccine given, e.g. F3"><input id="aa-vdate" type="date"></div>
-      <label for="aa-initials" style="font-size:0.78rem; font-weight:700;">Your initials</label>
-      <input id="aa-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;">
-      <p id="aa-error" class="oc-modal-error" style="display:none;"></p>
-      <button type="button" id="aa-send">Send to Admission AA</button>
-      <span id="aa-sent" class="subtle" style="display:none;">Sent to the Admission AA ✓</span>
-    </section>
-
     <section class="card" id="memo-board">
       <h2>Memo board</h2>
+      <p class="subtle" style="margin:0 0 10px;">A place to record topics to discuss at the vet meetings. Post anonymously: only &ldquo;Nurse team&rdquo; or &ldquo;Vet team&rdquo; is shown, never your name. Memos from the nurses and the vets are shared, so everyone sees the same board.</p>
       <div id="memo-list"></div>
       <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
       <div id="memo-completed-list"></div>
@@ -358,10 +336,10 @@
   let TASKS = [], NURSE_REQUESTS = [], NURSE_TREATMENTS = [], NURSE_DOSES = [], NOGA_REQUESTS = [], MEMOS = [];
   let showCompletedMemos = false;
 
-  // Initials: each nurse column (Welfare / Processing) has its own box and the Admission AA form has one. They are
+  // Initials: each nurse column (Welfare / Processing) has its own box (the Send card remembers its own). They are
   // remembered for the rest of TODAY on this device (so every tick is stamped automatically) and cleared the next day.
   const INITIALS_KEY = 'ldh_nurse_initials_v1';
-  const INITIAL_BOXES = { welfare: 'initials-welfare', processing: 'initials-processing', aa: 'aa-initials' };
+  const INITIAL_BOXES = { welfare: 'initials-welfare', processing: 'initials-processing' };
   function cleanInitials(v) { return String(v || '').trim().toUpperCase().slice(0, 4); }
   function dayKey() { return new Date().toLocaleDateString('en-CA'); }
   function readSavedInitials() {
@@ -382,15 +360,6 @@
       el.value = cleanInitials(o[k]);
       el.addEventListener('input', () => { el.value = cleanInitials(el.value); saveInitials(); });
     });
-    // the AA form starts from the Processing nurse's initials (or the Welfare nurse's) if it has none of its own
-    document.getElementById('initials-processing').addEventListener('input', fillAaInitials);
-    document.getElementById('initials-welfare').addEventListener('input', fillAaInitials);
-    function fillAaInitials() {
-      const aa = document.getElementById('aa-initials');
-      if (!aa.dataset.touched) { aa.value = cleanInitials(document.getElementById('initials-processing').value) || cleanInitials(document.getElementById('initials-welfare').value); saveInitials(); }
-    }
-    document.getElementById('aa-initials').addEventListener('input', (e) => { e.target.dataset.touched = '1'; });
-    if (!document.getElementById('aa-initials').value) fillAaInitials();
   })();
   // Who is on today: the two nurse columns' initials are shared (initials only) so the Admission AA page can show them.
   let onDutyTimer = null;
@@ -1017,47 +986,19 @@
      Send to Admission AA (2026-10-17). One row in aa_items per send; the AA enters it in ShelterMate and ticks it off,
      which deletes it. The rules (one ID except vaccination, chip digits, initials) live in LDHLogic.aaBuildItem.
      ============================================================ */
-  const AA_SHOW = {
-    fiv: ['aa-f-result'], uv: ['aa-f-result'], microchip: ['aa-f-chip'],
-    microchip_uv: ['aa-f-chip', 'aa-f-uv'], vaccination: ['aa-f-vacc']
-  };
-  function syncAaFields() {
-    const kind = document.getElementById('aa-kind').value;
-    ['aa-f-result', 'aa-f-chip', 'aa-f-uv', 'aa-f-vacc'].forEach(id => { document.getElementById(id).style.display = (AA_SHOW[kind] || []).includes(id) ? '' : 'none'; });
-    document.getElementById('aa-ids-label').textContent = kind === 'vaccination' ? 'Animal ID(s), several allowed' : 'Animal ID';
-    document.getElementById('aa-result').placeholder = kind === 'uv' ? 'UV result, e.g. No fluorescence' : 'Result, e.g. FIV negative';
-    if (kind === 'vaccination' && !document.getElementById('aa-vdate').value) document.getElementById('aa-vdate').value = LDHLogic.localISO(new Date());
-  }
-  document.getElementById('aa-kind').addEventListener('change', syncAaFields);
-  // The task the Send-to-AA form was filled from: once its result is sent, that task is marked done (the form must
-  // still be about that same animal: if the nurse types a different ID the task is left open).
-  let aaSource = null;
+  // The Send to Admission AA form now lives in the one Send card (its "Admission AA" tab, with a comment box).
+  // The task the form was filled from: once its result is sent, that task is marked done (the form must still be about
+  // that same animal: if the nurse types a different ID the task is left open).
+  let aaSource = null, SEND = null;
   function prefillAaSend(kind, ids, src) {
     aaSource = src ? { src: src.src, id: src.id, animal: ids } : null;
-    document.getElementById('aa-kind').value = kind;
-    document.getElementById('aa-ids').value = ids;
-    // a half-typed result from the previous animal must never ride along onto this one
-    ['aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
-    syncAaFields();
-    document.getElementById('aa-send-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (SEND) SEND.prefillAa(kind, ids);
   }
   document.addEventListener('click', (e) => {
     const b = e.target.closest('.aa-prefill'); if (b) prefillAaSend(b.dataset.kind, b.dataset.ids, b.dataset.src ? { src: b.dataset.src, id: b.dataset.rid } : null);
   });
-  document.getElementById('aa-send').addEventListener('click', async () => {
-    const err = document.getElementById('aa-error'), btn = document.getElementById('aa-send');
-    const val = id => document.getElementById(id).value;
-    err.style.display = 'none';
-    const built = LDHLogic.aaBuildItem({
-      kind: val('aa-kind'), idsText: val('aa-ids'), result: val('aa-result'), chipNumber: val('aa-chip'), uvResult: val('aa-uv'),
-      vaccine: val('aa-vaccine'), vaccDate: val('aa-vdate'), initials: cleanInitials(val('aa-initials')) || myInitials('processing')
-    });
-    if (built.error) { err.textContent = built.error; err.style.display = 'block'; return; }
-    btn.disabled = true;
-    const { error } = await sb.from('aa_items').insert(built.row);
-    btn.disabled = false;
-    if (error) { err.textContent = 'Could not send: ' + error.message; err.style.display = 'block'; return; }
-    if (aaSource && built.row.animal_ids.length === 1 && built.row.animal_ids[0].toUpperCase() === String(aaSource.animal).trim().toUpperCase()) {
+  async function afterAaSent(row) {
+    if (aaSource && row.animal_ids.length === 1 && row.animal_ids[0].toUpperCase() === String(aaSource.animal).trim().toUpperCase()) {
       const task = aaSource.src === 'nr' ? NURSE_REQUESTS.find(x => x.id === aaSource.id) : NOGA_REQUESTS.find(x => x.id === aaSource.id);
       if (task) {
         const col = aaSource.src === 'nr' || isProcessingMisc(task) ? 'processing' : 'welfare';
@@ -1068,11 +1009,7 @@
       }
     }
     aaSource = null;
-    ['aa-ids', 'aa-result', 'aa-chip', 'aa-uv', 'aa-vaccine'].forEach(id => { document.getElementById(id).value = ''; });
-    OpsCore.toast();
-    const ok = document.getElementById('aa-sent'); ok.style.display = ''; setTimeout(() => { ok.style.display = 'none'; }, 4000);
-  });
-  syncAaFields();
+  }
 
   /* ---- Vaccinations due (Report 7): upload, group by location, tick what was given, send to the Admission AA ----
      Only ID, location, kennel, treatment, due date and weight are kept (names and microchips never leave the file),
@@ -1291,7 +1228,7 @@
     // Initials: this card remembers its own for the day, starting from whichever nurse column has initials in it.
     const REQ_KEY = 'ldh_nurse_request_initials_v1';
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });
-    SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
+    SEND = SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour', 'aa'], vetsFrom: 'nurse', onAaSent: afterAaSent,
       initials: OpsCore.readInitials(REQ_KEY) || cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
       saveInitials: (v) => OpsCore.saveInitials(REQ_KEY, v), onSent: () => loadAll() });
     document.getElementById('app-root').style.display = 'grid';

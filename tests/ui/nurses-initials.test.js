@@ -45,7 +45,6 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     await a.page.reload();
     await a.page.waitForSelector('#initials-welfare');
     t.ok((await a.page.inputValue('#initials-welfare')) === 'AB' && (await a.page.inputValue('#initials-processing')) === 'CD', 'initials are still there after a reload the same day');
-    t.ok((await a.page.inputValue('#aa-initials')) === 'CD', 'the Admission AA form starts from the Processing initials');
 
     /* ...but not the next day */
     await a.page.evaluate(() => { const o = JSON.parse(localStorage.getItem('ldh_nurse_initials_v1')); o.day = '2000-01-01'; localStorage.setItem('ldh_nurse_initials_v1', JSON.stringify(o)); });
@@ -53,13 +52,6 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     await a.page.waitForSelector('#initials-welfare');
     t.ok((await a.page.inputValue('#initials-welfare')) === '' && (await a.page.inputValue('#initials-processing')) === '', 'yesterday\'s initials are cleared');
 
-    /* layout: Send to Admission AA is at the bottom, just above the memo board */
-    const order = await a.page.evaluate(() => {
-      const ids = ['welfare-col', 'processing-col', 'aa-send-card', 'memo-board'];
-      const pos = ids.map(id => document.getElementById(id).getBoundingClientRect().top);
-      return { pos, between: document.getElementById('aa-send-card').nextElementSibling.id };
-    });
-    t.ok(order.pos[2] > order.pos[0] && order.pos[2] > order.pos[1] && order.pos[3] > order.pos[2] && order.between === 'memo-board', 'Send to Admission AA is below the nurse columns and directly above the memo board: ' + JSON.stringify(order));
     t.ok(a.errors.length === 0, 'no page errors: ' + a.errors.join('; '));
   } finally { await a.browser.close(); }
   t.done();

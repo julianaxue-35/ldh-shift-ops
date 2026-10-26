@@ -13,6 +13,9 @@ test('a good processing note is accepted and normalised', () => {
   const r = validateAaShare(ok());
   assert.deepEqual(r.row, { kind: 'processing_note', animal_ids: ['T-100'], payload: { text: 'Exam normal.', location: 'Pound 1' }, sent_by: 'AB' });
 });
+test('a surgery note is accepted', () => {
+  assert.equal(validateAaShare(ok({ kind: 'surgery_note' })).row.kind, 'surgery_note');
+});
 test('docx_b64 is kept when it is base64', () => {
   assert.equal(validateAaShare(ok({ payload: { text: 'x', docx_b64: 'UEsDBBQ=' } })).row.payload.docx_b64, 'UEsDBBQ=');
 });
