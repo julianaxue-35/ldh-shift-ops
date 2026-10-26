@@ -148,31 +148,85 @@
   .status-pill.urgent { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .status-pill.routine { background: rgba(216,214,206,0.35); color: var(--muted); }
   .status-pill.red_flag { background: rgba(208,59,59,0.14); color: var(--critical); }
+  /* Case stage colours — same four colours as the Shelter board */
+  .stage-pill { display: inline-block; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 10px; line-height: 1.35; }
+  .stage-pill::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; vertical-align: 1px; }
+  .stage-flagged { background: rgba(255,159,67,0.28); color: #8a5000; }
+  .stage-picked_up { background: rgba(74,108,247,0.18); color: #2f4fd6; }
+  .stage-waiting_medication { background: rgba(140,98,255,0.18); color: #6a3fe0; }
+  .stage-completed { background: rgba(34,154,99,0.16); color: #1b7a4f; }
   .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
   .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
   .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
   .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
   .tag-med { font-size: 0.62rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: rgba(74,108,247,0.14); color: var(--blue); margin-left: 6px; white-space: nowrap; }
   /* One request card for vets / nurses / behaviour (2026-10-21): same field order, labels and look in every panel. */
-  .sr-head { display: flex; gap: 14px; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin: 4px 0 14px; }
-  .sr-to { display: flex; gap: 6px; flex-wrap: wrap; }
-  .sr-tab { width: auto; background: var(--card-bg); color: var(--ink); border: 2px solid var(--border); box-shadow: none; font-weight: 700; padding: 10px 22px; border-radius: 12px; cursor: pointer; }
-  .sr-tab[data-sr="vets"][aria-selected="true"] { background: var(--blue, #4a6cf7); border-color: var(--blue, #4a6cf7); color: #fff; }
-  .sr-tab[data-sr="nurses"][aria-selected="true"] { background: #1c7387; border-color: #1c7387; color: #fff; }
-  .sr-tab[data-sr="behaviour"][aria-selected="true"] { background: #7c5cbf; border-color: #7c5cbf; color: #fff; }
-  .sr-who { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; font-weight: 700; color: var(--muted); margin: 0; }
-  .sr-who input { width: 110px; margin: 0; }
-  .sr-who-note { font-weight: 400; max-width: 260px; }
-  .sr-panel { border-left: 5px solid var(--border); padding: 4px 0 4px 14px; }
+  /* Send a request (2026-10-27): banner, 1 recipient cards, 2 request & location details */
+  #send-request { padding: 0; overflow: hidden; }
+  .sr-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 20px 28px; color: #fff; background: linear-gradient(110deg, #1E2238 0%, #2d2f8f 100%); }
+  .sr-banner .eyebrow { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #a9b4ff; }
+  .sr-banner h2 { margin: 2px 0 0; font-size: 1.2rem; color: #fff; }
+  .sr-body { padding: 24px 28px 28px; }
+  .sr-sec { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 0 12px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink); }
+  .sr-sec .hint { font-weight: 600; font-size: 0.68rem; color: var(--muted); letter-spacing: 0.06em; }
+  .sr-sec .req { color: var(--critical); }
+  .sr-divider { border: none; border-top: 1px solid var(--border); margin: 22px 0 20px; }
+  .who-box { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 6px 8px 6px 14px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border); font-size: 0.78rem; font-weight: 600; color: var(--muted); cursor: text; transition: border-color .15s, background .15s; }
+  .who-box input { width: 4.6ch; min-width: 0; margin: 0; padding: 4px 8px; text-align: center; border: 1px solid var(--border); border-radius: 8px; background: #fff; font-size: 0.85rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+  .who-box input::placeholder { letter-spacing: 0; font-weight: 500; text-transform: none; }
+  .who-box:not(.filled) { background: rgba(255,159,67,0.14); border-color: rgba(255,159,67,0.6); color: #8a5000; }
+  .who-box input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(74,108,247,0.18); }
+  .who-state { font-weight: 700; font-size: 0.72rem; color: #1b7a4f; white-space: nowrap; }
+  .sr-head { margin: 0; }
+  .sr-to { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .sr-tab { position: relative; width: auto; background: #fff; color: var(--ink); border: 1.5px solid var(--border); box-shadow: none; text-align: left; font-weight: 700; font-size: 0.95rem; line-height: 1.3; padding: 16px 18px 16px; padding-top: 58px; border-radius: 14px; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s;
+    background-image: radial-gradient(circle, #c4c9d8 0 4px, transparent 5px); background-repeat: no-repeat; background-position: right 16px top 16px; background-size: 14px 14px; }
+  .sr-tab::before { position: absolute; left: 16px; top: 14px; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.05rem; background: #eef0fb; }
+  .sr-tab[data-sr="vets"]::before { content: '\1FA7A'; }
+  .sr-tab[data-sr="nurses"]::before { content: '\1F489'; background: #e6f4f7; }
+  .sr-tab[data-sr="behaviour"]::before { content: '\1F415'; background: #f1ebfb; }
+  .sr-tab::after { content: attr(data-sub); display: block; font-weight: 400; font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+  .sr-tab:hover { border-color: rgba(30,34,56,0.3); }
+  .sr-tab:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .sr-tab[aria-selected="true"] { background-color: #f5f6ff; box-shadow: 0 0 0 1px var(--tab-c), 0 4px 14px rgba(30,34,56,0.08); border-color: var(--tab-c); background-image: radial-gradient(circle, var(--tab-c) 0 5px, transparent 6px); }
+  .sr-tab[data-sr="vets"] { --tab-c: #4338ca; }
+  .sr-tab[data-sr="nurses"] { --tab-c: #1c7387; }
+  .sr-tab[data-sr="behaviour"] { --tab-c: #7c5cbf; }
+  .sr-tab[data-sr="nurses"][aria-selected="true"] { background-color: #f1f9fb; }
+  .sr-tab[data-sr="behaviour"][aria-selected="true"] { background-color: #f8f5fd; }
+  .sr-panel { border: none; border-radius: 0; padding: 0; background: none; box-shadow: none; }
   .sr-panel[hidden] { display: none; }
-  .sr-panel[data-to="vets"] { border-left-color: var(--blue, #4a6cf7); }
-  .sr-panel[data-to="nurses"] { border-left-color: #2a9db5; background: #eef8fb; padding: 10px 14px; border-radius: 0 12px 12px 0; }
-  .sr-panel[data-to="behaviour"] { border-left-color: #7c5cbf; background: #f6f1fd; padding: 10px 14px; border-radius: 0 12px 12px 0; }
-  .sr-lead { font-size: 0.82rem; color: var(--muted); margin: 0 0 10px; }
-  .sr-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; align-items: end; }
-  .sr-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
-  .sr-form .sr-wide { grid-column: 1 / -1; }
-  .sr-send { margin-top: 12px; }
+  .sr-lead { font-size: 0.85rem; color: var(--muted); margin: 0 0 14px; }
+  .sr-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 22px; align-items: start; }
+  .sr-form label { font-size: 0.82rem; font-weight: 600; color: var(--ink); display: flex; flex-direction: column; gap: 6px; margin: 0; }
+  .sr-form label .req { color: var(--critical); }
+  .sr-form input, .sr-form select, .sr-form textarea { background: #f5f7fa; }
+  .sr-form .sr-wide, .sr-form .sr-span2 { grid-column: 1 / -1; }
+  #new-request-form .sr-form .sr-span2 { grid-column: auto; }
+  .sr-form textarea { min-height: 84px; resize: vertical; font: inherit; }
+  select.tier-routine { color: #1b7a4f; font-weight: 700; }
+  select.tier-urgent { color: #9a5b00; font-weight: 700; }
+  select.tier-red_flag { color: var(--critical); font-weight: 700; }
+  .sr-panel input:focus, .sr-panel select:focus, .sr-panel textarea:focus { outline: none; border-color: var(--blue, #4a6cf7); box-shadow: 0 0 0 3px rgba(74,108,247,0.18); }
+  /* Clinical triage checklist: collapsible bar with emergency signs as chips */
+  .triage { margin: 20px 0 4px; }
+  .triage > details { border: 1px solid rgba(208,59,59,0.25); border-radius: 12px; background: #fff5f6; }
+  .triage summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: 0.85rem; font-weight: 700; color: #8f1d2c; }
+  .triage summary::-webkit-details-marker { display: none; }
+  .triage summary .view { margin-left: auto; font-size: 0.78rem; font-weight: 700; color: var(--critical); }
+  .triage summary .view::after { content: ' \25BE'; }
+  .triage details[open] summary .view::after { content: ' \25B4'; }
+  .triage .tri-count { background: var(--critical); color: #fff; border-radius: 999px; font-size: 0.68rem; padding: 1px 8px; display: none; }
+  .triage .tri-count.on { display: inline-block; }
+  .triage .tri-body { padding: 2px 16px 14px; }
+  .triage-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .req-chip { position: relative; display: inline-flex; align-items: center; margin: 0; padding: 7px 13px; border: 1.5px solid var(--border); border-radius: 999px; background: #fff; font-size: 0.8rem; font-weight: 600; color: var(--ink); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+  .req-chip:hover { border-color: rgba(208,59,59,0.5); }
+  .req-chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
+  .req-chip:has(input:checked) { background: var(--critical); border-color: var(--critical); color: #fff; }
+  .req-chip:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+  @media (max-width: 760px) { .sr-body { padding: 18px 16px 22px; } .sr-banner { padding: 16px; } .sr-to { grid-template-columns: minmax(0, 1fr); } .sr-form { grid-template-columns: minmax(0, 1fr); } }
+  .sr-send { margin-top: 18px; padding: 13px 32px; font-size: 0.95rem; border-radius: 12px; }
   .sr-panel[data-to="vets"] .sr-send { background: var(--blue, #4a6cf7); color: #fff; }
   .sr-panel[data-to="nurses"] .sr-send { background: #1c7387; color: #fff; }
   .sr-panel[data-to="behaviour"] .sr-send { background: #7c5cbf; color: #fff; }
@@ -249,27 +303,30 @@
         <p>All open tasks across Processing, Sick &amp; Injured, and Surgery.</p>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <label class="who-box" id="sr-who" title="Needed for Behaviour requests, optional for the others. Remembered on this device for the day.">Initials:<input id="sr-initials" maxlength="4" placeholder="AB" aria-label="Your initials" autocomplete="off"><span class="who-state" id="sr-who-state"></span></label>
         <input id="search-box" placeholder="Search animal ID...">
         <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
       </div>
     </div>
 
     <section class="card" id="send-request">
-      <h2>Send a request</h2>
-      <p class="subtle">Pick who it is for, then fill in the form. Every request shows who sent it.</p>
+      <div class="sr-banner"><div><div class="eyebrow">New submission</div><h2>Send a request</h2></div></div>
+      <div class="sr-body">
+      <div class="sr-sec"><span>1. Who is this request for?</span><span class="hint">Select recipient</span></div>
       <div class="sr-head">
         <div class="sr-to" role="tablist" aria-label="Send to">
-          <button type="button" role="tab" class="sr-tab" data-sr="vets" aria-selected="true">Vets</button>
-          <button type="button" role="tab" class="sr-tab" data-sr="nurses" aria-selected="false">Nurses</button>
-          <button type="button" role="tab" class="sr-tab" data-sr="behaviour" aria-selected="false">Behaviour</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="vets" data-sub="Medical exam &amp; diagnosis" aria-selected="true">Vets</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="nurses" data-sub="Nursing care &amp; treatments" aria-selected="false">Nurses</button>
+          <button type="button" role="tab" class="sr-tab" data-sr="behaviour" data-sub="Assessments &amp; enrichment" aria-selected="false">Behaviour</button>
         </div>
-        <label class="sr-who">Your initials<input id="sr-initials" maxlength="4" placeholder="e.g. AB"><span class="sr-who-note">Needed for Behaviour, optional for the others. Remembered on this device for the day.</span></label>
       </div>
 
+      <hr class="sr-divider">
+      <div class="sr-sec"><span>2. Request &amp; location details</span></div>
       <div class="sr-panel" id="new-request-form" data-to="vets">
         <p class="sr-lead">For a vet to look at an animal. Logged under Sick &amp; Injured, today's list.</p>
         <div class="sr-form">
-          <label>What<select id="req-type">
+          <label>What type of request?<select id="req-type">
             <option value="shelter">Shelter request</option>
             <option value="foster">Foster request</option>
             <option value="rescue">Rescue request</option>
@@ -277,10 +334,10 @@
             <option value="other">Other (describe in the note)</option>
             <option value="admin">Admin / paperwork review (e.g. vet history)</option>
           </select></label>
-          <label>Animal ID<input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)"></label>
-          <label>Space<select id="req-location"></select></label>
-          <label>Pen / detail<input id="req-pen" placeholder="Pen #"><input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="display:none;"></label>
-          <label class="sr-span2">Needed within<select id="req-urgency-pick">
+          <label><span>Animal ID <span class="req">*</span></span><input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)"></label>
+          <label>Location / Space<select id="req-location"></select></label>
+          <label>Pen / Detail #<input id="req-pen" placeholder="Pen #"><input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="display:none;"></label>
+          <label class="sr-span2">Needed within<select id="req-urgency-pick" class="tier-routine">
             <option value="routine">Request check — within 24–48 h</option>
             <option value="urgent">Urgent — within 12–24 h</option>
             <option value="red_flag">Emergency — within 2–4 h</option>
@@ -299,17 +356,8 @@
           <option value="other">Other</option>
         </select>
           </label>
-          <label class="sr-wide">Reason / note<input id="req-problem" placeholder="Describe the issue, e.g. limping on front-left leg"></label>
+          <label class="sr-wide">Reason / clinical notes<textarea id="req-problem" rows="3" placeholder="Describe the issue in detail, e.g. limping on front-left leg, not eating for 2 days..."></textarea></label>
         </div>
-      <details id="triage-levels" style="margin-top:6px; font-size:0.82rem;">
-          <summary style="cursor:pointer; font-weight:700;">What do the levels mean?</summary>
-          <div style="padding:6px 2px;">
-            <p style="margin:4px 0;"><b>Request check (24–48 h) — green.</b> Can wait. Old-age changes, stable arthritis, overgrown nails, mild skin disease, mild cat flu and still eating.</p>
-            <p style="margin:4px 0;"><b>Urgent (12–24 h) — yellow / orange.</b> Needs a vet look that day or the next. One vomit or loose stool but bright, limping but weight-bearing, not eating (cat 24 h+, dog 48 h+), a wound that may need stitches, repeated vomiting, anything you think is painful.</p>
-            <p style="margin:4px 0;"><b>Emergency (within 2–4 h) — red.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
-            <p style="margin:4px 0; color:var(--muted);">From the draft triage guide (not yet approved). It does not replace common sense and gut instinct.</p>
-          </div>
-        </details>
 
       <div id="req-birthing-wrap" style="display:none; margin:10px 0 0; padding:10px 12px; border:2px solid var(--critical); border-radius:12px; background:rgba(208,59,59,0.06);">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--critical);">Urgent cat birthing check — what is wrong? (goes straight to the top of the vet board)</div>
@@ -329,10 +377,22 @@
           <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
         </div>
       </div>
-      <div id="req-redflags-wrap" style="margin:12px 0 4px;">
-        <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px;">Emergency signs — tick any that apply</div>
-        <div id="req-redflags" style="display:flex; flex-wrap:wrap; gap:8px 18px;"></div>
-        <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:8px;"></div>
+      <div id="req-redflags-wrap" class="triage">
+        <details id="triage-drawer">
+          <summary>&#9888;&#65039; Clinical triage &amp; emergency criteria checklist <span class="tri-count" id="tri-count"></span><span class="view">View criteria</span></summary>
+          <div class="tri-body"><div style="font-size:0.78rem; font-weight:700; margin-bottom:8px;">Emergency signs &mdash; tap any that apply</div><div id="req-redflags" class="triage-chips"></div>
+      <details id="triage-levels" style="margin-top:12px; font-size:0.82rem;">
+          <summary style="cursor:pointer; font-weight:700;">What do the levels mean?</summary>
+          <div style="padding:6px 2px;">
+            <p style="margin:4px 0;"><b>Request check (24–48 h) — green.</b> Can wait. Old-age changes, stable arthritis, overgrown nails, mild skin disease, mild cat flu and still eating.</p>
+            <p style="margin:4px 0;"><b>Urgent (12–24 h) — yellow / orange.</b> Needs a vet look that day or the next. One vomit or loose stool but bright, limping but weight-bearing, not eating (cat 24 h+, dog 48 h+), a wound that may need stitches, repeated vomiting, anything you think is painful.</p>
+            <p style="margin:4px 0;"><b>Emergency (within 2–4 h) — red.</b> Collapse, trouble breathing, pale / yellow / blue gums, major trauma, seizures, suspected toxin, bloat signs, straining to urinate with no urine, heat stress, dystocia, neonate cold or weak. Ticking an emergency sign below sets this level automatically.</p>
+            <p style="margin:4px 0; color:var(--muted);">From the draft triage guide (not yet approved). It does not replace common sense and gut instinct.</p>
+          </div>
+        </details>
+</div>
+        </details>
+        <div id="req-tier-preview" style="font-size:0.85rem; font-weight:700; margin-top:10px;"></div>
         <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">High priority emergency? Radio the vet, don't wait for this board.</div>
       </div>
         <button id="req-submit" type="button" class="sr-send">Send to vets</button>
@@ -344,10 +404,10 @@
           <input type="checkbox" id="nr-scheduled-toggle" style="width:auto; margin:0;"> Not here yet — schedule it for a later arrival
         </label>
         <div class="sr-form" id="nr-form">
-          <label>What<select id="nr-kind">
+          <label>What type of request?<select id="nr-kind">
             <option value="vaccination">Vaccination</option>
           </select></label>
-          <label>Space<select id="nr-location"></select></label>
+          <label>Location / Space<select id="nr-location"></select></label>
           <label class="nr-grp">Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
           <label class="nr-grp">How many<input id="nr-count" type="number" min="1" value="1"></label>
           <label class="nr-grp">Needed within<select id="nr-window">
@@ -366,15 +426,15 @@
       <div class="sr-panel" id="bh-bar" data-to="behaviour" hidden>
         <p class="sr-lead">For the behaviour team: courthold reassessment, owner surrender history with concerns, aggression / incident review or a behaviour review. They see it straight away.</p>
         <div class="sr-form">
-          <label>What<select id="bk-kind">
+          <label>What type of request?<select id="bk-kind">
             <option value="courthold">Courthold reassessment</option>
             <option value="surrender_history">Owner surrender history with concerns</option>
             <option value="incident_review">Aggression / incident review</option>
             <option value="behaviour_review">Behaviour review</option>
             <option value="other">Other</option></select></label>
-          <label>Animal ID<input id="bk-animal" placeholder="Animal ID"></label>
-          <label>Space<select id="bk-room"></select></label>
-          <label>Pen / detail<input id="bk-pen" placeholder="Pen # or detail"></label>
+          <label><span>Animal ID <span class="req">*</span></span><input id="bk-animal" placeholder="Animal ID"></label>
+          <label>Location / Space<select id="bk-room"></select></label>
+          <label>Pen / Detail #<input id="bk-pen" placeholder="Pen # or detail"></label>
           <label>Needed within<select id="bk-window">
             <option value="30_60m">Within 30–60 minutes</option>
             <option value="today">Within today</option>
@@ -384,6 +444,7 @@
         <label style="display:flex; gap:6px; align-items:center; font-size:0.85rem; margin:8px 0;"><input type="checkbox" id="bk-tl" style="width:auto;"> Send straight to the Behaviour TL</label>
         <button id="bk-submit" type="button" class="sr-send">Send to behaviour</button>
         <p id="bk-error" class="oc-modal-error"></p>
+      </div>
       </div>
     </section>
 
@@ -426,10 +487,10 @@
 
     <section class="card" id="disease-watch" style="display:none">
       <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap;">
-        <h2 style="margin:0;">Disease watch — last 3 days</h2>
+        <h2 style="margin:0;">Disease watch — last month</h2>
         <a href="stats.html" style="font-size:0.8rem; color:var(--ink);">Full surveillance board →</a>
       </div>
-      <p class="subtle" style="margin:6px 0 12px;">Flagged cases in the last 3 days as a share of each space's cages (an animal counts once for each sign flagged). No threshold line yet — a baseline is being collected first.</p>
+      <p class="subtle" style="margin:6px 0 12px;">Flagged cases in the last 30 days as a share of each space's cages (an animal counts once for each sign flagged). No threshold line yet — a baseline is being collected first.</p>
       <div id="disease-watch-map"></div>
     </section>
 
@@ -461,7 +522,7 @@
       <details><summary>A case went back from "picked up" to "flagged" — why?</summary><div><p>Vets can <b>put a case back</b> if they are called away. It returns to its tier and any vet can pick it up. The time target keeps running from when it was first flagged.</p></div></details>
       <details><summary>What are the numbers and rings at the top?</summary><div><p>The big ring is tasks completed today across all shifts, with a ring per shift. Only today's checks are counted. Older unfinished list entries are shown separately as "older still open" so they don't inflate today's total.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
-      <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and pick a <b>Suspected condition</b>, that sign is counted. We track eight <b>reported signs</b>: cat flu (URI), kennel cough, diarrhoea / GI upset, vomiting, eye condition, skin condition, wounds / injury and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 3 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
+      <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and pick a <b>Suspected condition</b>, that sign is counted. We track eight <b>reported signs</b>: cat flu (URI), kennel cough, diarrhoea / GI upset, vomiting, eye condition, skin condition, wounds / injury and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 30 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
       <details><summary>Why do we track it?</summary><div><ul><li><b>Catch clusters early.</b> Several animals with the same sign in one space is the first clue to an outbreak, often before anyone has diagnosed anything.</li><li><b>Back decisions with numbers.</b> Moving animals, tightening cleaning or biosecurity, or isolating a room is easier to justify with a count.</li><li><b>Learn our own seasonal pattern.</b> A baseline is being collected for a full year because disease varies with the season. Once it is complete, each period is compared with the same time last year. Until then there is no "high" line.</li></ul></div></details>
       <details><summary>What do I need to do so the tracking is accurate?</summary><div><ul><li>Choose a <b>Suspected condition</b> every time you flag an animal. If you leave it blank the animal is flagged but is <b>not</b> counted in disease tracking.</li><li>Pick the right <b>space</b> and pen — counts are per space.</li><li>An animal counts once for the same sign, so there is no harm in re-flagging an animal that is still sick.</li><li>Only flagged animals are counted, so the rate reads lower than a full vet-exam prevalence. Compare it with our own baseline, not with older prevalence figures.</li></ul></div></details>
     </div>
@@ -812,7 +873,7 @@
         <td data-label="Shift" style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
         <td data-label="Type">${TYPE_LABELS[t.type] || t.type}</td>
         <td data-label="Tier"><span class="status-pill ${tier}">${esc(LDHLogic.TIER_LABELS[tier])}</span></td>
-        <td data-label="Stage">${esc(STAGE_LABELS[stage] || stage)}${stage === 'completed' && t.needs_medication && t.med_done_by ? ' — meds by ' + esc(t.med_done_by) : ''}</td>
+        <td data-label="Stage"><span class="stage-pill stage-${stage}">${esc(STAGE_LABELS[stage] || stage)}</span>${stage === 'completed' && t.needs_medication && t.med_done_by ? ' — meds by ' + esc(t.med_done_by) : ''}</td>
         <td data-label="Reason">${reasonCellHtml(t)}</td>
         <td data-label="Flagged">${esc(fmtFlagged(t.created_at))}</td>
         <td data-label="Time left">${isCompleted ? '—' : statusChipHtml(t)}</td>
@@ -876,21 +937,28 @@
   }
   function allFlags() { const r = birthingReason(); return selectedFlags().concat(r ? [r] : []); }
   function updateTierPreview() {
-    const tier = LDHLogic.pickTier(document.getElementById('req-urgency-pick').value, allFlags());
+    const pick = document.getElementById('req-urgency-pick'); pick.className = 'tier-' + LDHLogic.normTier(pick.value);
+    const tier = LDHLogic.pickTier(pick.value, allFlags());
     document.getElementById('req-tier-preview').textContent = LDHLogic.TIER_LABELS[tier] + ' — check ' + LDHLogic.TIER_TARGETS[tier];
+  }
+  function syncTriageCount() {
+    const n = document.querySelectorAll('.req-flag:checked').length, el = document.getElementById('tri-count');
+    el.textContent = n; el.classList.toggle('on', n > 0);
+    if (n) document.getElementById('triage-drawer').open = true;
   }
   function renderRedFlagForm() {
     const wrap = document.getElementById('req-redflags');
     wrap.innerHTML = LDHLogic.EMERGENCY_SIGNS.map(f =>
-      `<label style="display:flex; align-items:center; gap:6px; font-size:0.82rem; margin:0;"><input type="checkbox" class="req-flag" value="${f.key}" style="width:auto; margin:0;"> ${esc(f.label)}</label>`).join('');
+      `<label class="req-chip"><input type="checkbox" class="req-flag" value="${f.key}">${esc(f.label)}</label>`).join('');
     wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', updateTierPreview));
+    wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', syncTriageCount));
     updateTierPreview();
   }
   function nowLocalInput() {
     const d = new Date();
     return LDHLogic.localISO(d) + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   }
-  const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Transport' };
+  const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Dog transport' };
   function applyNrDefaultLocation() {
     document.getElementById('nr-location').value = NR_DEFAULT_LOCATION[document.getElementById('nr-species').value] || 'FIR Room';
   }
@@ -947,7 +1015,7 @@
   function renderDiseaseWatch() {
     const card = document.getElementById('disease-watch');
     if (!LOCATION_ROWS.length) { card.style.display = 'none'; return; }
-    const survey = LDHLogic.buildSurvey(TASKS, LOCATION_ROWS, LDHLogic.windowStart('3d', Date.now()));
+    const survey = LDHLogic.buildSurvey(TASKS, LOCATION_ROWS, LDHLogic.windowStart('30d', Date.now()));
     document.getElementById('disease-watch-map').innerHTML = SurveillanceView.heatMapHtml(survey) + SurveillanceView.unmappedHtml(survey);
     card.style.display = 'block';
   }
@@ -965,7 +1033,10 @@
   (function () {
     const KEY = 'ldh_staff_initials_v1', el = document.getElementById('sr-initials');
     el.value = OpsCore.readInitials(KEY);
-    el.addEventListener('change', () => { el.value = el.value.trim().toUpperCase(); OpsCore.saveInitials(KEY, el.value); OpsCore.saveInitials('ldh_behaviour_initials_v1', el.value); });
+    const who = document.getElementById('sr-who'), state = document.getElementById('sr-who-state');
+    const paint = () => { const v = el.value.trim(); who.classList.toggle('filled', !!v); state.textContent = v ? '\u2713 saved' : ''; };
+    el.addEventListener('input', paint); paint();
+    el.addEventListener('change', () => { el.value = el.value.trim().toUpperCase(); paint(); OpsCore.saveInitials(KEY, el.value); OpsCore.saveInitials('ldh_behaviour_initials_v1', el.value); });
     window.staffInitials = () => el.value.trim().toUpperCase();
   })();
 
@@ -992,7 +1063,7 @@
       const msg = LDHLogic.behaviourValidate({ kind, animalId: $('bk-animal').value, location, reason: $('bk-reason').value });
       if (msg) return fail(msg);
       const who = window.staffInitials();
-      if (!who) return fail('Enter your initials (top of this card) so the team knows who sent it.');
+      if (!who) return fail('Enter your initials (top of the page) so the team knows who sent it.');
       const btn = $('bk-submit'); btn.disabled = true;
       const lane = $('bk-tl').checked ? 'tl' : 'incoming';
       const { error } = await sb.from('behaviour_tasks').insert({ requested_by_role: 'staff', kind, animal_id: $('bk-animal').value.trim(), location, lane,

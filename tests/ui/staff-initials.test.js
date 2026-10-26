@@ -19,7 +19,7 @@ const t = require('./check')('staff-initials');
     // the flag form: initials go on the vet request, and a routine request with initials is still a plain routine request
     await s.page.fill('#sr-initials', 'cd'); await s.page.dispatchEvent('#sr-initials', 'change');
     await s.page.click('.sr-tab[data-sr="vets"]');
-    await s.page.fill('#req-title', 'INI-1'); await s.page.check('input.req-flag[value="bleeding_wound"]');
+    await s.page.fill('#req-title', 'INI-1'); await s.page.evaluate(() => { document.getElementById('triage-drawer').open = true; }); await s.page.check('input.req-flag[value="bleeding_wound"]');
     await s.page.click('#req-submit');
     await s.page.waitForFunction(() => window.__db.tasks.length === 1);
     t.ok(/sent by CD/.test((await s.db()).tasks[0].problem), 'a flagged request shows who sent it: ' + (await s.db()).tasks[0].problem);

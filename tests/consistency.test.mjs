@@ -13,7 +13,9 @@ test('the migration seeds exactly the spaces the flag form offers (same names; o
   assert.equal(new Set(L.LOCATIONS).size, L.LOCATIONS.length, 'no duplicate names in LOCATIONS');
   // Order is presentation only: the dropdown keeps its familiar order, the heat map orders by the migration's sort column.
   // Offsite is a flag-form option only: it has no cages, so it is not a heat-map space.
-  assert.deepEqual([...names].sort(), L.LOCATIONS.filter(n => !L.OFFSITE_NAMES.includes(n)).sort());
+  // Dog transport / Cat transport are two flag-form choices that share the one 'Transport' space (L.SUB_SPACES).
+  const spaces = [...new Set(L.LOCATIONS.filter(n => !L.OFFSITE_NAMES.includes(n)).map(n => L.SUB_SPACES[n] || n))];
+  assert.deepEqual([...names].sort(), spaces.sort());
 });
 
 test('the migration allows exactly the reported signs the JS knows about', () => {
