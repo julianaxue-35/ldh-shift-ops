@@ -218,6 +218,19 @@ test('buildSurvey: each space lists every condition reported (with animal IDs) a
   assert.deepEqual(s1.top3.map(c => c.key), ['cat_flu', 'diarrhoea', 'vomiting'], 'top 3 only; ties keep the usual sign order');
   assert.deepEqual(L.buildSurvey([], LOC, since).spaces[0].top3, []);
 });
+test('buildSurvey: per-condition top 3 spaces and the space where each is most prevalent', () => {
+  const since = new Date(NOW - 3 * 24 * H);
+  const tasks = [
+    trow('A1', 'Cat Room 1 / 4', 'cat_flu', 1 * H), trow('A2', 'Cat Room 1 / 5', 'cat_flu', 1 * H),
+    trow('B1', 'Cat Room 2 / 1', 'cat_flu', 1 * H), trow('B2', 'Cat Room 2 / 2', 'cat_flu', 1 * H), trow('B3', 'Cat Room 2 / 3', 'cat_flu', 1 * H),
+    trow('C1', 'Pound 2 / 7', 'cat_flu', 1 * H), trow('D1', 'Pound 2 / 8', 'vomiting', 1 * H)
+  ];
+  const r = L.buildSurvey(tasks, LOC, since);
+  const flu = r.byCondition.find(c => c.key === 'cat_flu');
+  assert.deepEqual(flu.top3.map(s => [s.name, s.animals]), [['Cat Room 2', 3], ['Cat Room 1', 2], ['Pound 2', 1]]);
+  assert.equal(flu.peak.name, 'Cat Room 2', 'most animals per cage');
+  assert.equal(r.byCondition.find(c => c.key === 'vomiting').peak.name, 'Pound 2');
+});
 test('buildSurvey with no data gives zero rates, not errors', () => {
   const r = L.buildSurvey([], LOC, new Date(NOW - 3 * 24 * H));
   assert.equal(r.totalCases, 0);

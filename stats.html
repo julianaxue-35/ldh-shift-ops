@@ -295,6 +295,14 @@
       <div id="heat-map"></div>
       <h3 style="font-size:0.85rem; margin:16px 0 6px;">What was reported in each space</h3>
       <div id="heat-rooms"></div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:16px 0 6px;">
+        <h3 style="font-size:0.85rem; margin:0;">Each condition by space (cases flagged)</h3>
+        <span class="no-print"><button class="secondary" id="cond-expand" style="margin:0; padding:4px 10px; font-size:0.75rem;">Expand all</button>
+        <button class="secondary" id="cond-collapse" style="margin:0 0 0 4px; padding:4px 10px; font-size:0.75rem;">Collapse all</button></span>
+      </div>
+      <div id="heat-cond-charts"></div>
+      <h3 style="font-size:0.85rem; margin:16px 0 6px;">Where each condition is most prevalent (flagged animals as a share of that space's cages)</h3>
+      <div id="heat-prevalence"></div>
       <h3 style="font-size:0.85rem; margin:16px 0 6px;">By group</h3>
       <div id="heat-groups"></div>
       <h3 style="font-size:0.85rem; margin:16px 0 6px;">Most commonly reported</h3>
@@ -582,12 +590,12 @@
       `<h1 style="font-size:1.2rem;margin:0 0 4px;">Disease surveillance report</h1><p style="margin:0 0 12px;">${esc(WINDOW_LABELS[key] || key)} · generated ${esc(new Date().toLocaleString('en-AU'))} · LDH Cranbourne</p>`;
     if (SURVEY_ERROR) {   // never show a clean all-zero board when the data did not load
       el('heat-map').innerHTML = `<p class="empty-state">Could not load the flagged requests: ${esc(SURVEY_ERROR)}</p>`;
-      ['heat-groups', 'heat-rooms', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      ['heat-groups', 'heat-rooms', 'heat-cond-charts', 'heat-prevalence', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
       return;
     }
     if (!SURVEY_LOCATIONS.length) {
       el('heat-map').innerHTML = '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
-      ['baseline-banner', 'heat-groups', 'heat-rooms', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      ['baseline-banner', 'heat-groups', 'heat-rooms', 'heat-cond-charts', 'heat-prevalence', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
       return;
     }
     const since = LDHLogic.windowStart(key, Date.now());
@@ -595,6 +603,8 @@
     el('baseline-banner').innerHTML = SurveillanceView.baselineHtml(LDHLogic.baselineStatus(SNAPSHOT_DATES), SNAPSHOT_LAST);
     el('heat-map').innerHTML = SurveillanceView.heatMapHtml(survey);
     el('heat-rooms').innerHTML = SurveillanceView.roomsHtml(survey);
+    el('heat-cond-charts').innerHTML = SurveillanceView.conditionChartsHtml(survey);
+    el('heat-prevalence').innerHTML = SurveillanceView.prevalenceHtml(survey);
     el('heat-groups').innerHTML = SurveillanceView.groupsHtml(survey);
     el('heat-ranked').innerHTML = SurveillanceView.rankedHtml(survey);
     const capNote = SURVEY_ROWS_RETURNED >= 1000 ? '<p class="subtle">Showing the most recent 1000 flagged requests — older ones in this window are not included.</p>' : '';
@@ -602,6 +612,12 @@
   }
   document.getElementById('surv-window').addEventListener('change', renderSurvey);
 
+  // The exported report always shows every condition's graph: open them all for printing, then put them back as they were.
+  let condOpenState = null;
+  window.addEventListener('beforeprint', () => { condOpenState = Array.from(document.querySelectorAll('.cond-chart')).map(d => d.open); document.querySelectorAll('.cond-chart').forEach(d => { d.open = true; }); });
+  window.addEventListener('afterprint', () => { if (condOpenState) document.querySelectorAll('.cond-chart').forEach((d, i) => { d.open = !!condOpenState[i]; }); condOpenState = null; });
+  document.getElementById('cond-expand').addEventListener('click', () => document.querySelectorAll('.cond-chart').forEach(d => { d.open = true; }));
+  document.getElementById('cond-collapse').addEventListener('click', () => document.querySelectorAll('.cond-chart').forEach(d => { d.open = false; }));
   document.getElementById('report-export').addEventListener('click', () => window.print());
   document.getElementById('surveillance-export').addEventListener('click', async () => {
     const monthStr = document.getElementById('surveillance-month').value;
