@@ -757,3 +757,12 @@ test('dailyAverage: per working day (S&I every day, Processing Mon-Fri, Surgery 
   assert.equal(L.dailyAverage(['2026-11-04T09:00:00'], 'month', wedNov, 'weekdays').days, 3);
   assert.equal(L.dailyAverage([], 'week', new Date('2026-10-26T06:00:00').getTime(), 'weekdays').avg, null, 'Monday morning, nothing done yet: no average yet');
 });
+
+test('isStaffRequest: staff-form requests only (not checks, nurse tasks / results or Behaviour requests)', () => {
+  assert.equal(L.isStaffRequest({ type: 'shelter', problem: 'Sneezing and eye discharge' }), true);
+  assert.equal(L.isStaffRequest({ type: 'foster', problem: null }), true);
+  assert.equal(L.isStaffRequest({ type: 'check_recheck', problem: 'x' }), false);
+  assert.equal(L.isStaffRequest({ type: 'shelter', problem: 'Task for vets from nurse \u2014 check the eye.' }), false);
+  assert.equal(L.isStaffRequest({ type: 'shelter', problem: 'Result back from nurse \u2014 FIV test: negative.' }), false);
+  assert.equal(L.isStaffRequest({ type: 'shelter', problem: 'Behaviour team request \u2014 dispense shelter stress medication' }), false);
+});
