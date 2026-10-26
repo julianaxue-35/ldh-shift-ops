@@ -291,22 +291,12 @@
         <input type="month" id="surveillance-month" style="margin:0; width:auto;">
         <button class="secondary" id="surveillance-export" style="margin:0;">Download case list (CSV)</button>
       </div>
-      <h3 style="font-size:0.85rem; margin:16px 0 8px;">Heat map — share of cages with a flagged animal</h3>
-      <div id="heat-map"></div>
-      <h3 style="font-size:0.85rem; margin:16px 0 6px;">What was reported in each space</h3>
-      <div id="heat-rooms"></div>
-      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:16px 0 6px;">
-        <h3 style="font-size:0.85rem; margin:0;">Each condition by space (cases flagged)</h3>
-        <span class="no-print"><button class="secondary" id="cond-expand" style="margin:0; padding:4px 10px; font-size:0.75rem;">Expand all</button>
-        <button class="secondary" id="cond-collapse" style="margin:0 0 0 4px; padding:4px 10px; font-size:0.75rem;">Collapse all</button></span>
+      <div class="surv-tabs no-print" role="tablist" aria-label="Species">
+        <button type="button" class="surv-tab" role="tab" data-sp="cats" aria-selected="true">Cats</button>
+        <button type="button" class="surv-tab" role="tab" data-sp="dogs" aria-selected="false">Dogs</button>
+        <button type="button" class="surv-tab" role="tab" data-sp="rabbits" aria-selected="false">Rabbits</button>
       </div>
-      <div id="heat-cond-charts"></div>
-      <h3 style="font-size:0.85rem; margin:16px 0 6px;">Where each condition is most prevalent (flagged animals as a share of that space's cages)</h3>
-      <div id="heat-prevalence"></div>
-      <h3 style="font-size:0.85rem; margin:16px 0 6px;">By group</h3>
-      <div id="heat-groups"></div>
-      <h3 style="font-size:0.85rem; margin:16px 0 6px;">Most commonly reported</h3>
-      <div id="heat-ranked"></div>
+      <div id="surv-dash"></div>
       <div id="heat-notes"></div>
     </section>
 
@@ -583,32 +573,31 @@
     }
   }
 
+  let SURV_SPECIES = 'cats';
   function renderSurvey() {
     const key = document.getElementById('surv-window').value;
     const el = (id) => document.getElementById(id);
     el('report-head').innerHTML =
       `<h1 style="font-size:1.2rem;margin:0 0 4px;">Disease surveillance report</h1><p style="margin:0 0 12px;">${esc(WINDOW_LABELS[key] || key)} · generated ${esc(new Date().toLocaleString('en-AU'))} · LDH Cranbourne</p>`;
     if (SURVEY_ERROR) {   // never show a clean all-zero board when the data did not load
-      el('heat-map').innerHTML = `<p class="empty-state">Could not load the flagged requests: ${esc(SURVEY_ERROR)}</p>`;
-      ['heat-groups', 'heat-rooms', 'heat-cond-charts', 'heat-prevalence', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      el('surv-dash').innerHTML = `<p class="empty-state">Could not load the flagged requests: ${esc(SURVEY_ERROR)}</p>`;
+      el('heat-notes').innerHTML = '';
       return;
     }
     if (!SURVEY_LOCATIONS.length) {
-      el('heat-map').innerHTML = '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
-      ['baseline-banner', 'heat-groups', 'heat-rooms', 'heat-cond-charts', 'heat-prevalence', 'heat-ranked', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
+      el('surv-dash').innerHTML = '<p class="empty-state">The spaces list is not set up yet (run migration 0009).</p>';
+      ['baseline-banner', 'heat-notes'].forEach(id => { el(id).innerHTML = ''; });
       return;
     }
     const since = LDHLogic.windowStart(key, Date.now());
     const survey = LDHLogic.buildSurvey(SURVEY_TASKS, SURVEY_LOCATIONS, since);
     el('baseline-banner').innerHTML = SurveillanceView.baselineHtml(LDHLogic.baselineStatus(SNAPSHOT_DATES), SNAPSHOT_LAST);
-    el('heat-map').innerHTML = SurveillanceView.heatMapHtml(survey);
-    el('heat-rooms').innerHTML = SurveillanceView.roomsHtml(survey);
-    el('heat-cond-charts').innerHTML = SurveillanceView.conditionChartsHtml(survey);
-    el('heat-prevalence').innerHTML = SurveillanceView.prevalenceHtml(survey);
-    el('heat-groups').innerHTML = SurveillanceView.groupsHtml(survey);
-    el('heat-ranked').innerHTML = SurveillanceView.rankedHtml(survey);
+    const bySp = LDHLogic.surveyBySpecies(SURVEY_TASKS, SURVEY_LOCATIONS, since);
+    el('surv-dash').innerHTML = Object.keys(bySp).map(k => `<div class="surv-pane${k === SURV_SPECIES ? ' on' : ''}" data-sp="${k}"><h3 class="surv-pane-title">${esc(bySp[k].label)}</h3>${SurveillanceView.dashboardHtml(bySp[k])}</div>`).join('');
     const capNote = SURVEY_ROWS_RETURNED >= 1000 ? '<p class="subtle">Showing the most recent 1000 flagged requests — older ones in this window are not included.</p>' : '';
-    el('heat-notes').innerHTML = capNote + SurveillanceView.unmappedHtml(survey) + SurveillanceView.caveatHtml();
+    const inTabs = Object.keys(bySp).reduce((n, k) => n + bySp[k].survey.totalCases, 0), elsewhere = survey.totalCases - inTabs;
+    const elseNote = elsewhere > 0 ? `<p class="subtle">${elsewhere} more case${elsewhere === 1 ? ' was' : 's were'} flagged in spaces that are not in the Cats, Dogs or Rabbits tabs (Transport, Pathway, Vet clinic, Office, Offsite), so ${elsewhere === 1 ? 'it is' : 'they are'} not shown above.</p>` : '';
+    el('heat-notes').innerHTML = capNote + elseNote + SurveillanceView.unmappedHtml(survey) + SurveillanceView.caveatHtml();
   }
   document.getElementById('surv-window').addEventListener('change', renderSurvey);
 
@@ -616,8 +605,18 @@
   let condOpenState = null;
   window.addEventListener('beforeprint', () => { condOpenState = Array.from(document.querySelectorAll('.cond-chart')).map(d => d.open); document.querySelectorAll('.cond-chart').forEach(d => { d.open = true; }); });
   window.addEventListener('afterprint', () => { if (condOpenState) document.querySelectorAll('.cond-chart').forEach((d, i) => { d.open = !!condOpenState[i]; }); condOpenState = null; });
-  document.getElementById('cond-expand').addEventListener('click', () => document.querySelectorAll('.cond-chart').forEach(d => { d.open = true; }));
-  document.getElementById('cond-collapse').addEventListener('click', () => document.querySelectorAll('.cond-chart').forEach(d => { d.open = false; }));
+  document.getElementById('surveillance-section').addEventListener('click', (e) => {
+    const tab = e.target.closest('.surv-tab');
+    if (tab) {
+      SURV_SPECIES = tab.dataset.sp;
+      document.querySelectorAll('.surv-tab').forEach(b => b.setAttribute('aria-selected', String(b === tab)));
+      document.querySelectorAll('.surv-pane').forEach(p => p.classList.toggle('on', p.dataset.sp === SURV_SPECIES));
+      return;
+    }
+    const pane = e.target.closest('.surv-pane');
+    if (pane && e.target.closest('.cond-expand')) pane.querySelectorAll('.cond-chart').forEach(d => { d.open = true; });
+    if (pane && e.target.closest('.cond-collapse')) pane.querySelectorAll('.cond-chart').forEach(d => { d.open = false; });
+  });
   document.getElementById('report-export').addEventListener('click', () => window.print());
   document.getElementById('surveillance-export').addEventListener('click', async () => {
     const monthStr = document.getElementById('surveillance-month').value;
