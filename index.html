@@ -231,6 +231,7 @@
   .sr-form label .req { color: var(--critical); }
   .sr-form input, .sr-form select, .sr-form textarea { background: #f5f7fa; }
   .sr-form .sr-wide, .sr-form .sr-span2 { grid-column: 1 / -1; }
+  .dt-pair { display: flex; gap: 8px; } .dt-pair input, .dt-pair select { margin: 0; flex: 1 1 0; min-width: 0; }
   #new-request-form .sr-form .sr-span2 { grid-column: auto; }
   .sr-form textarea { min-height: 84px; resize: vertical; font: inherit; }
   select.tier-routine { color: #1b7a4f; font-weight: 700; }
@@ -459,9 +460,9 @@
             <option value="today">Within today</option>
             <option value="24_48h">Within 24–48 hours</option>
           </select></label>
-          <span id="nr-arrived-wrap" class="nr-grp"><label>Arrived<input id="nr-arrived" type="datetime-local" step="1800"></label>
+          <span id="nr-arrived-wrap" class="nr-grp"><label>Arrived (to the hour)<span class="dt-pair"><input id="nr-arrived-date" type="date"><select id="nr-arrived-hour" aria-label="Arrival hour"></select></span></label>
           <button class="secondary" id="nr-now" type="button">Arrived now</button></span>
-          <label id="nr-expected-wrap" style="display:none;">Expected arrival<input id="nr-expected" type="datetime-local" step="1800"></label>
+          <label id="nr-expected-wrap" style="display:none;">Expected arrival (every 15 min)<span class="dt-pair"><input id="nr-expected-date" type="date"><select id="nr-expected-time" aria-label="Expected arrival time"></select></span></label>
           <label class="sr-wide">Reason / note (optional)<input id="nr-note" placeholder="e.g. from transport van 2"></label>
         </div>
         <button id="nr-submit" type="button" class="sr-send">Send to nurses</button>
@@ -1035,17 +1036,18 @@
     wrap.querySelectorAll('.req-flag').forEach(cb => cb.addEventListener('change', syncTriageCount));
     updateTierPreview();
   }
-  function nowLocalInput() {
-    const d = new Date();
-    return LDHLogic.localISO(d) + 'T' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  }
   const NR_DEFAULT_LOCATION = { cat: 'FIR Room', dog: 'Dog transport' };
   function applyNrDefaultLocation() {
     document.getElementById('nr-location').value = NR_DEFAULT_LOCATION[document.getElementById('nr-species').value] || 'FIR Room';
   }
   document.getElementById('nr-species').addEventListener('change', applyNrDefaultLocation);
-  document.getElementById('nr-arrived').value = nowLocalInput();
-  document.getElementById('nr-now').addEventListener('click', () => { document.getElementById('nr-arrived').value = nowLocalInput(); });
+  // Arrival is to the HOUR (2 pm, 3 pm: no minutes); a scheduled arrival is picked every 15 minutes (a cat due about 2:48 is set to 3 pm).
+  const clock12 = (h, m) => ((h % 12) || 12) + (m ? ':' + String(m).padStart(2, '0') : '') + (h < 12 ? ' am' : ' pm');
+  document.getElementById('nr-arrived-hour').innerHTML = Array.from({ length: 24 }, (_, h) => `<option value="${String(h).padStart(2, '0')}">${clock12(h, 0)}</option>`).join('');
+  document.getElementById('nr-expected-time').innerHTML = '<option value="">Time\u2026</option>' + Array.from({ length: 96 }, (_, i) => { const h = Math.floor(i / 4), m = (i % 4) * 15; return `<option value="${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}">${clock12(h, m)}</option>`; }).join('');
+  function setArrivedNow() { const d = new Date(); document.getElementById('nr-arrived-date').value = LDHLogic.localISO(d); document.getElementById('nr-arrived-hour').value = String(d.getHours()).padStart(2, '0'); }
+  setArrivedNow();
+  document.getElementById('nr-now').addEventListener('click', setArrivedNow);
   // Scheduled arrival (2026-09-26): an alternative to "it's here now" — log
   // an animal that hasn't arrived yet (e.g. "8 cats at 2pm") so nurses see
   // it coming, instead of only ever logging an arrival after the fact.
@@ -1069,13 +1071,15 @@
         created_by: 'Shelter Staff' + (window.staffInitials() ? ' (' + window.staffInitials() + ')' : '')
       };
       if (scheduled) {
-        const expectedRaw = document.getElementById('nr-expected').value;
-        if (!expectedRaw) { alert('Enter the expected arrival time.'); return; }
+        const expDate = document.getElementById('nr-expected-date').value, expTime = document.getElementById('nr-expected-time').value;
+        if (!expDate || !expTime) { alert('Enter the expected arrival date and time.'); return; }
+        const expectedRaw = expDate + 'T' + expTime;
         payload.arrived_at = null;
         payload.expected_at = new Date(expectedRaw).toISOString();
       } else {
-        const arrivedRaw = document.getElementById('nr-arrived').value;
-        if (!arrivedRaw) { alert('Enter the arrival time (or tap "Arrived now").'); return; }
+        const arrDate = document.getElementById('nr-arrived-date').value;
+        if (!arrDate) { alert('Enter the arrival date and hour (or tap "Arrived now").'); return; }
+        const arrivedRaw = arrDate + 'T' + document.getElementById('nr-arrived-hour').value + ':00';
         payload.arrived_at = new Date(arrivedRaw).toISOString();
       }
       const { error } = await sb.from('nurse_requests').insert(payload);
@@ -1084,8 +1088,8 @@
       document.getElementById('nr-count').value = '1';
       applyNrDefaultLocation();
       document.getElementById('nr-note').value = '';
-      document.getElementById('nr-arrived').value = nowLocalInput();
-      document.getElementById('nr-expected').value = '';
+      setArrivedNow();
+      document.getElementById('nr-expected-date').value = ''; document.getElementById('nr-expected-time').value = '';
       document.getElementById('nr-scheduled-toggle').checked = false;
       document.getElementById('nr-arrived-wrap').style.display = '';
       document.getElementById('nr-expected-wrap').style.display = 'none';
