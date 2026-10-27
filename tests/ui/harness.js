@@ -9,7 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test', behaviour: 'b
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -33,6 +33,7 @@ const STUB = `
     vacc_list: () => ({}),
     aa_done_log: () => ({ completed_at: now() }),
     behaviour_tasks: () => ({ lane: 'incoming', status: 'open', courthold: false, history: [], created_at: now() }),
+    fsa_cats: () => ({ status: 'active', data: {}, created_at: now(), updated_at: now() + '' }),
     aa_items: () => ({ payload: {}, sent_at: now(), done_ids: [], completed_at: null })
   };
   // Mirrors the tasks_hold_medication trigger (0010_round3.sql): a medication
@@ -83,7 +84,7 @@ const STUB = `
             }
             data = payload.map(p => hold(Object.assign({ id: uuid() }, defaults[name](), p))); data.forEach(d => { rows.push(d); logFlag(d); });
           }
-          else if (op === 'update') { data = match(); data.forEach(r => { const before = r.created_at; hold(Object.assign(r, payload)); if (name === 'behaviour_tasks' && r.status === 'done') r.attached_note = null; if (payload && payload.created_at && payload.created_at !== before) logFlag(r); }); }
+          else if (op === 'update') { data = match(); data.forEach(r => { const before = r.created_at; hold(Object.assign(r, payload)); if (name === 'fsa_cats') r.updated_at = new Date(Date.now() + Math.random()).toISOString(); if (name === 'behaviour_tasks' && r.status === 'done') r.attached_note = null; if (payload && payload.created_at && payload.created_at !== before) logFlag(r); }); }
           else if (op === 'upsert') {
             data = payload.map(p => {
               const existing = rows.find(r => conflictCols.every(c => r[c] === p[c]));
