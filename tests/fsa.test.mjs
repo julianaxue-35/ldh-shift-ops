@@ -128,3 +128,11 @@ test('vet note carries the cage, FSA result, points, FAS and behaviour notes on 
   assert.match(n, /Day 1 points 27, Day 2 points 25\. FAS 4\. Behaviour: Day 1 - hiding\. Day 2 - on den\.$/);
   assert.match(F.vetNote(cat({}, { cage: 3 })), /Day 1 points not scored.*Behaviour: no notes yet$/);
 });
+
+test('log outcome: graduate, 1-4 once both mornings are scored, otherwise unscored', () => {
+  assert.equal(F.logOutcome(cat({ s1: { ticks: tick(F.tickId('A', 'all', 'rub')) } })), 'graduate');
+  assert.equal(F.logOutcome(cat({ s1: { answers: { a_noeat: true, a_aff: true, c_head: true } }, s3: { answers: { a_eye: true, b_alert: true, b_back: true } } })), '1');
+  assert.equal(F.logOutcome(cat({ s1: { answers: { a_noeat: false } }, s3: { answers: { a_eye: false } } })), '4');
+  assert.equal(F.logOutcome(cat({ s1: { answers: { a_noeat: true } } })), 'unscored');   // Day 2 not scored: provisional only
+  assert.equal(F.logOutcome(cat({})), 'unscored');
+});

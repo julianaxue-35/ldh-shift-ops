@@ -7,6 +7,10 @@ const D = 24 * 3600e3;
     { id: 'c5', status: 'active', updated_at: ago(1000), cage: 5, animal_id: 'FICT-5', intake_at: ago(2 * D), intake_type: 'stray', description: 'grey DSH', data: { sessions: {} } },
     { id: 'c9', status: 'active', updated_at: ago(1000), cage: 9, animal_id: 'FICT-9', intake_at: ago(6 * D), data: { sessions: { s1: { doneAt: ago(5 * D), by: 'AB' }, s2: { doneAt: ago(5 * D), by: 'AB' }, s3: { doneAt: ago(4 * D), by: 'AB' }, s4: { doneAt: ago(4 * D), by: 'AB' } } } },
     { id: 'c31', status: 'active', updated_at: ago(1000), cage: 31, animal_id: 'FICT-31', intake_at: ago(60e3), data: { sessions: {} } }
+  ], fsa_log: [
+    { cat_id: '00000000-0000-0000-0000-000000000001', intake_at: ago(3600e3), completed_at: ago(1800e3), outcome: 'graduate' },
+    { cat_id: '00000000-0000-0000-0000-000000000002', intake_at: ago(3600e3), completed_at: ago(1800e3), outcome: '2' },
+    { cat_id: '00000000-0000-0000-0000-000000000003', intake_at: ago(3600e3 * 2), completed_at: ago(1800e3), outcome: '4' }
   ] }, 'behaviour.html');
   const p = b.page;
   const openSec = (k) => p.evaluate((k) => { const d = document.querySelector('#fir-drawer details.sec[data-sec="' + k + '"]'); if (!d.open) d.open = true; }, k);
@@ -25,6 +29,13 @@ const D = 24 * 3600e3;
     t.ok(/Cage 9 \u00B7 FICT-9 \u2014 notes are not in ShelterMate yet/.test(bn), 'and of notes still not in ShelterMate two days after the final assessment');
     t.ok((await p.getAttribute(cage(9), 'class')).includes('late'), 'those cages are outlined in red on the map');
     t.ok(await p.locator(cage(31)).getAttribute('class').then(c => !c.includes('late')), 'a cat that arrived today has nothing to pick up');
+    // numbers over time (counts only)
+    t.ok(await p.locator('#fir-stats-wrap .tc-svg').count() === 1 && await p.locator('#fir-stats-wrap [data-fperiod]').count() === 4, 'the bottom of the FIR tab has a chart with Week / Month / Quarter / Year');
+    await p.click('[data-fperiod="year"]');
+    const yr = await p.textContent('#fir-stats-wrap');
+    t.ok(/6 cats arrived this year/.test(yr) && /FSA graduate \(social\) 1/.test(yr) && /FSA 2 \u2013 likely 1/.test(yr) && /FSA 4 \u2013 extremely unlikely 1/.test(yr) && /In progress \/ not scored 3/.test(yr), 'it counts the cats that arrived by FSA result, including the ones still in the room: ' + yr.replace(/\s+/g, ' ').slice(0, 220));
+    await p.click('[data-fperiod="week"]'); t.ok(await p.locator('[data-fperiod="week"].on').count() === 1 && /cats? arrived this week/.test(await p.textContent('#fir-stats-total')), 'the period buttons switch the chart');
+    await p.click('[data-fperiod="month"]');
     t.ok(/Start of the day/.test(await p.textContent('#fir-whowhy')), 'the tab asks for the staff initials at the start of the day');
     await p.fill('#fir-who', 'ab'); await p.dispatchEvent('#fir-who', 'change');
     t.ok((await p.inputValue('#bh-initials')) === 'AB' && /go on the assessments/.test(await p.textContent('#fir-whowhy')), 'initials entered once on the tablet are kept for the day');
@@ -123,6 +134,8 @@ const D = 24 * 3600e3;
     // ticking "Entered in ShelterMate" completes it: the cage is available straight away
     await p.check('#fir-sm'); await p.waitForTimeout(1200);
     t.ok(!(await p.locator('#fir-drawer-ov.open').count()) && /Empty/.test(await p.textContent(cage(5))), 'ticking Entered in ShelterMate frees the cage straight away');
+    const logRow = await p.evaluate(() => window.__db.fsa_log.find(r => r.cat_id === 'c5'));
+    t.ok(logRow && logRow.outcome === '1' && !('animal_id' in logRow) && !('data' in logRow), 'completing a cat adds a counts-only log row (arrival, completed time, FSA result: no animal ID or notes)');
     const done5 = await p.evaluate(() => window.__db.fsa_cats.find(c => c.animal_id === 'FICT-5'));
     t.ok(done5.status === 'completed' && done5.data.smEntered.by === 'AB', 'the cat is marked completed with who entered it in ShelterMate');
     t.ok(/FICT-5/.test(await p.textContent('#fir-done-wrap')) && /was in cage 5/.test(await p.textContent('#fir-done-wrap')) && /deleted in 7 days/.test(await p.textContent('#fir-done-wrap')), 'it moves to Completed with its animal ID, kept for 7 days');
@@ -130,6 +143,7 @@ const D = 24 * 3600e3;
     // put it back within the 7 days
     await p.click('[data-putback][data-cage="5"]'); await p.waitForFunction(() => /FICT-5/.test(document.querySelector('.fir .cage[data-cage="5"]').textContent)); await p.waitForTimeout(300);
     const back5 = await p.evaluate(() => window.__db.fsa_cats.find(c => c.animal_id === 'FICT-5'));
+    t.ok(!(await p.evaluate(() => window.__db.fsa_log.some(r => r.cat_id === 'c5'))), 'putting it back removes its log row (it is counted again when completed)');
     t.ok(back5.status === 'active' && !back5.data.smEntered && back5.data.sessions.s1.ticks['A.all.reach'], 'Put back returns it to its cage with its assessments, ready to be ticked again');
     // a cat added by mistake (nothing recorded) can be removed
     await p.click(cage(12)); await p.fill('#fir-add-id', 'FICT-OOPS'); await p.click('#fir-add-save'); await p.waitForSelector(cage(12) + ':has-text("FICT-OOPS")');
