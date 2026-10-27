@@ -610,7 +610,7 @@
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart),
+      sb.from('tasks').select('title, shift, completed_at').eq('done', true).gte('completed_at', yearStart),
       sb.from('flag_history').select('*').gte('flagged_at', new Date(Date.now() - 92 * 86400000).toISOString()),
     ]);
     HISTORY = histRes.error ? [] : (histRes.data || []);   // a nice-to-have: the page works without it

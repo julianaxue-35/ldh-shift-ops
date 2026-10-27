@@ -766,3 +766,14 @@ test('isStaffRequest: staff-form requests only (not checks, nurse tasks / result
   assert.equal(L.isStaffRequest({ type: 'shelter', problem: 'Result back from nurse \u2014 FIV test: negative.' }), false);
   assert.equal(L.isStaffRequest({ type: 'shelter', problem: 'Behaviour team request \u2014 dispense shelter stress medication' }), false);
 });
+
+test('TEST animals (TEST1, test 2, TEST-3) are never counted', () => {
+  for (const id of ['TEST1', 'test 2', ' TEST-3 ', 'Test_14']) assert.equal(L.isTestAnimal(id), true, id);
+  for (const id of ['TESTY1', 'TEST', 'A123456', '', null, 'TEST1A']) assert.equal(L.isTestAnimal(id), false, String(id));
+  const now = Date.now(), iso = new Date(now).toISOString();
+  const rows = ['TEST1', 'A100'].map(title => ({ title, shift: 'processing', done: true, created_at: iso, completed_at: iso, location: 'X' }));
+  assert.equal(L.todayTasks(rows, now).length, 1);
+  const open = [{ title: 'TEST2', shift: 'processing', done: false, created_at: new Date(now - 2 * 86400000).toISOString(), location: 'X' }];
+  assert.equal(L.carriedOver(open, now).length, 0);
+  assert.equal(L.periodTotals(rows, now).year.total, 1);
+});

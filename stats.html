@@ -20,10 +20,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261027g"></script>
-<script src="lib/surveillance-view.js?v=20261027g"></script>
-<script src="lib/trend-chart.js?v=20261027g"></script>
-<link rel="stylesheet" href="lib/surveillance.css?v=20261027g">
+<script src="lib/ldh-logic.js?v=20261028a"></script>
+<script src="lib/surveillance-view.js?v=20261028a"></script>
+<script src="lib/trend-chart.js?v=20261028a"></script>
+<link rel="stylesheet" href="lib/surveillance.css?v=20261028a">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -421,9 +421,9 @@
   async function loadFlagged() {
     const yearStart = new Date(new Date().getFullYear(), 0, 1), out = [];
     for (let from = 0; from < 20000; from += 1000) {
-      const r = await sb.from('tasks').select('created_at, type, problem').neq('type', 'check_recheck').gte('created_at', yearStart.toISOString()).order('created_at', { ascending: false }).range(from, from + 999);
+      const r = await sb.from('tasks').select('title, created_at, type, problem').neq('type', 'check_recheck').gte('created_at', yearStart.toISOString()).order('created_at', { ascending: false }).range(from, from + 999);
       if (r.error) { FLAGGED_DATES = null; return; }
-      out.push(...(r.data || []).filter(LDHLogic.isStaffRequest).map(x => x.created_at));
+      out.push(...(r.data || []).filter(x => LDHLogic.isStaffRequest(x) && !LDHLogic.isTestAnimal(x.title)).map(x => x.created_at));
       if ((r.data || []).length < 1000) break;
     }
     FLAGGED_DATES = out;
@@ -431,8 +431,8 @@
   async function loadTrends() {
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
-    const { data, error } = await sb.from('tasks').select('shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
-    const rows = error ? [] : (data || []);
+    const { data, error } = await sb.from('tasks').select('title, shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
+    const rows = error ? [] : (data || []).filter(x => !LDHLogic.isTestAnimal(x.title));   // TEST1, TEST 2 ... are practice animals
     YEAR_ROWS = rows; // reused by renderPeriodTotals — same completed-this-year rows, no second query
 
     const monthsSoFar = now.getMonth() + 1;
@@ -503,8 +503,8 @@
   async function loadResponseRates() {
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
-    const { data, error } = await sb.from('tasks').select('shift, done, created_at').gte('created_at', yearStart.toISOString());
-    const rows = error ? [] : (data || []);
+    const { data, error } = await sb.from('tasks').select('title, shift, done, created_at').gte('created_at', yearStart.toISOString());
+    const rows = error ? [] : (data || []).filter(x => !LDHLogic.isTestAnimal(x.title));
     const monthsSoFar = now.getMonth() + 1;
     const zeros = (n) => Array.from({ length: n }, () => 0);
     const totals = { processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), surgery: zeros(monthsSoFar) };
@@ -563,7 +563,7 @@
     const { data, error } = await sb.from('tasks').select('title, location, condition, created_at')
       .gte('created_at', start.toISOString()).lt('created_at', end.toISOString());
     if (error) throw new Error(error.message);
-    return LDHLogic.summariseConditions(data || []);
+    return LDHLogic.summariseConditions((data || []).filter(x => !LDHLogic.isTestAnimal(x.title)));
   }
 
   // ---- surveillance board ----
@@ -586,7 +586,7 @@
     SURVEY_ERROR = tk.error ? (tk.error.message || 'unknown error') : null;
     SURVEY_LOCATIONS = loc.data || [];
     SURVEY_ROWS_RETURNED = pages.length >= 10000 ? 1000 : 0;   // only warn if even ten pages were not enough
-    SURVEY_TASKS = pages.filter(t => t.condition);
+    SURVEY_TASKS = pages.filter(t => t.condition && !LDHLogic.isTestAnimal(t.title));
     // Baseline day count: read ONE space's 'any' rows (one per night, so at most ~400 for a year) — reading every space
     // would hit the API's 1000-row cap after about 80 days.
     SNAPSHOT_DATES = []; SNAPSHOT_LAST = null;
