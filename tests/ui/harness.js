@@ -9,7 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test', behaviour: 'b
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [] };
+  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -33,6 +33,7 @@ const STUB = `
     vacc_list: () => ({}),
     aa_done_log: () => ({ completed_at: now() }),
     behaviour_tasks: () => ({ lane: 'incoming', status: 'open', courthold: false, history: [], created_at: now() }),
+    fsa_log: () => ({ completed_at: now() }),
     fsa_cats: () => ({ status: 'active', data: {}, created_at: now(), updated_at: now() + '' }),
     aa_items: () => ({ payload: {}, sent_at: now(), done_ids: [], completed_at: null })
   };
