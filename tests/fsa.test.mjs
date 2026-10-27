@@ -136,3 +136,10 @@ test('log outcome: graduate, 1-4 once both mornings are scored, otherwise unscor
   assert.equal(F.logOutcome(cat({ s1: { answers: { a_noeat: true } } })), 'unscored');   // Day 2 not scored: provisional only
   assert.equal(F.logOutcome(cat({})), 'unscored');
 });
+
+test('pathwayKey: the plan becomes adoption / behaviour_mod / uu for the numbers', () => {
+  assert.equal(F.pathwayKey({ data: { plan: 'General population adoption' } }), 'adoption');
+  assert.equal(F.pathwayKey({ data: { plan: 'Behaviour modification' } }), 'behaviour_mod');
+  assert.equal(F.pathwayKey({ data: { plan: 'Behavioural euthanasia' } }), 'uu');
+  assert.equal(F.pathwayKey({ data: {} }), '');
+});

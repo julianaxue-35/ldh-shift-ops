@@ -605,7 +605,7 @@
   /* ---------- data loading ---------- */
   let YTD_ROWS = [];
   async function loadAll() {
-    const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+    const yearStart = LDHLogic.statsSince(Date.now()).toISOString();
     const [tasksRes, rosterRes, lcRes, ytdRes, histRes] = await Promise.all([
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
@@ -987,7 +987,7 @@
   // scoped by device/location — every shift's completions across the year.
   function renderPeriodTotals() {
     const totals = LDHLogic.periodTotals(YTD_ROWS, Date.now());
-    const PERIOD_LABELS = { month: 'This month', quarter: 'This quarter', year: 'This year' };
+    const PERIOD_LABELS = { month: 'This month', quarter: 'This season', year: 'This year' };
     document.getElementById('period-totals-grid').innerHTML = ['month', 'quarter', 'year'].map(key => {
       const t = totals[key];
       return `<div class="totals-period">

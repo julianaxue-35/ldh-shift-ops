@@ -8,9 +8,9 @@ const D = 24 * 3600e3;
     { id: 'c9', status: 'active', updated_at: ago(1000), cage: 9, animal_id: 'FICT-9', intake_at: ago(6 * D), data: { sessions: { s1: { doneAt: ago(5 * D), by: 'AB' }, s2: { doneAt: ago(5 * D), by: 'AB' }, s3: { doneAt: ago(4 * D), by: 'AB' }, s4: { doneAt: ago(4 * D), by: 'AB' } } } },
     { id: 'c31', status: 'active', updated_at: ago(1000), cage: 31, animal_id: 'FICT-31', intake_at: ago(60e3), data: { sessions: {} } }
   ], fsa_log: [
-    { cat_id: '00000000-0000-0000-0000-000000000001', intake_at: ago(3600e3), completed_at: ago(1800e3), outcome: 'graduate' },
-    { cat_id: '00000000-0000-0000-0000-000000000002', intake_at: ago(3600e3), completed_at: ago(1800e3), outcome: '2' },
-    { cat_id: '00000000-0000-0000-0000-000000000003', intake_at: ago(3600e3 * 2), completed_at: ago(1800e3), outcome: '4' }
+    { cat_id: '00000000-0000-0000-0000-000000000001', intake_at: ago(3600e3), completed_at: ago(1800e3), outcome: 'graduate', pathway: 'adoption' },
+    { cat_id: '00000000-0000-0000-0000-000000000002', intake_at: ago(3600e3), completed_at: ago(1800e3), outcome: '2', pathway: 'behaviour_mod' },
+    { cat_id: '00000000-0000-0000-0000-000000000003', intake_at: ago(3600e3 * 2), completed_at: ago(1800e3), outcome: '4', pathway: 'uu' }
   ] }, 'behaviour.html');
   const p = b.page;
   const openSec = (k) => p.evaluate((k) => { const d = document.querySelector('#fir-drawer details.sec[data-sec="' + k + '"]'); if (!d.open) d.open = true; }, k);
@@ -30,10 +30,16 @@ const D = 24 * 3600e3;
     t.ok((await p.getAttribute(cage(9), 'class')).includes('late'), 'those cages are outlined in red on the map');
     t.ok(await p.locator(cage(31)).getAttribute('class').then(c => !c.includes('late')), 'a cat that arrived today has nothing to pick up');
     // numbers over time (counts only)
-    t.ok(await p.locator('#fir-stats-wrap .tc-svg').count() === 1 && await p.locator('#fir-stats-wrap [data-fperiod]').count() === 4, 'the bottom of the FIR tab has a chart with Week / Month / Quarter / Year');
+    t.ok(await p.locator('#fir-stats-wrap .tc-svg').count() === 2 && await p.locator('#fir-stats-wrap [data-fperiod]').count() === 4 && /Season/.test(await p.textContent('#fir-stats-wrap .fseg')) && !/Quarter/.test(await p.textContent('#fir-stats-wrap .fseg')), 'the bottom of the FIR tab has two arrival charts (FSA result, pathway) with Week / Month / Season / Year');
     await p.click('[data-fperiod="year"]');
     const yr = await p.textContent('#fir-stats-wrap');
-    t.ok(/6 cats arrived this year/.test(yr) && /FSA graduate \(social\) 1/.test(yr) && /FSA 2 \u2013 likely 1/.test(yr) && /FSA 4 \u2013 extremely unlikely 1/.test(yr) && /In progress \/ not scored 3/.test(yr), 'it counts the cats that arrived by FSA result, including the ones still in the room: ' + yr.replace(/\s+/g, ' ').slice(0, 220));
+    t.ok(/6 cats arrived this year/.test(yr) && /FSA graduate \(social\) 1/.test(yr) && /FSA 2 \u2013 likely 1/.test(yr) && /FSA 4 \u2013 extremely unlikely 1/.test(yr) && /In progress \/ not scored 3/.test(yr), 'it counts every cat that arrived by FSA result, including the ones still in the room: ' + yr.replace(/\s+/g, ' ').slice(0, 220));
+    const rings = await p.textContent('#fir-stats-wrap .fdonuts');
+    t.ok(await p.locator('#fir-stats-wrap .fdonut').count() === 2 && /FSA graduate \(social\)17%/.test(rings) && /FSA 2 \u2013 likely17%/.test(rings) && /FSA 4 \u2013 extremely unlikely17%/.test(rings) && /In progress \/ not scored50%/.test(rings), 'the rings are shares of ALL arrivals (cats still being assessed are their own slice, so it adds to 100%): ' + rings.replace(/\s+/g, ' ').slice(0, 260));
+    t.ok(/Adoption17%/.test(rings) && /Behaviour mod17%/.test(rings) && /UU17%/.test(rings) && /Not decided yet50%/.test(rings) && !/euthan/i.test(rings.replace(/extremely unlikely/g, '')), 'and where they went next: Adoption, Behaviour mod, UU, Not decided yet (never the word euthanasia)');
+    t.ok(/1 early graduate \(17% of arrivals\)/.test(await p.textContent('#fir-stats-grads')), 'it says how many cats graduated early (a white square or 4 grey circles before the assessments finished): ' + await p.textContent('#fir-stats-grads'));
+    await p.click('[data-fperiod="week"]'); t.ok(await p.locator('#fir-stats-wrap .fdonut').count() === 0 && await p.locator('#fir-stats-wrap .tc-svg').count() === 2, 'the week shows the daily charts only (too few cats for percentages)');
+    await p.click('[data-fperiod="season"]'); t.ok(/this season \((Summer|Autumn|Winter|Spring)\)/.test(await p.textContent('#fir-stats-total')) && await p.locator('#fir-stats-wrap .fdonut').count() === 2, 'the season button follows the Australian seasons and shows the rings');
     await p.click('[data-fperiod="week"]'); t.ok(await p.locator('[data-fperiod="week"].on').count() === 1 && /cats? arrived this week/.test(await p.textContent('#fir-stats-total')), 'the period buttons switch the chart');
     await p.click('[data-fperiod="month"]');
     t.ok(/Start of the day/.test(await p.textContent('#fir-whowhy')), 'the tab asks for the staff initials at the start of the day');
@@ -135,7 +141,7 @@ const D = 24 * 3600e3;
     await p.check('#fir-sm'); await p.waitForTimeout(1200);
     t.ok(!(await p.locator('#fir-drawer-ov.open').count()) && /Empty/.test(await p.textContent(cage(5))), 'ticking Entered in ShelterMate frees the cage straight away');
     const logRow = await p.evaluate(() => window.__db.fsa_log.find(r => r.cat_id === 'c5'));
-    t.ok(logRow && logRow.outcome === '1' && !('animal_id' in logRow) && !('data' in logRow), 'completing a cat adds a counts-only log row (arrival, completed time, FSA result: no animal ID or notes)');
+    t.ok(logRow && logRow.outcome === '1' && logRow.pathway === 'behaviour_mod' && !('animal_id' in logRow) && !('data' in logRow), 'completing a cat adds a counts-only log row (arrival, completed time, FSA result, pathway: no animal ID or notes)');
     const done5 = await p.evaluate(() => window.__db.fsa_cats.find(c => c.animal_id === 'FICT-5'));
     t.ok(done5.status === 'completed' && done5.data.smEntered.by === 'AB', 'the cat is marked completed with who entered it in ShelterMate');
     t.ok(/FICT-5/.test(await p.textContent('#fir-done-wrap')) && /was in cage 5/.test(await p.textContent('#fir-done-wrap')) && /deleted in 7 days/.test(await p.textContent('#fir-done-wrap')), 'it moves to Completed with its animal ID, kept for 7 days');

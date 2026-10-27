@@ -63,7 +63,7 @@ const H = 3600 * 1000;
     t.ok((await a.page.locator('#ops-nav a.active').textContent()) === 'Vets', 'sidebar nav marks Vets as current');
 
     // Column headings use the new tier labels + targets.
-    t.ok((await a.page.textContent('#col-red-h')) === 'Emergency · within 2 h', 'Emergency column heading');
+    t.ok((await a.page.textContent('#col-red-h')) === 'Emergency · within 2–4 h', 'Emergency column heading');
     t.ok((await a.page.textContent('#col-urgent-h')) === 'Urgent · within 12–24 h', 'Urgent column heading');
     t.ok((await a.page.textContent('#col-routine-h')) === 'Request checks · within 24–48 h', 'Request checks column heading');
 
@@ -161,7 +161,7 @@ const H = 3600 * 1000;
   const b = await open({ memos: [{ author: 'Shelter Staff', text: 'Cage 4 latch is loose', done: false }] }, 'vets.html');
   try {
     t.ok((await b.page.textContent('#nurse-treatments')).includes('Treatment courses in progress'), 'the treatment card lists the courses in progress');
-    t.ok(await b.page.locator('#send-request .sc-panel[data-to="nurses"] [data-f="room"] option').count() === 16, 'request card location select filled from the shared list');
+    t.ok(await b.page.locator('#send-request .sc-panel[data-to="nurses"] [data-f="room"] option').count() === 18, 'request card location select filled from the shared list');
     t.ok(await b.page.isVisible('#start-shift-card'), 'Start a shift card present');
     t.ok(await b.page.locator('#start-shift-card a.shift-launch').count() === 3, 'Start a shift links to all three shift tools');
 
@@ -455,7 +455,7 @@ const H = 3600 * 1000;
   try {
     t.ok(await m.page.locator('#nurse-misc').count() === 1 && await m.page.locator('#send-request .sc-panel[data-to="nurses"]').count() === 1, 'vets page lists nurse tasks and has the Send a request card');
     const NF = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
-    t.ok((await m.page.$$eval(NF('kind') + ' option', os => os.map(o => o.value))).join() === 'dispense,course,blood,ear_swab,fiv_test,ivft,microchip,uv,treatment,other', 'what list: dispense medication, treatment course, bloods, ear swab, FIV, cat in fluids IVFT, microchip, UV, treatment check, other');
+    t.ok((await m.page.$$eval(NF('kind') + ' option', os => os.map(o => o.value))).join() === 'dispense,course,blood,ear_swab,fiv_test,ivft,microchip,uv,tail_bandage,urine_collection,triple_test,other', 'what list: dispense medication, treatment course, bloods, ear swab, FIV, cat in fluids IVFT, microchip, UV, tail bandage, urine collection, triple test, other');
     await m.page.fill(NF('animal'), 'CAT-12');
     await m.page.selectOption(NF('room'), 'Cat Room 2');
     await m.page.selectOption(NF('kind'), 'ear_swab');

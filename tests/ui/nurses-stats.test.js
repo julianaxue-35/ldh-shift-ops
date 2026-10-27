@@ -23,7 +23,7 @@ const dayKey = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(
     t.ok(order.st > order.memo && order.after === 'nurse-stats', 'the card sits directly under the memo board');
     const w = (await n.page.textContent('[data-role="welfare"]')).replace(/\s+/g, ' ');
     t.ok(/Welfare nurse/.test(w) && />/.test('>') && /12/.test(await n.page.textContent('[data-role="welfare"] svg')), 'the Welfare ring shows today\'s count');
-    t.ok(/This year/.test(w) && /This quarter/.test(w) && /This month/.test(w) && /This week/.test(w), 'week, month, quarter and year rows are shown');
+    t.ok(/This year/.test(w) && /This season/.test(w) && /This month/.test(w) && /This week/.test(w), 'week, month, season and year rows are shown');
     const yearRow = (await n.page.textContent('[data-role="welfare"] tr[data-period="year"]')).replace(/\s+/g, ' ');
     t.ok(/30/.test(yearRow) && /10/.test(yearRow), 'year: 30 tasks over 3 working days = 10 per working day: ' + yearRow);
     t.ok(/4/.test(await n.page.textContent('[data-role="processing"] svg')), 'the Processing ring is separate');
