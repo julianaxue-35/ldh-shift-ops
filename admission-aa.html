@@ -444,7 +444,7 @@
       return false;
     }
     // count it for the progress totals (kind and number of animals only), then refresh
-    if (complete) { try { const r = await sb.from('aa_done_log').insert({ item_id: it.id, kind: it.kind, animals: it.animal_ids.length }); if (r && r.error) console.warn('aa_done_log', r.error.message); await loadAaCounts(); } catch (e) { /* the totals are a nicety */ } }
+    if (complete) { try { const r = await sb.from('aa_done_log').insert({ item_id: it.id, kind: it.kind, animals: it.animal_ids.filter(a => !LDHLogic.isTestAnimal(a)).length }); if (r && r.error) console.warn('aa_done_log', r.error.message); await loadAaCounts(); } catch (e) { /* the totals are a nicety */ } }
     await loadAll();
     return true;
   }
@@ -548,7 +548,7 @@
       const have = new Set((data || []).map(r => r.item_id));
       const missing = DONE.filter(i => !have.has(i.id) && i.animal_ids.every(a => (i.done_ids || []).indexOf(a) !== -1));
       if (!missing.length) return;
-      const { error: e2 } = await sb.from('aa_done_log').insert(missing.map(i => ({ item_id: i.id, kind: i.kind, animals: i.animal_ids.length, completed_at: i.completed_at })));
+      const { error: e2 } = await sb.from('aa_done_log').insert(missing.map(i => ({ item_id: i.id, kind: i.kind, animals: i.animal_ids.filter(a => !LDHLogic.isTestAnimal(a)).length, completed_at: i.completed_at })));
       if (!e2) { await loadAaCounts(); renderAaStats(); }
     } catch (e) { /* the totals are a nicety */ }
   }
