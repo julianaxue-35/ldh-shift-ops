@@ -36,10 +36,13 @@ const D = 24 * 3600e3;
     t.ok(/FICT-5/.test(await p.textContent(cage(5))) && /Day 1 AM due/.test(await p.textContent(cage(5))), 'a cat from two days ago shows its ID and "Day 1 AM due"');
     t.ok(/Day 0/.test(await p.textContent(cage(31))), 'a cat that arrived just now is Day 0');
     // add a cat
-    await p.click(cage(7)); await p.fill('#fir-add-id', 'FICT-7'); await p.fill('#fir-add-type', 'surrender'); await p.click('#fir-add-save');
+    await p.click(cage(7));
+    t.ok((await p.$$eval('#fir-add-hour option', os => os.length)) === 24 && (await p.inputValue('#fir-add-hour')) === String(new Date().getHours()).padStart(2, '0') && !(await p.locator('#fir-add-desc').count()), 'the arrival time is picked to the hour (defaults to this hour) and there is no description box');
+    await p.selectOption('#fir-add-hour', '14'); await p.fill('#fir-add-id', 'FICT-7'); await p.fill('#fir-add-type', 'surrender'); await p.click('#fir-add-save');
     await p.waitForFunction(() => /FICT-7/.test(document.querySelector('.fir .cage[data-cage="7"]').textContent));
     const row7 = await p.evaluate(() => window.__db.fsa_cats.find(c => c.cage === 7));
     t.ok(row7 && row7.animal_id === 'FICT-7' && row7.intake_type === 'surrender', 'adding a cat stores it against the cage');
+    t.ok(new Date(row7.intake_at).getHours() === 14 && new Date(row7.intake_at).getMinutes() === 0, 'and its arrival time is on the hour (2 pm), no minutes');
     await p.click(cage(8)); await p.fill('#fir-add-id', 'fict-7'); await p.click('#fir-add-save');
     t.ok(/already in cage 7/.test(await p.textContent('#fir-add-err')), 'the same ID cannot go in two cages'); await p.click('#fir-add-cancel');
 

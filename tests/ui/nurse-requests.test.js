@@ -21,14 +21,15 @@ const t = require('./check')('nurse-requests');
     t.ok((await page.inputValue('#nr-location')) === 'FIR Room', 'switching back to cats restores FIR Room');
 
     await page.fill('#nr-count', '3');
-    await page.fill('#nr-arrived', '');
+    await page.fill('#nr-arrived-date', '');
     await page.click('#nr-now');
-    t.ok((await page.inputValue('#nr-arrived')).length === 16, '"Arrived now" fills the arrival time');
+    t.ok((await page.inputValue('#nr-arrived-date')).length === 10 && (await page.inputValue('#nr-arrived-hour')) === String(new Date().getHours()).padStart(2, '0'), '"Arrived now" fills today\'s date and the current hour');
+    t.ok((await page.$$eval('#nr-arrived-hour option', os => os.length)) === 24 && /^12 am$/.test(await page.textContent('#nr-arrived-hour option:first-child')) && /^2 pm$/.test(await page.textContent('#nr-arrived-hour option[value="14"]')), 'the arrival time is picked to the hour (12 am to 11 pm, no minutes)');
     await page.click('#nr-submit');
     await page.waitForTimeout(250);
     const reqs = (await db()).nurse_requests;
     t.ok(reqs.length === 1 && reqs[0].animal_count === 3 && reqs[0].location === 'FIR Room' && reqs[0].created_by === 'Shelter Staff', 'new request saved from the form, raised by Shelter Staff');
-    t.ok(Math.abs(Date.now() - new Date(reqs[0].arrived_at).getTime()) < 120000, 'arrival time saved as ~now');
+    const arr0 = new Date(reqs[0].arrived_at); t.ok(arr0.getMinutes() === 0 && Date.now() - arr0.getTime() >= 0 && Date.now() - arr0.getTime() < 3600e3 + 120000, 'arrival time saved on the hour (this hour): ' + arr0.toISOString());
 
     /* ---------- Scheduled arrival (2026-09-26): log one for later, not now ---------- */
     t.ok(!(await page.isVisible('#nr-expected-wrap')), 'expected-arrival field hidden by default');
@@ -40,15 +41,16 @@ const t = require('./check')('nurse-requests');
     await page.fill('#nr-count', '5');
     await page.selectOption('#nr-species', 'dog');
     const future = new Date(Date.now() + 3 * 3600 * 1000);
-    const futureLocal = future.getFullYear() + '-' + String(future.getMonth() + 1).padStart(2, '0') + '-' + String(future.getDate()).padStart(2, '0')
-      + 'T' + String(future.getHours()).padStart(2, '0') + ':' + String(future.getMinutes()).padStart(2, '0');
-    await page.fill('#nr-expected', futureLocal);
+    const futureDate = future.getFullYear() + '-' + String(future.getMonth() + 1).padStart(2, '0') + '-' + String(future.getDate()).padStart(2, '0');
+    const times = await page.$$eval('#nr-expected-time option', os => os.map(o => o.value).filter(Boolean));
+    t.ok(times.length === 96 && times[0] === '00:00' && times[1] === '00:15' && times[95] === '23:45' && times.every(v => ['00', '15', '30', '45'].includes(v.slice(3))), 'a scheduled arrival is picked every 15 minutes');
+    await page.fill('#nr-expected-date', futureDate); await page.selectOption('#nr-expected-time', '14:45');
     await page.click('#nr-submit');
     await page.waitForTimeout(250);
     const reqs2 = (await db()).nurse_requests;
     const scheduled = reqs2.find(r => r.animal_count === 5);
     t.ok(scheduled && scheduled.arrived_at == null, 'a scheduled request saves with arrived_at null');
-    t.ok(scheduled && scheduled.expected_at != null, 'and expected_at set');
+    t.ok(scheduled && scheduled.expected_at != null && new Date(scheduled.expected_at).getHours() === 14 && new Date(scheduled.expected_at).getMinutes() === 45, 'and expected_at set to the 15-minute time chosen');
 
     // Form resets to the non-scheduled mode after a successful submit.
     t.ok(!(await page.isVisible('#nr-expected-wrap')), 'toggle resets off after submit');
@@ -56,7 +58,7 @@ const t = require('./check')('nurse-requests');
 
     // Submitting scheduled mode with no expected time is blocked (no insert).
     await page.check('#nr-scheduled-toggle');
-    await page.fill('#nr-expected', '');
+    await page.fill('#nr-expected-date', ''); await page.selectOption('#nr-expected-time', '');
     await page.click('#nr-submit');
     await page.waitForTimeout(200);
     t.ok((await db()).nurse_requests.length === 2, 'submit is blocked with the toggle on and no expected time entered');
