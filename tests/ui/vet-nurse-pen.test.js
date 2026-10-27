@@ -48,8 +48,8 @@ const t = require('./check')('vet-nurse-pen');
   try {
     await n.page.waitForSelector('#nurse-doses .nt-tick');
     const txt = (await n.page.textContent('#nurse-doses')).replace(/\s+/g, ' ');
-    t.ok(/PEN-3 \(pen 7\)/.test(txt) && /PEN-4 \(pen 9\)/.test(txt), 'the nurse sees each animal with its pen: ' + txt.slice(0, 120));
-    t.ok(await n.page.locator('#nurse-doses .nt-loc-h').count() === 1, 'one heading for the room, not one per pen');
+    t.ok(/PEN-3.*Pen 7/.test(txt) && /PEN-4.*Pen 9/.test(txt), 'the nurse sees each animal with its pen: ' + txt.slice(0, 120));
+    t.ok(await n.page.locator('#nurse-doses .nt-group-h').count() === 1, 'one heading for the room, not one per pen');
     t.ok(n.errors.length === 0, 'no nurse page errors');
   } finally { await n.browser.close(); }
   t.done();

@@ -143,6 +143,74 @@
 
   #noga-list .attn-item, #proc-misc-list .attn-item { align-items: flex-start; }
 
+  /* ---- Nurse page redesign (2026-10-27): clear active vs completed, badges, floating bulk bars, search + filters ---- */
+  .card { padding: 24px; border-radius: 16px; box-shadow: 0 1px 2px rgba(30,34,56,0.05), 0 6px 20px rgba(30,34,56,0.05); }
+  .card h2 { font-size: 1.1rem; font-weight: 800; margin: 0 0 6px; }
+  .card p.subtle { margin: 0 0 16px; }
+  .nt-card { background: #fff; border: 1px solid var(--border); border-left: 5px solid var(--neutral-300, #d8d6ce); border-radius: 14px; padding: 14px 16px; margin: 0 0 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px 16px; flex-wrap: wrap; box-shadow: var(--shadow-card); }
+  .nt-card.cat-med { border-left-color: var(--violet); } .nt-card.cat-vac { border-left-color: var(--green); } .nt-card.cat-treat { border-left-color: #1c7387; }
+  .nt-card.cat-test { border-left-color: var(--amber); } .nt-card.cat-chip { border-left-color: var(--blue); } .nt-card.cat-other { border-left-color: #8a90a6; }
+  .nt-card.overdue { background: #fff6f6; border-color: rgba(208,59,59,0.45); }
+  .nt-main { display: flex; gap: 10px; align-items: flex-start; flex: 1 1 320px; min-width: 0; }
+  .nt-main > input[type="checkbox"] { width: 20px; height: 20px; margin: 4px 0 0; flex: 0 0 auto; }
+  .nt-body { min-width: 0; flex: 1; }
+  .nt-head { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .nt-id { font-size: 1.15rem; font-weight: 800; letter-spacing: 0.01em; }
+  .nt-room { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+  .nt-pen { font-size: 0.74rem; font-weight: 700; background: var(--sidebar); color: #fff; border-radius: 8px; padding: 2px 9px; white-space: nowrap; }
+  .nt-cat { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; border-radius: 8px; padding: 3px 9px; white-space: nowrap; }
+  .nt-cat.cat-med { background: rgba(140,98,255,0.16); color: #6a3fe0; } .nt-cat.cat-vac { background: rgba(34,154,99,0.16); color: #17694a; }
+  .nt-cat.cat-treat { background: rgba(28,115,135,0.16); color: #14566a; } .nt-cat.cat-test { background: rgba(255,159,67,0.26); color: #8a5000; }
+  .nt-cat.cat-chip { background: rgba(74,108,247,0.16); color: #2f4fd6; } .nt-cat.cat-other { background: rgba(138,144,166,0.2); color: #4b5266; }
+  .nt-time { font-size: 0.74rem; font-weight: 700; background: #f1f2f7; border-radius: 8px; padding: 2px 9px; white-space: nowrap; color: #3d4256; }
+  .nt-time.late { background: var(--critical); color: #fff; }
+  .nt-sub { font-size: 0.8rem; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .nt-block { margin-top: 8px; background: var(--neutral-100); border-radius: 10px; padding: 9px 12px; font-size: 0.84rem; white-space: pre-wrap; border-left: 3px solid rgba(30,34,56,0.2); }
+  .nt-block.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; }
+  .nt-block .bl { display: block; font-size: 0.64rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 2px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .nt-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+  .nt-actions button { padding: 8px 14px; font-size: 0.8rem; }
+  .nt-actions button.go { background: var(--green); color: #fff; box-shadow: none; border: none; }
+  .nt-progress { height: 6px; border-radius: 4px; background: rgba(30,34,56,0.08); margin-top: 8px; max-width: 260px; overflow: hidden; }
+  .nt-progress i { display: block; height: 100%; background: var(--green); }
+  .nt-block .med-label-text { background: none; padding: 0; margin: 0; border-radius: 0; }
+  .nt-card.done { background: #fafbfa; border-left-color: var(--green); box-shadow: none; }
+  .nt-card.done .nt-id { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--muted); }
+  .nt-card.done .nt-block { opacity: 0.7; }
+  .nt-done-badge { font-size: 0.72rem; font-weight: 800; background: rgba(34,154,99,0.16); color: #17694a; border-radius: 8px; padding: 3px 9px; white-space: nowrap; }
+  .nt-done-badge.back { background: rgba(255,159,67,0.26); color: #8a5000; }
+  details.done-block { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  details.done-block > summary { cursor: pointer; list-style: none; font-weight: 800; font-size: 0.88rem; color: #17694a; display: flex; gap: 8px; align-items: center; }
+  details.done-block > summary::-webkit-details-marker { display: none; }
+  details.done-block > summary::before { content: '\25B8'; transition: transform .15s; }
+  details.done-block[open] > summary::before { transform: rotate(90deg); }
+  details.done-block > summary .nt-count { background: rgba(34,154,99,0.16); border-radius: 999px; padding: 1px 9px; font-size: 0.74rem; }
+  details.done-block .nt-card { margin-top: 10px; }
+  .nt-group-h { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 16px 0 8px; display: flex; gap: 8px; align-items: center; }
+  .nt-group-h .nt-count { background: #f1f2f7; border-radius: 999px; padding: 1px 9px; color: var(--ink); }
+  .bulk-float { position: fixed; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 600; width: min(960px, calc(100vw - 32px)); background: var(--sidebar); color: #fff; border-radius: 16px; padding: 12px 16px; box-shadow: 0 10px 34px rgba(30,34,56,0.4); }
+  #bulk-bar-processing.bulk-float { bottom: 92px; }
+  .bulk-float .bf-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .bulk-float .bf-count { font-size: 0.9rem; font-weight: 800; flex: 1 1 160px; }
+  .bulk-float button { padding: 9px 16px; }
+  .bulk-float button.secondary { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); color: #fff; box-shadow: none; }
+  .bulk-float button.go { background: var(--green); color: #fff; }
+  .bulk-float input { background: #fff; color: var(--ink); }
+  .bulk-float .oc-modal-error { color: #ffb4b4; }
+  .vacc-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; margin: 4px 0 14px; }
+  .vacc-box { background: #f7f8fc; border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+  .vacc-box h3 { margin: 0 0 8px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .vacc-box input[type="file"] { background: #fff; margin: 0; }
+  .vacc-box .vacc-add-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+  .vacc-box .vacc-add-grid input { flex: 1 1 160px; margin: 0; background: #fff; }
+  .vacc-summary { display: flex; gap: 10px 14px; flex-wrap: wrap; align-items: center; margin: 0 0 6px; }
+  .vacc-summary #vacc-count { font-size: 0.88rem; font-weight: 800; flex: 1 1 260px; }
+  .vr-group-h { display: flex; gap: 8px; align-items: center; font-weight: 800; padding: 10px 0 6px; border-bottom: 2px solid var(--border); margin-top: 8px; }
+  .vr-group-h .nt-count { background: #f1f2f7; border-radius: 999px; padding: 1px 9px; font-size: 0.74rem; }
+  .vr-row2 { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 9px 0 9px 4px; border-bottom: 1px solid rgba(30,34,56,0.06); }
+  .vr-row2 input[type="checkbox"] { width: 20px; height: 20px; margin: 0; }
+  .vr-row2 .nt-id { font-size: 1rem; }
+  @media (max-width: 900px) { .vacc-top { grid-template-columns: 1fr; } }
   .alert-banner {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     background: rgba(255,159,67,0.18); border: 1px solid rgba(255,159,67,0.55); border-radius: 12px;
@@ -157,14 +225,18 @@
     line-height: 1; color: #7a4a00; font-weight: 700; width: auto;
   }
 
-  .nurse-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-  .nurse-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .nurse-col-title { margin: 0; font-size: 1.05rem; padding: 10px 16px; border-radius: 12px; color: #fff; }
+  .nurse-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: start; position: relative; }
+  .nurse-cols::before { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; border-radius: 3px; background: linear-gradient(180deg, var(--violet) 0%, var(--violet) 50%, var(--green) 50%, var(--green) 100%); opacity: 0.35; }
+  .nurse-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; padding: 16px; border-radius: 22px; }
+  #welfare-col { background: rgba(140,98,255,0.07); box-shadow: inset 0 0 0 2px rgba(140,98,255,0.22); }
+  #processing-col { background: rgba(34,154,99,0.07); box-shadow: inset 0 0 0 2px rgba(34,154,99,0.22); }
+  .nurse-col-title { margin: 0; font-size: 1.15rem; padding: 12px 18px; border-radius: 14px; color: #fff; letter-spacing: 0.01em; box-shadow: 0 4px 14px rgba(30,34,56,0.18); }
   .nurse-col-title.welfare { background: var(--violet); }
   .nurse-col-title.processing { background: var(--green); }
   @media (max-width: 1000px) {
     .urgency-board { grid-template-columns: 1fr; }
-    .nurse-cols { grid-template-columns: 1fr; }
+    .nurse-cols { grid-template-columns: 1fr; gap: 28px; }
+    .nurse-cols::before { display: none; }
   }
   @media (max-width: 800px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
@@ -202,9 +274,11 @@
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
-      <div id="med-batch-bar" style="display:none; margin-bottom:14px;">
-        <button type="button" id="med-batch-done-btn">Mark <span id="med-batch-count">0</span> selected done, entering initials once →</button>
-        <button type="button" class="secondary" id="med-batch-clear" style="margin-left:8px; padding:10px 14px; font-size:0.82rem;">Clear selection</button>
+      <div id="med-batch-bar" class="bulk-float" style="display:none;">
+        <div class="bf-row">
+          <button type="button" id="med-batch-done-btn" class="go">Mark <span id="med-batch-count">0</span> selected done, entering initials once →</button>
+          <button type="button" class="secondary" id="med-batch-clear">Clear selection</button>
+        </div>
       </div>
       <div id="med-labels-list"></div>
     </section>
@@ -218,10 +292,10 @@
     <section class="card" id="noga-section">
       <h2>Miscellaneous tasks</h2>
       <p class="subtle">Requested by the vets — bloods, ear swabs, FIV tests, flu cats needing IVFT and other tasks.</p>
-      <div id="bulk-bar-welfare" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <span style="font-size:0.85rem; font-weight:700; flex:1;" id="bulk-count-welfare"></span>
-          <button type="button" id="bulk-done-welfare">Mark selected done</button>
+      <div id="bulk-bar-welfare" class="bulk-float" style="display:none;">
+        <div class="bf-row">
+          <span class="bf-count" id="bulk-count-welfare"></span>
+          <button type="button" id="bulk-done-welfare" class="go">Mark selected done</button>
           <button type="button" class="secondary" id="bulk-clear-welfare">Clear</button>
         </div>
         <p id="bulk-error-welfare" class="oc-modal-error" style="display:none;"></p>
@@ -236,10 +310,10 @@
       <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
-      <div id="bulk-bar-processing" style="display:none; margin-bottom:12px; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <span style="font-size:0.85rem; font-weight:700; flex:1;" id="bulk-count-processing"></span>
-          <button type="button" id="bulk-done-processing">Mark selected done</button>
+      <div id="bulk-bar-processing" class="bulk-float" style="display:none;">
+        <div class="bf-row">
+          <span class="bf-count" id="bulk-count-processing"></span>
+          <button type="button" id="bulk-done-processing" class="go">Mark selected done</button>
           <button type="button" class="secondary" id="bulk-clear-processing">Clear</button>
         </div>
         <div id="uv-bulk-controls" style="display:none; margin-top:8px;">
@@ -259,22 +333,29 @@
     <section class="card" id="vacc-report-section">
       <h2>Vaccinations due (Report 7)</h2>
       <p class="subtle">Upload the <b>Vet Treatments Due</b> report (Excel) from ShelterMate. The animals are grouped by shelter location. Tick the ones you have vaccinated, then send them to the Admission AA to enter in ShelterMate.</p>
-      <input type="file" id="vacc-file" accept=".xlsx" style="margin-bottom:8px;">
-      <p id="vacc-error" class="oc-modal-error" style="display:none;"></p>
-      <div id="vacc-add-row" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:6px 0 10px;">
-        <input id="vacc-add-id" placeholder="Shelter ID (a litter: 1170123 - 1170130)" style="flex:1; min-width:200px; margin:0;">
-        <input id="vacc-add-loc" list="vacc-locs" placeholder="Location" style="flex:1; min-width:150px; margin:0;">
-        <datalist id="vacc-locs"></datalist>
-        <button type="button" class="secondary" id="vacc-add">Add a cat / dog</button>
+      <div class="vacc-top">
+        <div class="vacc-box"><h3>1 &middot; Upload the report</h3><input type="file" id="vacc-file" accept=".xlsx"></div>
+        <div class="vacc-box"><h3>Or add an animal by hand</h3>
+          <div class="vacc-add-grid" id="vacc-add-row">
+            <input id="vacc-add-id" placeholder="Shelter ID (a litter: 1170123 - 1170130)">
+            <input id="vacc-add-loc" list="vacc-locs" placeholder="Location">
+            <datalist id="vacc-locs"></datalist>
+            <button type="button" class="secondary" id="vacc-add">Add a cat / dog</button>
+          </div>
+        </div>
       </div>
-      <div id="vacc-bar" style="display:none; margin:8px 0; padding:10px 12px; border:2px solid var(--border); border-radius:12px;">
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-          <span style="font-size:0.85rem; font-weight:700; flex:1;" id="vacc-count"></span>
-          <button type="button" class="secondary" id="vacc-select-all">Select all</button>
-          <button type="button" id="vacc-send">Send ticked to Admission AA</button>
+      <p id="vacc-error" class="oc-modal-error" style="display:none;"></p>
+      <div id="vacc-bar" class="vacc-summary" style="display:none;">
+        <span id="vacc-count"></span>
+        <button type="button" class="secondary" id="vacc-select-all">Select all</button>
+        <button type="button" class="secondary" id="vacc-clear">Clear list</button>
+      </div>
+      <div id="vacc-float" class="bulk-float" style="display:none;">
+        <div class="bf-row">
+          <span class="bf-count" id="vacc-float-count"></span>
+          <button type="button" id="vacc-send" class="go">Send ticked to Admission AA</button>
           <button type="button" class="secondary" id="vacc-behaviour">Send ticked to behaviour</button>
           <button type="button" id="vacc-done">Mark ticked as done</button>
-          <button type="button" class="secondary" id="vacc-clear">Clear list</button>
         </div>
       </div>
       <div id="vacc-list"></div>
@@ -392,6 +473,18 @@
   }
   function fmtTime(iso) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
 
+  /* ---- category badges (2026-10-27) ---- */
+  // the category badge colour for a task or request
+  const MISC_CAT = { med_label: ['Medication', 'cat-med'], dispense: ['Medication', 'cat-med'], treatment: ['Treatment', 'cat-treat'], ivft: ['Treatment', 'cat-treat'], tail_bandage: ['Treatment', 'cat-treat'],
+    blood: ['Test', 'cat-test'], ear_swab: ['Test', 'cat-test'], fiv_test: ['Test', 'cat-test'], urine_collection: ['Test', 'cat-test'], triple_test: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'] };
+  const REQ_CAT = { vaccination: ['Vaccination', 'cat-vac'], fiv: ['Test', 'cat-test'], blood: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'], microchip_uv: ['Microchip / UV', 'cat-chip'] };
+  const catOf = (map, key) => map[key] || ['Task', 'cat-other'];
+  const catBadge = (c) => `<span class="nt-cat ${c[1]}">${esc(c[0])}</span>`;
+  function penBadges(location) {
+    const i = String(location || '').indexOf('/'), pen = i === -1 ? '' : String(location).slice(i + 1).trim(), room = LDHLogic.spaceOf(location) || String(location || '');
+    return `<span class="nt-room">${esc(room)}</span>${pen ? `<span class="nt-pen">Pen ${esc(pen)}</span>` : ''}`;
+  }
+
   /* ============================================================
      Medication labels to make
      ============================================================ */
@@ -405,17 +498,19 @@
     return TASKS.filter(t => t.needs_medication && t.vet_done_at && !t.done);
   }
   function medLabelCardHtml(t) {
-    return `<div class="med-label-card" data-id="${esc(t.id)}">
-      <label style="display:flex; gap:8px; align-items:flex-start; margin:0 0 6px;">
-        <input type="checkbox" class="med-select" data-id="${esc(t.id)}" ${selectedMedDone.has(t.id) ? 'checked' : ''} style="width:auto; margin-top:3px;">
-        <span class="aname">${esc(t.title)} <span class="ameta">SM ${esc(t.sm_number || '—')}</span></span>
-      </label>
-      <div class="ameta">${esc(locationText(t))} · ${t.med_chart_done ? 'Chart printed by admission' : 'No chart'}</div>
-      <div class="med-label-text">${esc(t.med_label || '')}</div>
-      <div class="med-label-actions">
+    return `<div class="med-label-card nt-card cat-med" data-id="${esc(t.id)}">
+      <div class="nt-main">
+        <input type="checkbox" class="med-select" data-id="${esc(t.id)}" ${selectedMedDone.has(t.id) ? 'checked' : ''} aria-label="Select ${esc(t.title)}">
+        <div class="nt-body">
+          <div class="nt-head"><span class="nt-id aname">${esc(t.title)}</span>${penBadges(locationText(t))}${catBadge(['Medication', 'cat-med'])}<span class="nt-time">SM ${esc(t.sm_number || '\u2014')}</span></div>
+          <div class="nt-sub ameta">${t.med_chart_done ? 'Chart printed by admission' : 'No chart'}</div>
+          <div class="nt-block mono"><span class="bl">Medication label</span><span class="med-label-text" style="display:block">${esc(t.med_label || '')}</span></div>
+        </div>
+      </div>
+      <div class="nt-actions med-label-actions">
         <button type="button" class="secondary med-copy-btn" data-id="${esc(t.id)}">Copy</button>
         <button type="button" class="secondary med-back-btn" data-id="${esc(t.id)}">Send back to vet</button>
-        <button type="button" class="med-done-btn" data-id="${esc(t.id)}">Done</button>
+        <button type="button" class="med-done-btn go" data-id="${esc(t.id)}">Done</button>
       </div>
     </div>`;
   }
@@ -430,8 +525,12 @@
     document.getElementById('med-batch-count').textContent = String(selectedMedDone.size);
   }
   function renderMedLabels() {
-    const list = medLabelTasks();
-    document.getElementById('med-labels-list').innerHTML = list.map(medLabelCardHtml).join('') || '<p class="empty-state">No medication labels waiting.</p>';
+    // medication from the vets: the cases they marked done on the vet board, plus medication / dispense tasks they sent (from the med sheet,
+    // or by transferring a case). All of them are here, none in Miscellaneous tasks.
+    const now = Date.now(), recent = r => !r.done || now - new Date(r.done_at || r.created_at).getTime() <= 24 * 3600e3;
+    const sent = NOGA_REQUESTS.filter(r => MED_TASKS.includes(r.task) && recent(r));
+    const cards = medLabelTasks().map(medLabelCardHtml).join('') + sent.filter(r => !r.done).map(miscRowHtml).join('');
+    document.getElementById('med-labels-list').innerHTML = (cards || '<p class="empty-state">No medication labels waiting.</p>') + doneBlockHtml(sent.filter(r => r.done), 'med');
     updateMedBatchBar();
   }
   function copyTextFallback(text) {
@@ -535,31 +634,36 @@
   // arrived_at yet: show a countdown/overdue state and just a "Mark
   // arrived" button, not the progress actions, which only make sense once
   // the animal is actually here.
+  function reqHead(r) {
+    const k = nurseReqKind(r), cat = catOf(REQ_CAT, r.kind);
+    return `<div class="nt-head"><span class="nt-id aname">${r.animal_id ? esc(r.animal_id) : r.animal_count + ' ' + esc(r.species) + (r.animal_count > 1 ? 's' : '')}</span>${penBadges(r.location)}${catBadge(cat)}</div>
+      <div class="nt-sub ameta" style="margin-top:2px">${nurseReqTitle(r)}</div>`;
+  }
   function scheduledRowHtml(r) {
     const st = LDHLogic.arrivalStatus(r, Date.now());
-    const k = nurseReqKind(r);
-    return `<div class="attn-item nr-item">
-      <div><div class="aname">${nurseReqTitle(r)}</div>
-        <div class="ameta">expected ${fmtTime(r.expected_at)}${r.note ? ' · ' + esc(r.note) : ''}</div></div>
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+    return `<div class="attn-item nr-item nt-card ${esc(catOf(REQ_CAT, r.kind)[1])}${st.level === 'red' ? ' overdue' : ''}">
+      <div class="nt-main"><div class="nt-body">${reqHead(r)}
+        <div class="nt-sub ameta">expected ${fmtTime(r.expected_at)}${r.note ? ' \u00B7 ' + esc(r.note) : ''}</div></div></div>
+      <div class="nt-actions">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-arrive" data-id="${esc(r.id)}">Mark arrived</button>
       </div></div>`;
   }
   function arrivedRowHtml(r) {
     const st = LDHLogic.nurseRequestStatus(r, Date.now());
-    const k = nurseReqKind(r);
-    return `<div class="attn-item nr-item">
-      <div style="display:flex; gap:8px; align-items:flex-start;">${rowPickBox('nr', r, 'processing', r.kind === 'uv' && !!r.animal_id)}<div><div class="aname">${nurseReqTitle(r)}</div>
-        <div class="ameta">arrived ${fmtTime(r.arrived_at)} · <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' · claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></div></div>
-      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+    const k = nurseReqKind(r), pct = r.animal_count ? Math.round(r.done_count / r.animal_count * 100) : 0;
+    return `<div class="attn-item nr-item nt-card ${esc(catOf(REQ_CAT, r.kind)[1])}${st.level === 'red' ? ' overdue' : ''}">
+      <div class="nt-main">${rowPickBox('nr', r, 'processing', r.kind === 'uv' && !!r.animal_id)}<div class="nt-body">${reqHead(r)}
+        <div class="nt-sub ameta">arrived ${fmtTime(r.arrived_at)} \u00B7 <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' \u00B7 claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' \u00B7 ' + esc(r.note) : ''}</div>
+        <div class="nt-progress" aria-hidden="true"><i style="width:${pct}%"></i></div></div></div>
+      <div class="nt-actions">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
         ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}" data-src="nr" data-rid="${esc(r.id)}">Send to AA</button>` : ''}
         ${r.animal_id && ['microchip', 'microchip_uv', 'vaccination'].includes(r.kind) ? `<button class="secondary bh-send" data-src="nr" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}
         <button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>
         <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
-        <button class="secondary nr-all" data-id="${esc(r.id)}">All done</button>
+        <button class="go nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
   }
   /* ---- Pick several tasks and mark them done together; UV-only picks can also send one result to the AA ---- */
@@ -673,18 +777,18 @@
         return Object.assign({}, d, { animal_id: t.animal_id, location: t.location, treatment: t.treatment, requested_by: t.requested_by, slot_label: LDHLogic.slotLabel(t.times_per_day, d.slot_no) }); });
   }
   function doseRowHtml(d, todayISO) {
-    const done = !!d.done_at;
-    return `<label class="attn-item" style="cursor:pointer;">
-      <span style="display:flex; gap:10px; align-items:center;">
-        <input type="checkbox" class="nt-tick" data-id="${esc(d.id)}" ${done ? 'checked' : ''} style="width:20px; height:20px; margin:0;">
-        <span><span class="aname">${esc(d.animal_id)}${penOf(d.location) ? ' (pen ' + esc(penOf(d.location)) + ')' : ''} — ${esc(d.treatment)}</span><br>
-          <span class="ameta">${esc(d.slot_label)}${d.requested_by && d.requested_by !== 'Vet team' ? ' · requested by ' + esc(d.requested_by) : ''}${d.due_date !== todayISO ? ' · due ' + esc(d.due_date) : ''}${done ? ' · done by ' + esc(d.done_by || '?') + ' ' + fmtTime(d.done_at) : ''}</span></span>
-      </span></label>`;
+    const done = !!d.done_at, late = !done && d.due_date < todayISO;
+    return `<label class="attn-item nt-card cat-treat${done ? ' done' : ''}${late ? ' overdue' : ''}" style="cursor:pointer;">
+      <span class="nt-main"><input type="checkbox" class="nt-tick" data-id="${esc(d.id)}" ${done ? 'checked' : ''}>
+        <span class="nt-body"><span class="nt-head"><span class="nt-id aname">${esc(d.animal_id)}</span>${penBadges(d.location)}${catBadge(['Treatment', 'cat-treat'])}<span class="nt-time${late ? ' late' : ''}">${esc(d.slot_label)}${d.due_date !== todayISO ? ' \u00B7 due ' + esc(d.due_date) : ''}</span>${done ? `<span class="nt-done-badge">\u2713 done${d.done_by ? ' by ' + esc(d.done_by) : ''}</span>` : ''}</span>
+          <span class="nt-block" style="display:block"><span class="bl">Treatment</span>${esc(d.treatment)}</span>
+          <span class="nt-sub ameta" style="display:block">${d.requested_by && d.requested_by !== 'Vet team' ? 'requested by ' + esc(d.requested_by) : ''}</span></span></span>
+      </label>`;
   }
   function penOf(location) { const i = String(location || '').indexOf('/'); return i === -1 ? '' : String(location).slice(i + 1).trim(); }
   function groupedDoseHtml(list, todayISO) {
     const by = {}; list.forEach(d => { const room = LDHLogic.spaceOf(d.location) || d.location; (by[room] = by[room] || []).push(d); });   // grouped by room; the pen shows on the animal
-    return Object.keys(by).sort().map(loc => `<div><div class="nt-loc-h">${esc(loc)}</div>${by[loc].map(d => doseRowHtml(d, todayISO)).join('')}</div>`).join('');
+    return Object.keys(by).sort().map(loc => `<div><div class="nt-group-h">${esc(loc)} <span class="nt-count">${by[loc].length}</span></div>${by[loc].slice().sort((a, b) => (!!a.done_at - !!b.done_at)).map(d => doseRowHtml(d, todayISO)).join('')}</div>`).join('');
   }
   function renderNurseDoses() {
     const todayISO = LDHLogic.localISO(new Date());
@@ -715,6 +819,7 @@
   const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
   // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
   const PROCESSING_MISC_KINDS = ['microchip', 'uv', 'treatment'];
+  const MED_TASKS = ['med_label', 'dispense'];   // medication the vets send over: shown under Medication labels to make
   const AA_PREFILL_KIND = { fiv_test: 'fiv', microchip: 'microchip', uv: 'uv' };   // misc task -> Send-to-AA type
   // When the task was handed to the nurses: a time today ("09:40"), or the day and time if it is older ("Sun 09:40")
   function assignedAt(iso) {
@@ -723,13 +828,32 @@
     return (d.toDateString() === new Date().toDateString() ? '' : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' ') + fmtTime(iso);
   }
   function miscRowHtml(r) {
+    const cat = catOf(MISC_CAT, r.task), taskLabel = NOGA_TASK_LABELS[r.task] || r.task;
+    const doneBadge = r.done ? `<span class="nt-done-badge${r.returned_at ? ' back' : ''}">${r.returned_at ? '\u21A9 sent back to vet' : '\u2713 done'}${r.done_by ? ' by ' + esc(r.done_by) : ''}</span>` : '';
+    const isMed = MED_TASKS.includes(r.task), note = r.note && !isMed ? r.note : '';
+    const block = isMed && r.note ? `<div class="nt-block mono"><span class="bl">${r.task === 'dispense' ? 'Medication to dispense' : 'Medication label'}</span><span class="med-label-text" style="display:block">${esc(r.note)}</span></div>` : (note ? `<div class="nt-block"><span class="bl">Note</span>${esc(note)}</div>` : '');
+    const actions = r.done ? `<button class="secondary noga-putback" data-id="${esc(r.id)}">Put back</button>`
+      : isMed ? `<button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="go noga-done" data-id="${esc(r.id)}">Done</button>`
+      : `${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}${r.task === 'microchip' && isProcessingMisc(r) && r.animal_id ? `<button class="secondary bh-send" data-src="misc" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="go noga-done" data-id="${esc(r.id)}">Done</button>`;
     return `
-      <div class="attn-item noga-item">
-        <div style="display:flex; gap:8px; align-items:flex-start;">${r.done ? '' : rowPickBox('misc', r, isProcessingMisc(r) ? 'processing' : 'welfare', r.task === 'uv')}<div><div class="aname">${esc(r.animal_id)} — ${esc(locationText(r))}</div>
-          <div class="ameta">${esc(NOGA_TASK_LABELS[r.task] || r.task)} · assigned ${esc(assignedAt(r.created_at))}${r.note && r.task !== 'med_label' ? ' · ' + esc(r.note) : ''}${r.added_by && r.added_by !== 'Vet team' ? ' · requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' · transferred from a vet case' : ''}${r.done ? (r.returned_at ? ' · sent back to vet' : ' · done') + (r.done_by ? ' by ' + esc(r.done_by) : '') : ''}${r.result_note ? ' · result: ' + esc(r.result_note) : ''}</div>${r.task === 'med_label' && r.note ? `<div class="med-label-text">${esc(r.note)}</div>` : ''}</div></div>
-        ${r.done ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-putback" data-id="${esc(r.id)}">Put back</button></div>` : r.task === 'med_label' ? `<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>` : `<div style="display:flex; gap:6px; flex-wrap:wrap;">${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}${r.task === 'microchip' && isProcessingMisc(r) && r.animal_id ? `<button class="secondary bh-send" data-src="misc" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="secondary noga-done" data-id="${esc(r.id)}">Done</button></div>`}
+      <div class="attn-item noga-item nt-card ${cat[1]}${r.done ? ' done' : ''}">
+        <div class="nt-main">${r.done ? '' : rowPickBox('misc', r, isProcessingMisc(r) ? 'processing' : 'welfare', r.task === 'uv')}<div class="nt-body">
+          <div class="nt-head"><span class="nt-id aname">${esc(r.animal_id)}</span>${penBadges(locationText(r))}${catBadge(cat)}${doneBadge}<span class="nt-time">assigned ${esc(assignedAt(r.created_at))}</span></div>
+          <div class="nt-sub ameta">${esc(taskLabel)}${r.added_by && r.added_by !== 'Vet team' ? ' \u00B7 requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' \u00B7 transferred from a vet case' : ''}${r.result_note ? ' \u00B7 result: ' + esc(r.result_note) : ''}</div>
+          ${block}</div></div>
+        <div class="nt-actions">${actions}</div>
       </div>`;
   }
+  // active tasks first; finished ones (last 24 h) fold away in a collapsible block underneath
+  const DONE_OPEN = new Set();
+  function doneBlockHtml(done, key) {
+    return done.length ? `<details class="done-block" data-key="${key}"${DONE_OPEN.has(key) ? ' open' : ''}><summary>Completed in the last 24 h <span class="nt-count">${done.length}</span></summary>${done.map(miscRowHtml).join('')}</details>` : '';
+  }
+  function miscListHtml(list, emptyMsg, key) {
+    const act = list.filter(r => !r.done), done = list.filter(r => r.done);
+    return (act.map(miscRowHtml).join('') || (done.length ? '' : `<p class="empty-state">${emptyMsg}</p>`)) + doneBlockHtml(done, key);
+  }
+  document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.matches && d.matches('details.done-block')) { d.open ? DONE_OPEN.add(d.dataset.key) : DONE_OPEN.delete(d.dataset.key); } }, true);
   function renderNoga() {
     const now = Date.now();
     // Same fallback-anchor style as LDHLogic.caseList's doneAt(): fall back
@@ -737,12 +861,14 @@
     // timestamp reads as "just now" (still visible) rather than vanishing.
     const doneAt = r => new Date(r.done_at || r.created_at).getTime();
     const visible = NOGA_REQUESTS.filter(r => !r.done || now - doneAt(r) <= 24 * 60 * 60 * 1000);
-    const welfare = visible.filter(r => !PROCESSING_MISC_KINDS.includes(r.task));
-    const processing = visible.filter(r => PROCESSING_MISC_KINDS.includes(r.task));
-    document.getElementById('noga-list').innerHTML = welfare.map(miscRowHtml).join('') || '<p class="empty-state">No miscellaneous tasks open.</p>';
-    document.getElementById('proc-misc-list').innerHTML = processing.map(miscRowHtml).join('');
+    const shown = visible.filter(r => !MED_TASKS.includes(r.task));   // medication tasks live under "Medication labels to make"
+    const welfare = shown.filter(r => !PROCESSING_MISC_KINDS.includes(r.task));
+    const processing = shown.filter(r => PROCESSING_MISC_KINDS.includes(r.task));
+    document.getElementById('noga-list').innerHTML = miscListHtml(welfare, 'No miscellaneous tasks open.', 'welfare');
+    document.getElementById('proc-misc-list').innerHTML = miscListHtml(processing, '', 'processing');
     document.getElementById('proc-misc-section').style.display = processing.length ? '' : 'none';
     renderPickBars();
+    renderMedLabels();
   }
   function isProcessingMisc(r) { return PROCESSING_MISC_KINDS.includes(r.task); }
   async function miscDoneClick(e) {
@@ -770,6 +896,7 @@
     loadAll();
   }
   document.getElementById('noga-list').addEventListener('click', miscDoneClick);
+  document.getElementById('med-labels-list').addEventListener('click', miscDoneClick);   // the Done / Send back / Put back buttons of medication tasks
 
   /* ============================================================
      Send back to vet (2026-10-16). The nurse records a result (FIV test, bloods...) and the vets get it as an
@@ -1156,19 +1283,26 @@
     } catch (e) { /* the local copy is kept */ }
   }
   function vaccCount() {
-    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due \u00b7 ' + vaccPicked.size + ' ticked' + (VACC.sent.length ? ' \u00b7 ' + VACC.sent.length + ' already done today' : '');
+    const ticked = vaccPicked.size;
+    document.getElementById('vacc-count').textContent = VACC.animals.length + ' animal' + (VACC.animals.length === 1 ? '' : 's') + ' due · ' + ticked + ' ticked' + (VACC.sent.length ? ' · ' + VACC.sent.length + ' already done today' : '');
     const all = VACC.animals.length > 0 && VACC.animals.every(a => vaccPicked.has(vaccKey(a)));
     document.getElementById('vacc-select-all').textContent = all ? 'Untick all' : 'Select all';
+    // the Send / Mark done buttons live in a floating bar that appears once something is ticked
+    document.getElementById('vacc-float').style.display = ticked ? '' : 'none';
+    document.getElementById('vacc-float-count').textContent = ticked + ' animal' + (ticked === 1 ? '' : 's') + ' ticked';
   }
   function renderVacc() {
     const list = document.getElementById('vacc-list');
     const groups = Report7.groupByLocation(VACC.animals, LDHLogic.LOCATIONS);
     const today = vaccToday();
-    list.innerHTML = groups.map(g => `<div class="vr-group" data-location="${esc(g.location)}" style="margin-top:12px;">
-        <label style="display:flex; gap:8px; align-items:center; font-weight:700;"><input type="checkbox" class="vr-all" data-location="${esc(g.location)}" style="width:18px; height:18px;"> ${esc(g.location)} <span class="ameta">(${g.animals.length})</span></label>
-        ${g.animals.map(a => `<label class="vr-row" style="display:flex; gap:8px; align-items:center; padding:4px 0 4px 26px; border-top:1px solid var(--border);">
-          <input type="checkbox" class="vr-pick" data-key="${esc(vaccKey(a))}" data-location="${esc(g.location)}" ${vaccPicked.has(vaccKey(a)) ? 'checked' : ''} style="width:18px; height:18px;">
-          <span><b>${esc(a.id)}</b>${a.kennel ? ' · kennel ' + esc(a.kennel) : ''} · ${esc(a.treatment)}${a.weight ? ' · ' + esc(a.weight) + ' kg' : ''}${a.manual ? ' · added by hand' : (a.due ? ' · due ' + esc(a.due) : '')}${!a.manual && a.due && a.due < today ? ' <b style="color:#c0392b;">overdue</b>' : ''}</span></label>`).join('')}
+    list.innerHTML = groups.map(g => `<div class="vr-group" data-location="${esc(g.location)}">
+        <label class="vr-group-h"><input type="checkbox" class="vr-all" data-location="${esc(g.location)}" style="width:20px; height:20px; margin:0;"> ${esc(g.location)} <span class="nt-count">${g.animals.length}</span></label>
+        ${g.animals.map(a => { const late = !a.manual && a.due && a.due < today;
+          return `<label class="vr-row vr-row2">
+          <input type="checkbox" class="vr-pick" data-key="${esc(vaccKey(a))}" data-location="${esc(g.location)}" ${vaccPicked.has(vaccKey(a)) ? 'checked' : ''}>
+          <span class="nt-id">${esc(a.id)}</span>${a.kennel ? `<span class="nt-pen">Kennel ${esc(a.kennel)}</span>` : ''}${catBadge(['Vaccination', 'cat-vac'])}
+          <span class="nt-sub" style="margin:0">${esc(a.treatment)}${a.weight ? ' · ' + esc(a.weight) + ' kg' : ''}</span>
+          <span class="nt-time${late ? ' late' : ''}">${a.manual ? 'added by hand' : (a.due ? 'due ' + esc(a.due) : '')}${late ? ' · overdue' : ''}</span></label>`; }).join('')}
       </div>`).join('') || '<p class="empty-state">No report loaded.</p>';
     const bar = document.getElementById('vacc-bar');
     bar.style.display = VACC.animals.length ? '' : 'none';

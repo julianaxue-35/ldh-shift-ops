@@ -30,6 +30,7 @@ const row = (x) => Object.assign({ kind: 'behaviour_review', animal_id: 'BEH-1',
   try {
     await n.page.waitForSelector('#noga-list .noga-item');
     t.ok(await n.page.locator('#noga-list .noga-item:has-text("N-DONE") .noga-putback').count() === 1 && await n.page.locator('#noga-list .noga-item:has-text("N-OPEN") .noga-putback').count() === 0, 'a finished nurse task has Put back; an open one does not');
+    await n.page.click('#noga-list details.done-block summary');   // finished tasks fold away under "Completed"
     await n.page.click('.noga-putback');
     await n.page.waitForFunction(() => window.__db.noga_requests.find(r => r.animal_id === 'N-DONE').done === false);
     const r = (await n.db()).noga_requests.find(x => x.animal_id === 'N-DONE');

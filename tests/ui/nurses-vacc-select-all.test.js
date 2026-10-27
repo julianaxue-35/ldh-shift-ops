@@ -26,8 +26,7 @@ const { makeReport7 } = require('../fixtures/report7-fixture.cjs');
 
     // mark done without sending
     await n.page.fill('#vacc-add-id', '9100010 - 9100012'); await n.page.fill('#vacc-add-loc', 'Pound 3'); await n.page.click('#vacc-add');
-    await n.page.click('#vacc-done');
-    t.ok(/Tick the animals/.test(await n.page.textContent('#vacc-error')), 'mark done with nothing ticked asks to tick');
+    t.ok(!(await n.page.isVisible('#vacc-float')), 'the Send / Mark done bar only appears once something is ticked');
     await n.page.click('#vacc-select-all');
     await n.page.click('#vacc-done');
     await n.page.waitForFunction(() => document.querySelectorAll('.vr-pick').length === 0);
