@@ -22,8 +22,9 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     await n.page.click('[data-send="vets"]');
     t.ok(/animal ID/i.test(await n.page.textContent(P + '[data-msg]')), 'it asks for the animal ID');
     await n.page.fill(F('animal'), 'ASK-1');
+    await n.page.selectOption(F('kind'), 'other');   // the default is "interpret results"; "Other" is the one that needs the task written
     await n.page.click('[data-send="vets"]');
-    t.ok(/write the task/i.test(await n.page.textContent(P + '[data-msg]')), 'and for the task itself');
+    t.ok(/write the task/i.test(await n.page.textContent(P + '[data-msg]')), 'and for the task itself when the type is Other');
     await n.page.selectOption(F('room'), 'Cat Room 2'); await n.page.fill(F('pen'), '5');
     await n.page.fill(F('note'), 'please look at the left eye');
     await n.page.selectOption(F('window'), '2h');

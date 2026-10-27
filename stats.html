@@ -207,7 +207,6 @@
   .totals-period .row.grand { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-weight: 700; }
   @media (max-width: 700px) { .totals-grid { grid-template-columns: 1fr; } }
 
-  .trend-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
   .chart-controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
   .seg { display: inline-flex; border: 2px solid var(--border, #d6d9e0); border-radius: 12px; overflow: hidden; }
   .seg-b { width: auto; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--ink, #222); padding: 7px 16px; font-weight: 600; cursor: pointer; }
@@ -232,19 +231,12 @@
   .tc-scroll { overflow: auto; max-height: 280px; }
   .tc-table tfoot th, .tc-table tfoot td { font-weight: 700; border-top: 2px solid rgba(30,34,56,0.25); }
   .tc-table table { border-collapse: collapse; } .tc-table th, .tc-table td { padding: 3px 10px; text-align: right; border-top: 1px solid rgba(30,34,56,0.08); } .tc-table th:first-child { text-align: left; }
-  .trend-card { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 16px 18px; }
-  .trend-card .trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
-  .trend-card .trend-title { font-size: 0.9rem; font-weight: 700; }
-  .trend-card .trend-ytd { font-size: 1.5rem; font-weight: 700; }
-  .trend-card .trend-ytd-lbl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .trend-card .chart-subhead { font-size: 0.75rem; margin: 12px 0 4px; color: var(--muted); }
   .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
   .chart-legend span { display: flex; align-items: center; gap: 5px; }
   .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
   @media (max-width: 1000px) {
-    .trend-grid { grid-template-columns: 1fr; }
-    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
     .dashboard-body { grid-template-columns: 1fr; }
   }
   @media (max-width: 800px) {
@@ -258,7 +250,7 @@
   @media print {
     @page { size: A4; margin: 12mm; }
     body { background: #fff; }
-    aside, .no-print, #trends-section, #response-rate-section { display: none !important; }
+    aside, .no-print, #period-totals, #surgery-breakdown, #response-rate-section { display: none !important; }
     .layout { display: block !important; }
     main { padding: 0 !important; }
     .print-only { display: block !important; }
@@ -307,7 +299,7 @@
         <select id="surv-window" style="margin:0; width:auto;">
           <option value="week" selected>This week</option>
           <option value="month">This month</option>
-          <option value="quarter">This quarter</option>
+          <option value="quarter">This season</option>
           <option value="year">This year</option>
         </select>
         <button class="secondary" id="report-export" style="margin:0;">Export report (PDF)</button>
@@ -369,20 +361,20 @@
   /* ---- Surgery breakdown (2026-10-19): species x routine / non-routine from surgery_log ---- */
   let SURGERY_ROWS = null;   // null = the table is not there yet
   async function loadSurgeryLog() {
-    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+    const yearStart = LDHLogic.statsSince(Date.now());
     const { data, error } = await sb.from('surgery_log').select('done_at, species, routine').gte('done_at', yearStart.toISOString());
     SURGERY_ROWS = error ? null : (data || []);
   }
   /* ---- Activity line graphs (2026-10-27): Totals and Surgery ----
-     X axis = time (days; months for the year), Y axis = animals. One line per category. Week / Month / Quarter / Year buttons. */
+     X axis = time (days; months for the year), Y axis = animals. One line per category. Week / Month / Season / Year buttons. */
   const ST = { tot: { period: 'month', running: false }, sur: { period: 'month', kind: 'all' }, prog: { running: true } };
   const C = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', violet: '#6250d6', ink: '#52514e' };
-  const PERIODS = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Quarter'], ['year', 'Year']];
+  const PERIODS = [['week', 'Week'], ['month', 'Month'], ['quarter', 'Season'], ['year', 'Year']];
   const seg = (id, opts, cur) => `<div class="seg no-print" data-seg="${id}">${opts.map(([k, l]) => `<button type="button" class="seg-b${String(k) === String(cur) ? ' on' : ''}" data-v="${k}">${l}</button>`).join('')}</div>`;
   const kpi = (label, v, color, sub) => `<div class="kpi"><div class="kpi-val" style="${color ? 'border-left:4px solid ' + color + ';padding-left:10px;' : ''}"><b>${v}</b></div><div class="kpi-label">${esc(label)}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
   // "2.4 a day" over the working days so far (Sick & Injured every day; Processing Mon-Fri; Surgery Mon-Fri, not public holidays).
   const avgSub = (a) => a.avg == null ? 'no working days yet' : `<b>${a.avg}</b> a day <span class="subtle">· ${a.days} working day${a.days === 1 ? '' : 's'}</span>`;
-  const PERIOD_NAME = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
+  const PERIOD_NAME = { week: 'This week', month: 'This month', quarter: 'This season', year: 'This year' };
 
   function renderPeriodTotals() {
     const st = ST.tot, b = LDHLogic.timeBuckets(st.period, Date.now());
@@ -419,7 +411,7 @@
   // Requests the shelter staff sent on the staff form this year, for the "Flagged by shelter staff" tile (nurse tasks, nurse results and Behaviour requests are left out).
   let FLAGGED_DATES = [];
   async function loadFlagged() {
-    const yearStart = new Date(new Date().getFullYear(), 0, 1), out = [];
+    const yearStart = LDHLogic.statsSince(Date.now()), out = [];
     for (let from = 0; from < 20000; from += 1000) {
       const r = await sb.from('tasks').select('title, created_at, type, problem').neq('type', 'check_recheck').gte('created_at', yearStart.toISOString()).order('created_at', { ascending: false }).range(from, from + 999);
       if (r.error) { FLAGGED_DATES = null; return; }
@@ -430,7 +422,7 @@
   }
   async function loadTrends() {
     const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const yearStart = LDHLogic.statsSince(now.getTime());
     const { data, error } = await sb.from('tasks').select('title, shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
     const rows = error ? [] : (data || []).filter(x => !LDHLogic.isTestAnimal(x.title));   // TEST1, TEST 2 ... are practice animals
     YEAR_ROWS = rows; // reused by renderPeriodTotals — same completed-this-year rows, no second query
@@ -450,7 +442,7 @@
       const dt = new Date(r.completed_at);
       const shift = r.shift;
       const m = dt.getMonth();
-      if (m < monthsSoFar) {
+      if (m < monthsSoFar && dt.getFullYear() === now.getFullYear()) {
         if (monthCounts[shift]) monthCounts[shift][m]++;
         monthCounts.attendant_flagged[m]++;
       }
@@ -502,7 +494,7 @@
   let RESPONSE_RATES = { processing: [], sick_injured: [], surgery: [] };
   async function loadResponseRates() {
     const now = new Date();
-    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const yearStart = LDHLogic.statsSince(now.getTime());
     const { data, error } = await sb.from('tasks').select('title, shift, done, created_at').gte('created_at', yearStart.toISOString());
     const rows = error ? [] : (data || []).filter(x => !LDHLogic.isTestAnimal(x.title));
     const monthsSoFar = now.getMonth() + 1;
@@ -511,7 +503,7 @@
     const dones = { processing: zeros(monthsSoFar), sick_injured: zeros(monthsSoFar), surgery: zeros(monthsSoFar) };
     rows.forEach(r => {
       const m = new Date(r.created_at).getMonth();
-      if (m >= monthsSoFar || !totals[r.shift]) return;
+      if (new Date(r.created_at).getFullYear() !== now.getFullYear() || m >= monthsSoFar || !totals[r.shift]) return;
       totals[r.shift][m]++;
       if (r.done) dones[r.shift][m]++;
     });
@@ -568,10 +560,10 @@
 
   // ---- surveillance board ----
   let SURVEY_LOCATIONS = [], SURVEY_TASKS = [], SNAPSHOT_DATES = [], SURVEY_ERROR = null, SURVEY_ROWS_RETURNED = 0, SNAPSHOT_LAST = null;
-  const WINDOW_LABELS = { week: 'This week', month: 'This month', quarter: 'This quarter', year: 'This year' };
+  const WINDOW_LABELS = { week: 'This week', month: 'This month', quarter: 'This season', year: 'This year' };
 
   async function loadSurveyData() {
-    const since = new Date(new Date().getFullYear(), 0, 1);   // the whole year: the board can be set to this week / month / quarter / year
+    const since = LDHLogic.statsSince(Date.now());   // the whole year (and last December if the season began then): the board can be set to this week / month / season / year
     // The API hands back at most 1000 rows at a time, so a year of flagged requests is read a page at a time.
     const pages = []; let tkError = null;
     for (let from = 0; from < 10000; from += 1000) {

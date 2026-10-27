@@ -244,7 +244,7 @@
       <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
-      <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, quarter and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
+      <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, season and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
       <details><summary>Who sees my Done note?</summary><div><p>The team that asked. A task given to you from the Vets page (or a vet&rsquo;s Send to Behaviour button) shows your note on the <b>Vets page</b>; one from the Nurses page shows it on the <b>Nurses page</b>; each rings when you tick Done. The Shelter board shows it against the animal too. So write the plan clearly: what you found and what should happen next. Tasks from the shelter staff page are only shown on the Shelter board.</p></div></details>
       <details><summary>How do I answer a task, or ask the vets to do something (e.g. start medication)?</summary><div><p>Press <b>Done</b> on the card and write your <b>comment</b>. Then choose: <b>Mark done</b> (the comment goes back to the vets and the Shelter board) or <b>Request a task back to the vets</b> (pick shelter stress medication, post adoption med pack or other, how soon: <b>Emergency</b> 2&ndash;4 h, <b>Urgent</b> 12&ndash;24 h or <b>Request check</b> 24&ndash;48 h, and add details). The request goes to the vet board with your comment, this task is finished, and the request shows under <b>Requested from the vets</b> on this page until a vet completes it, then moves to <b>Done by the vets</b> with the vet&rsquo;s treatment and plan.</p></div></details>
       <details><summary>I ticked Done by mistake — can I put it back?</summary><div><p>Yes. Finished tasks stay in the <b>Completed</b> list near the bottom of the page, with their note, for <b>24 hours</b>. Press <b>Put back</b> (your initials are needed) and it returns to the lane it was in. After 24 hours it is removed, but it still counts in the totals. The medical note a vet attached is deleted as soon as a task is ticked Done, so it does not come back.</p></div></details>
@@ -305,7 +305,7 @@
   let BH_COUNTS = null;   // null = the database function is not there yet
   async function loadCounts() {
     try {
-      const since = LDHLogic.localISO(new Date(new Date().getFullYear(), 0, 1));
+      const since = LDHLogic.localISO(LDHLogic.statsSince(Date.now()));
       const { data, error } = await sb.rpc('behaviour_daily_counts', { p_since: since });
       BH_COUNTS = error ? null : (data || []).map(r => ({ day: String(r.day).slice(0, 10), cat: r.cat, n: Number(r.n) }));
     } catch (e) { BH_COUNTS = null; }
@@ -325,7 +325,7 @@
     if (!BH_COUNTS) { el.innerHTML = '<p class="empty-state">The totals will appear here once the latest database update has been run.</p>'; return; }
     const s = LDHLogic.behaviourStats(BH_COUNTS, Date.now());
     const typical = s.cases.month.avg || s.cases.week.avg || s.cases.year.avg;
-    const P = [['week', 'This week'], ['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']];
+    const P = [['week', 'This week'], ['month', 'This month'], ['quarter', 'This season'], ['year', 'This year']];
     el.innerHTML = `<div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
       <div style="text-align:center;">${ringSvg(s.cases.today, typical)}<div style="font-size:0.78rem; opacity:.8; max-width:150px;">The ring fills as today nears a usual working day (${typical || 0} cases).</div></div>
       <table style="flex:1; min-width:280px; font-size:0.9rem; border-collapse:collapse;">

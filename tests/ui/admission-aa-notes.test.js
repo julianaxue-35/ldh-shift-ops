@@ -53,13 +53,13 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(await col('n1') === 'processing' && await col('n2') === 'processing', 'Processing notes have their own box');
     t.ok(await col('s1') === 'sick', 'Sick & Injured notes have their own box, not mixed with Processing');
     t.ok(await col('m1') === 'charts' && await col('m2') === 'charts', 'medication charts are in the charts box');
-    const r = await a.page.evaluate(() => Object.fromEntries(['processing', 'sick', 'charts', 'tasks'].map(k => { const b = document.querySelector('[data-col="' + k + '"]').getBoundingClientRect(); return [k, { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }]; })));
+    const r = await a.page.evaluate(() => Object.fromEntries(['processing', 'sick', 'surgery', 'charts', 'tasks'].map(k => { const b = document.querySelector('[data-col="' + k + '"]').getBoundingClientRect(); return [k, { x: Math.round(b.left), y: Math.round(b.top), w: Math.round(b.width) }]; })));
     t.ok(r.processing.x < r.sick.x && Math.abs(r.processing.y - r.sick.y) < 4, 'Processing on the left, Sick & Injured on the right, same row: ' + JSON.stringify(r));
-    t.ok(r.charts.y > r.processing.y + 20 && r.tasks.y > r.sick.y + 20 && r.charts.x < r.tasks.x, 'medication charts and nurse tasks sit on the row below: ' + JSON.stringify(r));
+    t.ok(r.surgery.y > r.processing.y + 20 && r.charts.y > r.processing.y + 20 && r.tasks.y > r.charts.y + 20 && r.surgery.x === r.processing.x && r.charts.x === r.sick.x && r.tasks.x === r.processing.x, 'Surgery notes and medication charts sit on the row below the notes, and nurse tasks on the next row: ' + JSON.stringify(r));
     t.ok(Math.abs(r.processing.w - r.sick.w) < 6 && r.processing.w > 400, 'the boxes are wide and equal, not cramped: ' + r.processing.w + 'px');
-    const colours = await a.page.evaluate(() => Object.fromEntries(['processing', 'sick', 'charts', 'tasks'].map(k => [k, getComputedStyle(document.querySelector('[data-col="' + k + '"]')).borderTopColor])));
+    const colours = await a.page.evaluate(() => Object.fromEntries(['processing', 'sick', 'surgery', 'charts', 'tasks'].map(k => [k, getComputedStyle(document.querySelector('[data-col="' + k + '"]')).borderTopColor])));
     t.ok(colours.processing === 'rgb(31, 122, 77)' && colours.sick === 'rgb(201, 138, 26)', 'Processing is green and Sick & Injured is orange, like the tools: ' + JSON.stringify(colours));
-    t.ok(new Set(Object.values(colours)).size === 4, 'every box has its own colour');
+    t.ok(new Set(Object.values(colours)).size === 5, 'every box has its own colour');
     t.ok(await a.page.isVisible('[data-col="tasks"] .col-empty'), 'an empty column says so');
 
     const asked = []; a.page.on('dialog', d => asked.push(d.message()));

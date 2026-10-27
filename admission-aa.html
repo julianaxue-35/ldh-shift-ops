@@ -243,7 +243,7 @@
       <details><summary>How long are completed items kept?</summary><div><p>Completed cards are kept for <b>7 days</b> (with the vet&rsquo;s note, so a note that was not entered can be put back) and then removed for good. Use the box above the list to find an animal ID. <b>Empty list</b> removes them all straight away.</p></div></details>
       <details><summary>What if the animal ID in the note is wrong or missing?</summary><div><p>The vet&rsquo;s tool will not send a note without an ID. If the ID was corrected after sending, the vet sends it again under the new ID and that makes a new card; the old one stays here until you remove it, so ask the vet which one to use.</p></div></details>
       <h3 class="faq-group">Numbers and who is on</h3>
-      <details><summary>What are the rings and totals at the bottom?</summary><div><p><b>What the Admission AA has done</b> counts cards you have completed, and the average per working day this week, month, quarter and year. The ring fills as today gets close to a usual working day. It is only a look back; nothing here affects your list.</p></div></details>
+      <details><summary>What are the rings and totals at the bottom?</summary><div><p><b>What the Admission AA has done</b> counts cards you have completed, and the average per working day this week, month, season and year. The ring fills as today gets close to a usual working day. It is only a look back; nothing here affects your list.</p></div></details>
       <details><summary>Why does it say who is on duty?</summary><div><p>The nurses set who is on shift on the Nurses page, and it shows here so everyone knows who to ask.</p></div></details>
     </div>
     </div>
@@ -343,7 +343,7 @@
   const downloadXlsx = it => downloadFile(it, 'xlsx_b64', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '_medication_chart.xlsx', 'Excel');
   async function loadAaCounts() {
     try {
-      const since = new Date(new Date().getFullYear(), 0, 1).toLocaleDateString('en-CA');
+      const since = LDHLogic.statsSince(Date.now()).toLocaleDateString('en-CA');
       const { data, error } = await sb.rpc('aa_daily_counts', { p_since: since });
       AA_COUNTS = error ? null : (data || []).map(r => ({ day: String(r.day).slice(0, 10), cat: r.cat, n: Number(r.n) }));
     } catch (e) { AA_COUNTS = null; }
@@ -363,7 +363,7 @@
     if (!AA_COUNTS) { el.innerHTML = '<p class="empty-state">The totals will appear here once the latest database update has been run.</p>'; return; }
     const s = LDHLogic.aaStats(AA_COUNTS, Date.now());
     const typical = s.notes.month.avg || s.notes.week.avg || s.notes.year.avg;
-    const P = [['week', 'This week'], ['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year']];
+    const P = [['week', 'This week'], ['month', 'This month'], ['quarter', 'This season'], ['year', 'This year']];
     el.innerHTML = `<div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center;">
       <div style="text-align:center;">${aaRing(s.notes.today, typical)}<div style="font-size:0.78rem; opacity:.8; max-width:150px;">The ring fills as today nears a usual working day (${typical || 0} notes).</div></div>
       <table style="flex:1; min-width:280px; font-size:0.9rem; border-collapse:collapse;">

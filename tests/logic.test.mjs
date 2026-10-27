@@ -777,3 +777,18 @@ test('TEST animals (TEST1, test 2, TEST-3) are never counted', () => {
   assert.equal(L.carriedOver(open, now).length, 0);
   assert.equal(L.periodTotals(rows, now).year.total, 1);
 });
+
+test('seasons follow Australia: Summer Dec-Feb, Autumn Mar-May, Winter Jun-Aug, Spring Sep-Nov', () => {
+  const at = (d) => new Date(d + 'T12:00:00').getTime();
+  for (const [d, start, name] of [['2026-01-15', '2025-12-01', 'Summer'], ['2026-02-28', '2025-12-01', 'Summer'], ['2026-03-01', '2026-03-01', 'Autumn'], ['2026-06-10', '2026-06-01', 'Winter'], ['2026-10-28', '2026-09-01', 'Spring'], ['2026-12-02', '2026-12-01', 'Summer']]) {
+    assert.equal(L.localDayKey(L.windowStart('season', at(d))), start, d);
+    assert.equal(L.seasonName(at(d)), name, d);
+  }
+});
+
+test('the "quarter" window is the season, and statsSince reaches back to last December in summer', () => {
+  const at = (d) => new Date(d + 'T12:00:00').getTime();
+  assert.equal(L.localDayKey(L.windowStart('quarter', at('2026-10-28'))), '2026-09-01');
+  assert.equal(L.localDayKey(L.statsSince(at('2026-01-20'))), '2025-12-01');
+  assert.equal(L.localDayKey(L.statsSince(at('2026-07-20'))), '2026-01-01');
+});
