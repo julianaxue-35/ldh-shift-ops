@@ -723,9 +723,6 @@
             <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Medication label</label>
             <textarea class="done-medlabel" rows="4" placeholder="Drug, dose, frequency..."></textarea>
             <p class="done-medlabel-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-6px 0 8px;">Enter the real medication label (drug, dose, frequency) \u2014 not "done".</p>
-            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">
-              ${LDHLogic.CHLORSIG_OPTIONS.map(o => `<button type="button" class="secondary chlorsig-btn" data-label="${esc(o.label)}" style="padding:6px 10px; font-size:0.72rem;">${esc(o.label)}</button>`).join('')}
-            </div>
             </div>
           ` : `<p style="font-size:0.88rem; margin:0 0 12px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
           <label style="font-size:0.78rem; font-weight:700; display:block; margin:0 0 6px;">Quick note (optional)</label>
@@ -814,14 +811,6 @@
 
     const cancelBtn = e.target.closest('.done-cancel');
     if (cancelBtn) { cancelBtn.closest('.done-modal-overlay').remove(); return; }
-
-    const chlorsigBtn = e.target.closest('.chlorsig-btn');
-    if (chlorsigBtn) {
-      const overlay = chlorsigBtn.closest('.done-modal-overlay');
-      const ta = overlay.querySelector('.done-medlabel');
-      ta.value = ta.value ? (ta.value + '\n' + chlorsigBtn.dataset.label) : chlorsigBtn.dataset.label;
-      return;
-    }
 
     const confirmBtn = e.target.closest('.done-confirm');
     if (confirmBtn) {
