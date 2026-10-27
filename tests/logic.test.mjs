@@ -340,8 +340,8 @@ test('medCopyText: SM number, location, offsite detail, label', () => {
   assert.equal(L.medCopyText({ title: 'Bella', location: 'Pound 1' }), 'Bella | SM — | Pound 1\n');
 });
 
-test('CHLORSIG_OPTIONS', () => {
-  assert.deepEqual(L.CHLORSIG_OPTIONS, [{ label: 'Chlorsig — left eye (L)' }, { label: 'Chlorsig — right eye (R)' }, { label: 'Chlorsig — both eyes' }]);
+test('the vet Done box no longer offers Chlorsig quick-insert options', () => {
+  assert.equal(L.CHLORSIG_OPTIONS, undefined);
 });
 
 test('boardRoomOf reads every spelling of a room + pen, and files unknowns under OTHER', () => {

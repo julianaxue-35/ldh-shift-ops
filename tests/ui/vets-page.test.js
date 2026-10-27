@@ -123,7 +123,7 @@ const H = 3600 * 1000;
     t.ok((await a.page.textContent('#completed-list')).includes('Eating well, bright'), 'and shows on the completed row');
     t.ok((await a.page.textContent('#completed-list')).includes('DONE-NM'), 'completed case shows in the Completed (last 24h) group');
 
-    /* ---------- DONE (medication): label required, chlorsig quick-insert, then waiting-on-medication ---------- */
+    /* ---------- DONE (medication): label required, then waiting-on-medication ---------- */
     await a.page.locator('.attn-item', { hasText: 'DONE-MED' }).locator('.done-btn').click();
     await a.page.waitForSelector('.done-modal-overlay');
     t.ok(await a.page.locator('.done-modal-overlay .done-medchart').count() === 1, 'medication case shows the Med chart completed checkbox');
@@ -132,9 +132,8 @@ const H = 3600 * 1000;
     tasks = (await a.db()).tasks;
     t.ok(!tasks.find(x => x.title === 'DONE-MED').done, 'still not done after the blocked confirm');
 
-    const chlorsigBtn = a.page.locator('.done-modal-overlay .chlorsig-btn', { hasText: 'Chlorsig — left eye (L)' });
-    await chlorsigBtn.click();
-    t.ok((await a.page.inputValue('.done-modal-overlay .done-medlabel')) === 'Chlorsig — left eye (L)', 'quick-insert appends the exact option label text');
+    t.ok(await a.page.locator('.done-modal-overlay .chlorsig-btn').count() === 0 && (await a.page.inputValue('.done-modal-overlay .done-medlabel')) === '', 'the medication Done box has no Chlorsig buttons and the label starts empty');
+    await a.page.fill('.done-modal-overlay .done-medlabel', 'Meloxicam 0.5 ml with food once daily');
     await a.page.check('.done-modal-overlay .done-medchart');
     await a.page.click('.done-confirm');
     await a.page.waitForTimeout(250);
@@ -144,7 +143,7 @@ const H = 3600 * 1000;
     const doneMed = tasks.find(x => x.title === 'DONE-MED');
     t.ok(doneMed.done === false, 'medication hold keeps the case not-done (mirrors the 0010 trigger)');
     t.ok(doneMed.vet_done_at != null, 'vet_done_at stamped');
-    t.ok(doneMed.med_chart_done === true && doneMed.med_label === 'Chlorsig — left eye (L)', 'chart flag and label saved');
+    t.ok(doneMed.med_chart_done === true && doneMed.med_label === 'Meloxicam 0.5 ml with food once daily', 'chart flag and label saved');
 
     const medRowText = await a.page.locator('.attn-item', { hasText: 'DONE-MED' }).textContent();
     t.ok(medRowText.includes('waiting on medication'), 'the case now shows the waiting-on-medication stage');
