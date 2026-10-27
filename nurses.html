@@ -277,6 +277,7 @@
       <div id="med-batch-bar" class="bulk-float" style="display:none;">
         <div class="bf-row">
           <button type="button" id="med-batch-done-btn" class="go">Mark <span id="med-batch-count">0</span> selected done, entering initials once →</button>
+          <button type="button" class="secondary" id="med-batch-back">Send back to vet</button>
           <button type="button" class="secondary" id="med-batch-clear">Clear selection</button>
         </div>
       </div>
@@ -296,6 +297,7 @@
         <div class="bf-row">
           <span class="bf-count" id="bulk-count-welfare"></span>
           <button type="button" id="bulk-done-welfare" class="go">Mark selected done</button>
+          <button type="button" class="secondary" id="bulk-back-welfare">Send back to vet</button>
           <button type="button" class="secondary" id="bulk-clear-welfare">Clear</button>
         </div>
         <p id="bulk-error-welfare" class="oc-modal-error" style="display:none;"></p>
@@ -314,6 +316,7 @@
         <div class="bf-row">
           <span class="bf-count" id="bulk-count-processing"></span>
           <button type="button" id="bulk-done-processing" class="go">Mark selected done</button>
+          <button type="button" class="secondary" id="bulk-back-processing">Send back to vet</button>
           <button type="button" class="secondary" id="bulk-clear-processing">Clear</button>
         </div>
         <div id="uv-bulk-controls" style="display:none; margin-top:8px;">
@@ -594,6 +597,18 @@
   document.getElementById('med-batch-clear').addEventListener('click', () => {
     selectedMedDone.clear();
     renderMedLabels();
+  });
+  document.getElementById('med-batch-back').addEventListener('click', async () => {
+    const ids = Array.from(selectedMedDone);
+    if (!ids.length) return;
+    if (!confirm('Send ' + ids.length + ' back to the vets? They leave this list and return to the vet queue.')) return;
+    // clearing vet_done_at puts each case back in the vet queue (same as the single Send back to vet)
+    const { error } = await sb.from('tasks').update({
+      vet_done_at: null, med_label: null, med_chart_done: false, claimed_at: null, claimed_by: null, put_back_at: new Date().toISOString()
+    }).in('id', ids);
+    if (error) { alert('Could not send these back: ' + error.message); return; }
+    selectedMedDone.clear();
+    loadAll();
   });
   document.getElementById('med-batch-done-btn').addEventListener('click', async () => {
     const ids = Array.from(selectedMedDone);
@@ -935,11 +950,70 @@
     overlay._src = src;
     document.body.appendChild(overlay);
   }
+  // Send back to vet for several ticked tasks at once: one result / comment, one vet task per animal.
+  function openBackBatch(col) {
+    const mine = Array.from(picked.values()).filter(p => p.col === col);
+    const items = mine.map(p => ({ src: p.src, row: p.src === 'nr' ? NURSE_REQUESTS.find(x => x.id === p.id) : NOGA_REQUESTS.find(x => x.id === p.id) })).filter(i => i.row);
+    const ok = items.filter(i => i.row.animal_id), skipped = items.length - ok.length;
+    if (!ok.length) { const er = document.getElementById('bulk-error-' + col); er.textContent = 'Tick tasks that have an animal ID, or use Send back to vet on the card.'; er.style.display = 'block'; return; }
+    document.querySelectorAll('.back-modal-overlay').forEach(el => el.remove());
+    const label = i => i.src === 'misc' ? (NOGA_TASK_LABELS[i.row.task] || i.row.task) : (nurseReqKind(i.row).label || i.row.kind);
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="oc-modal-overlay back-modal-overlay">
+        <div class="oc-modal done-modal">
+          <h3 class="done-modal-title">Send back to vet — ${ok.length} task${ok.length === 1 ? '' : 's'}</h3>
+          <ul style="margin:0 0 10px; padding-left:18px; font-size:0.85rem; max-height:120px; overflow:auto;">${ok.map(i => `<li><b>${esc(i.row.animal_id)}</b> — ${esc(i.src === 'misc' ? locationText(i.row) : i.row.location)} · ${esc(label(i))}</li>`).join('')}</ul>
+          ${skipped ? `<p class="subtle" style="margin:0 0 8px;">${skipped} ticked ${skipped === 1 ? 'task has' : 'tasks have'} no animal ID and ${skipped === 1 ? 'is' : 'are'} left out. Send ${skipped === 1 ? 'it' : 'them'} back from the card.</p>` : ''}
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Result / comment (goes to the vet for every animal above)</label>
+          <textarea class="back-result" rows="3" placeholder="e.g. FIV negative, FeLV negative"></textarea>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Vet to</label>
+          <select class="back-action">${Object.keys(LDHLogic.BACK_ACTIONS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_ACTIONS[k])}</option>`).join('')}</select>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Needed within</label>
+          <select class="back-window">${Object.keys(LDHLogic.BACK_WINDOWS).map(k => `<option value="${esc(k)}">${esc(LDHLogic.BACK_WINDOWS[k])}</option>`).join('')}</select>
+          <p class="oc-modal-error back-error"></p>
+          <div class="oc-modal-actions">
+            <button type="button" class="oc-modal-cancel back-cancel">Cancel</button>
+            <button type="button" class="oc-modal-submit back-confirm">Send ${ok.length} to vets</button>
+          </div>
+        </div>
+      </div>`;
+    const overlay = wrap.firstElementChild;
+    overlay._batch = { col, items: ok };
+    document.body.appendChild(overlay);
+  }
+  ['welfare', 'processing'].forEach(col => document.getElementById('bulk-back-' + col).addEventListener('click', () => openBackBatch(col)));
   document.addEventListener('click', async (e) => {
     const cancel = e.target.closest('.back-cancel');
     if (cancel) { cancel.closest('.back-modal-overlay').remove(); return; }
     const ok = e.target.closest('.back-confirm'); if (!ok) return;
     const overlay = ok.closest('.back-modal-overlay');
+    if (overlay._batch) {
+      const { col, items } = overlay._batch, err = overlay.querySelector('.back-error');
+      const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
+      const result = overlay.querySelector('.back-result').value.trim();
+      if (!result) return fail('Write the result or a comment for the vet.');
+      const initials = myInitials(col);
+      if (!initials) return fail('Enter your initials first.');
+      ok.disabled = true;
+      const action = overlay.querySelector('.back-action').value, win = overlay.querySelector('.back-window').value, now = new Date().toISOString(), problems = [];
+      for (const i of items) {
+        const r = i.row, isMisc = i.src === 'misc';
+        const row = LDHLogic.returnedResultTask({ animalId: r.animal_id, location: r.location, locationDetail: r.location_detail,
+          taskLabel: isMisc ? (NOGA_TASK_LABELS[r.task] || r.task) : (nurseReqKind(r).label || r.kind), result, action, window: win });
+        row.problem += ' (sent by ' + initials + ')';
+        const error = await sendTaskToVets(row);
+        if (error) { problems.push(r.animal_id + ': ' + error.message); continue; }
+        picked.delete(i.src + ':' + r.id);
+        if (isMisc) {
+          const { error: e2 } = await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: now, result_note: result, returned_at: now }).eq('id', r.id);
+          if (e2) problems.push(r.animal_id + ' (sent, but not closed here): ' + e2.message);
+        }
+      }
+      if (problems.length) { ok.disabled = false; loadAll(); return fail(problems.length + ' of ' + items.length + ' could not be sent: ' + problems[0]); }
+      overlay.remove(); OpsCore.toast(); loadAll();
+      return;
+    }
     const { src, row: r } = overlay._src, isMisc = src === 'misc';
     const err = overlay.querySelector('.back-error');
     const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
