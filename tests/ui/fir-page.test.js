@@ -102,9 +102,18 @@ const D = 24 * 3600e3;
     const saved = await p.evaluate(() => window.__db.fsa_cats.find(c => c.cage === 5));
     t.ok(saved.data.sessions.s1.ticks['A.all.reach'] && saved.data.sessions.s1.answers.c_head === true && saved.data.sessions.s3.answers.b_back === true && saved.data.fas === '4' && saved.data.plan === 'Behaviour modification', 'everything is saved to the shared record');
     t.ok(saved.data.sessions.s1.by === 'AB' && saved.data.sessions.s3.by === 'AB' && saved.data.behaviourBy === 'AB', 'each assessment and the behaviour notes carry the staff initials');
+    // start on shelter stress meds: a task for the vets with the animal, location, score and behaviour notes
+    t.ok(/Start on shelter stress meds/.test(await p.textContent('#fir-stress')), 'the cat has a "Start on shelter stress meds - send to vet" button');
+    await p.click('#fir-stress'); await p.waitForTimeout(700);
+    const vt = await p.evaluate(() => window.__db.tasks.find(x => x.title === 'FICT-5'));
+    t.ok(vt && vt.location === 'FIR Room / 5' && vt.type === 'medication' && vt.needs_medication === true && vt.shift === 'sick_injured' && !vt.done, 'it creates a vet task for FICT-5 in FIR Room, cage 5 (a medication request on the vet board)');
+    t.ok(/^Behaviour team request \u2014 dispense shelter stress medication/.test(vt.problem) && /FSA result: 1 \u2013 extremely likely/.test(vt.problem) && /Day 1 points 27, Day 2 points 25/.test(vt.problem) && /FAS 4/.test(vt.problem) && /Behaviour: Day 1 - in litter tray, flattened\. Day 2 - on den/.test(vt.problem) && /sent by AB/.test(vt.problem), 'the task carries the FSA result, both scores, FAS and the behaviour notes: ' + vt.problem.slice(0, 160));
+    t.ok(/Sent to the vets/.test(await p.textContent('#fir-stress-wrap')) && /again/.test(await p.textContent('#fir-stress')), 'the cat shows it was sent, and who sent it');
+    await p.waitForTimeout(700);
+    t.ok((await p.evaluate(() => window.__db.fsa_cats.find(c => c.animal_id === 'FICT-5').data.stressSent)).by === 'AB', 'and the shared record remembers it');
     // mark done needs initials, records them
     await p.click('.stab[data-sid="s1"]'); await p.click('#fir-sess-done'); await p.waitForTimeout(900);
-    t.ok(/Marked done by AB/.test(await p.textContent('.totalbar')), 'an assessment can be marked done with the initials');
+    t.ok(/assessment done/.test(await p.textContent('.donebar')) && /by AB/.test(await p.textContent('.donebar')), 'an assessment can be marked done with the initials');
     // the initials follow each assessment and can be changed by hand
     t.ok((await p.inputValue('#fir-by-sess')) === 'AB', 'the assessment shows who did it (the initials on the tablet)');
     await p.fill('#fir-by-sess', 'cd'); await p.dispatchEvent('#fir-by-sess', 'change'); await p.fill('#fir-by-beh', 'ef'); await p.dispatchEvent('#fir-by-beh', 'change'); await p.waitForTimeout(900);
@@ -131,6 +140,7 @@ const D = 24 * 3600e3;
     // the Behaviour tasks are untouched
     await p.keyboard.press('Escape'); await p.click('.faq-close >> nth=0').catch(() => {}); await p.click('#bh-tabbtn-tasks');
     t.ok(await p.locator('#send-request').isVisible() && await p.locator('#incoming').isVisible(), 'back on Behaviour tasks, the request card and Incoming are still there');
+    t.ok(/FICT-5/.test(await p.textContent('#waiting-list')), 'the stress-meds request shows on the Behaviour page under Requested from the vets');
     t.ok(b.errors.length === 0, 'no page errors: ' + b.errors.join('; '));
   } finally { await b.browser.close(); }
   t.done();

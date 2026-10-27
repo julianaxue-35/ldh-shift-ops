@@ -119,3 +119,12 @@ test('reminders: an assessment is overdue once the next slot has begun; notes ar
   assert.equal(F.reminders([g], at('2026-10-23T08:00:00')).length, 1);
   assert.equal(F.reminders([Object.assign(cat({}), { status: 'completed' })], at('2026-10-30T08:00:00')).length, 0);
 });
+
+test('vet note carries the cage, FSA result, points, FAS and behaviour notes on one line', () => {
+  const c = cat({ s1: { answers: { a_noeat: true, a_aff: true, c_head: true } }, s3: { answers: { a_eye: true, b_alert: true, b_back: true } } }, { cage: 12 });
+  c.data.fas = '4'; c.data.behaviour = 'Day 1 - hiding.\nDay 2 - on den.';
+  const n = F.vetNote(c);
+  assert.ok(!/\n/.test(n)); assert.match(n, /^FIR room cage 12\. FSA result: 1 \u2013 extremely likely to be socialised\./);
+  assert.match(n, /Day 1 points 27, Day 2 points 25\. FAS 4\. Behaviour: Day 1 - hiding\. Day 2 - on den\.$/);
+  assert.match(F.vetNote(cat({}, { cage: 3 })), /Day 1 points not scored.*Behaviour: no notes yet$/);
+});
