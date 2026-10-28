@@ -1,8 +1,8 @@
 // Vets and nurses can give a task to the behaviour team from their own pages (not only from the shelter staff page), using the one request card.
 const { open } = require('./harness');
 const t = require('./check')('task-for-behaviour');
-async function run(pageName, opener, label, inline) {
-  const p = await open({}, pageName);
+async function run(pageName, opener, label, inline, iniSel) {
+  const p = await open({}, pageName, { noVetInit: true });
   const root = inline ? '#send-request' : '.sc-overlay';
   const P = root + ' .sc-panel[data-to="behaviour"] ';
   const F = f => P + '[data-f="' + f + '"]';
@@ -16,7 +16,7 @@ async function run(pageName, opener, label, inline) {
     await p.page.fill(F('animal'), 'BEH-7'); await p.page.selectOption(F('kind'), 'behaviour_review');
     await p.page.click(P + '[data-send="behaviour"]');
     t.ok(/initials/i.test(await p.page.textContent(P + '[data-msg]')), label + ': and initials');
-    await p.page.fill(root + ' [data-f="initials"]', 'rk');
+    await p.page.fill(iniSel, 'rk');
     await p.page.click(P + '[data-send="behaviour"]');
     t.ok(/reason/i.test(await p.page.textContent(P + '[data-msg]')), label + ': a review needs the reason');
     t.ok((await p.db()).behaviour_tasks.length === 0, label + ': nothing written yet');
@@ -31,7 +31,7 @@ async function run(pageName, opener, label, inline) {
   } finally { await p.browser.close(); }
 }
 (async () => {
-  await run('vets.html', '#send-request .sc-tab[data-sc="behaviour"]', 'vets', true);
-  await run('nurses.html', '#send-request .sc-tab[data-sc="behaviour"]', 'nurses', true);
+  await run('vets.html', '#send-request .sc-tab[data-sc="behaviour"]', 'vets', true, '#vet-initials');
+  await run('nurses.html', '#send-request .sc-tab[data-sc="behaviour"]', 'nurses', true, '#initials-welfare');
   t.done();
 })();

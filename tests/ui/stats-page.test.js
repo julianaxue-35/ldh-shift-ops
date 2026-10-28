@@ -58,7 +58,7 @@ const D = 24 * 3600 * 1000;
     t.ok(stats.errors.length === 0, 'no page errors on stats page: ' + stats.errors.join('; '));
   } finally { await stats.browser.close(); }
   // 1b. a thousand flagged requests (the API hands back 1000 at a time; the page reads them a page at a time)
-  const many = await open({ tasks: Array.from({ length: 1000 }, (_, i) => flagged('cat_flu', 'Cat Room 1 / ' + (1 + i % 30))), locations: LOCATION_ROWS }, 'stats.html');
+  const many = await open({ tasks: Array.from({ length: 1000 }, (_, i) => Object.assign(flagged('cat_flu', 'Cat Room 1 / ' + (1 + i % 30)), { title: 'F-' + i })), locations: LOCATION_ROWS }, 'stats.html');
   try {
     await many.page.waitForSelector('#surv-dash .heat-tile');
     t.ok(/1000\s*Cases flagged|Cases flagged/.test(await many.page.textContent('#surv-dash')) && (await many.page.textContent('#surv-dash .kpi-row')).includes('1000') && !(await many.page.textContent('#heat-notes')).includes('Showing the most recent'), 'a thousand flagged requests are all read (it pages through them) and counted, with no cap warning');

@@ -7,7 +7,7 @@ const t = require('./check')('vet-nurse-pen');
     await v.page.waitForSelector('#send-request .sc-panel[data-to="nurses"] [data-f="room"] option', { state: 'attached' });
     const F = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
     // one-animal task
-    await v.page.fill(F('animal'), 'PEN-1'); await v.page.fill('#send-request [data-f="initials"]', 'jx');
+    await v.page.fill(F('animal'), 'PEN-1'); await v.page.fill('#vet-initials', 'jx');
     await v.page.selectOption(F('kind'), 'blood');
     await v.page.selectOption(F('room'), 'Pound 1');
     t.ok(await v.page.isVisible(F('pen')), 'a Pen box sits next to the space');
