@@ -9,7 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test', behaviour: 'b
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
-  const db = window.__db = { tasks: [], memos: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
+  const db = window.__db = { tasks: [], memos: [], clinic_meeting: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -20,6 +20,7 @@ const STUB = `
       sm_number: null, location_detail: null
     }),
     memos: () => ({ done: false, created_at: now() }),
+    clinic_meeting: () => ({}),
     roster: () => ({}),
     nurse_requests: () => ({ kind: 'vaccination', done_count: 0, arrived_at: now(), created_at: now() }),
     nurse_treatments: () => ({ stopped: false, created_at: now() }),
@@ -169,6 +170,8 @@ async function open(seed = {}, pageName, opts = {}) {
   }, seed);
   // opts.loggedOut: start with no session (default: already signed in, as before).
   // opts.loginCreds: { email, password } signInWithPassword must match to succeed.
+  // the vets page keeps the day's initials in one box; tests start with JX in it unless they ask for it empty (opts.noVetInit)
+  if (!opts.noVetInit) await ctx.addInitScript(() => { try { localStorage.setItem('ldh_vets_initials_v1', JSON.stringify({ d: new Date().toLocaleDateString('en-CA'), v: 'JX' })); } catch (e) {} });
   if (opts.loggedOut) await ctx.addInitScript(() => { window.__forceLoggedOut = true; });
   if (opts.loginCreds) await ctx.addInitScript((creds) => { window.__loginCreds = creds; }, opts.loginCreds);
   const page = await ctx.newPage();

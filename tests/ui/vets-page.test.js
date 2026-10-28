@@ -84,7 +84,7 @@ const H = 3600 * 1000;
     let tasks = (await a.db()).tasks;
     const pickedUp = tasks.find(x => x.title === 'PICKUP-1');
     t.ok(pickedUp.claimed_at != null, 'pick-up stamps claimed_at');
-    t.ok(pickedUp.claimed_by === null, 'claimed_by stays null (no initials for vets)');
+    t.ok(pickedUp.claimed_by === 'JX', 'pick-up stamps the vet\'s initials on the case');
 
     const openedUrls = await a.page.evaluate(() => window.__openedUrls);
     t.ok(openedUrls.length === 1, 'the hand-off tab was opened exactly once');
@@ -220,7 +220,7 @@ const H = 3600 * 1000;
     let tasks = (await c.db()).tasks;
     const bA = tasks.find(x => x.title === 'BATCH-A'), bB = tasks.find(x => x.title === 'BATCH-B');
     t.ok(bA.claimed_at != null && bB.claimed_at != null, 'the batch pick-up stamps claimed_at on every selected case');
-    t.ok(bA.claimed_by === null && bB.claimed_by === null, 'claimed_by stays null for both (no initials)');
+    t.ok(bA.claimed_by === 'JX' && bB.claimed_by === 'JX', 'a batch pick-up stamps the initials on every case');
 
     const openedUrls = await c.page.evaluate(() => window.__openedUrls);
     t.ok(openedUrls.length === 1, 'exactly one combined hand-off tab is opened for the whole batch');
@@ -460,7 +460,7 @@ const H = 3600 * 1000;
     await m.page.selectOption(NF('room'), 'Cat Room 2');
     await m.page.selectOption(NF('kind'), 'ear_swab');
     await m.page.fill(NF('note'), 'both ears');
-    await m.page.fill('#send-request [data-f="initials"]', 'jx');
+    await m.page.fill('#vet-initials', 'jx');
     await m.page.click('[data-send="nurses"]');
     await m.page.waitForTimeout(250);
     let ng = (await m.db()).noga_requests;

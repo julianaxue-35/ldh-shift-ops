@@ -30,7 +30,7 @@ const t = require('./check')('send-request-categories');
       const F = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
       t.ok((await v.page.$eval(F('kind'), e => e.value)) === 'dispense', 'on the Vets page the Nurses tab starts on Dispense medication');
       t.ok(!(await v.page.isVisible(F('treatment'))) && !(await v.page.isVisible(F('days'))) && !(await v.page.isVisible(F('times'))), 'dispensing asks for no treatment type, times a day or days');
-      await v.page.fill('#send-request [data-f="initials"]', 'jx'); await v.page.fill(F('animal'), 'MED-1');
+      await v.page.fill('#vet-initials', 'jx'); await v.page.fill(F('animal'), 'MED-1');
       let dlg = ''; v.page.once('dialog', () => {});
       await v.page.click('[data-send="nurses"]');
       t.ok(/medication to dispense/i.test(await v.page.textContent('#send-request .sc-panel[data-to="nurses"] [data-msg]')) && (await v.db()).noga_requests.length === 0, 'it needs the medication written in the note');

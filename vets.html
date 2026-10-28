@@ -24,6 +24,7 @@
 <script src="lib/animal-history-view.js"></script>
 <script src="lib/ops-core.js"></script>
 <script src="lib/send-card.js"></script>
+<script src="lib/memo-extras.js"></script>
 <script src="lib/behaviour-feedback.js"></script>
 <style>
   :root {
@@ -187,6 +188,8 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Your initials (kept on this device today)</label>
+    <input id="vet-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="margin-bottom:12px;">
     <p class="hint">
       Case queue, medication hand-off and treatment requests for the vet
       team. Clinical detail stays in the offline shift tools.
@@ -295,6 +298,7 @@
       <div id="memo-list"></div>
       <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
       <div id="memo-completed-list"></div>
+      <div id="memo-extras" style="border-top:1px solid rgba(30,34,56,0.08);padding-top:10px;margin-top:4px;"></div>
       <div id="memo-post">
         <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
         <button id="memo-submit">Post</button>
@@ -307,11 +311,11 @@
       <h2>FAQ — vets</h2>
       <p class="subtle">Quick answers for picking up cases, handing work to the nurses and handling results.</p>
       <h3 class="faq-group">Cases</h3>
-      <details><summary>How do I pick up a case?</summary><div><p>In <b>Cases</b>, press <b>Pick up →</b> on a card. To take several, tick their boxes and press <b>Pick up N selected, sorted by location</b>. Picking up opens the shift tool for that animal. If another vet got there first you'll be told it was skipped.</p></div></details>
-      <details><summary>I picked a case up but got called away — how do I put it back?</summary><div><p>Press <b>Put back</b> on the card. The case returns to its tier column for any vet to pick up. No reason is needed. Its time target keeps running from when it was first flagged, and the card shows "Put back" with the time.</p></div></details>
+      <details><summary>How do I pick up a case?</summary><div><p>In <b>Cases</b>, press <b>Pick up →</b> on a card. To take several, tick their boxes and press <b>Pick up N selected, sorted by location</b>. Type your initials once in the box at the top left at the start of the day; picking up uses them (no prompt) and they show on the card (&ldquo;Picked up 10:32 by AB&rdquo;), and opens the shift tool for that animal. Once a case is picked up it leaves the pick-up list for the other vets. If another vet got there first you'll be told it was skipped.</p></div></details>
+      <details><summary>I picked a case up but got called away — how do I put it back?</summary><div><p>Press <b>Put back</b> on the card. Only the vet who picked it up can put it back. The case returns to its tier column for any vet to pick up. No reason is needed. Its time target keeps running from when it was first flagged, and the card shows "Put back" with the time.</p></div></details>
       <details><summary>How do I finish a case?</summary><div><p>Press <b>DONE</b> once you have seen the animal. For a medication case the DONE panel asks for the medication details, and the case then waits for the nurses to make the label.</p></div></details>
       <details><summary>How do I hand a case to the nurses?</summary><div><p>Press <b>Transfer to nurse</b> on a picked-up case, choose the task (blood test, ear swab, FIV test, IVFT, microchip, UV, other) and add a note. The case leaves the vet board and appears on the Nurses page. Microchip and UV go to the Processing nurse, everything else to the Welfare nurse.</p></div></details>
-      <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Send a request</b> and pick <b>Nurses</b>. For <b>What</b> choose <b>Dispense medication</b> (animal, space, pen and the medication in the note; no schedule needed), a one-animal task (blood test, ear swab, FIV test, cat needing IVFT, microchip, UV, treatment check), or <b>Treatment course</b> for something given on a schedule such as "flush twice a day for 7 days" (then fill in times a day and days).</p></div></details>
+      <details><summary>How do I ask the nurses for a task without a case?</summary><div><p>Use <b>Send a request</b> and pick <b>Nurses</b>. For <b>What</b> choose <b>Dispense medication</b> (animal, space, pen and the medication in the note; no schedule needed), a one-animal task (blood test, ear swab, FIV test, cat needing IVFT, microchip, UV, treatment check), (for several tasks on the same animal, such as bloods and an FIV test, pick one and tick the others under <b>Also needed for this animal</b>; each goes to the nurses as its own task with the same note), or <b>Treatment course</b> for something given on a schedule such as "flush twice a day for 7 days" (then fill in times a day and days).</p></div></details>
       <details><summary>How will I know a new request has arrived?</summary><div><p>A red <b>NEW REQUEST</b> banner appears at the top, the page plays three beeps and the tab title flashes. It covers requests from shelter staff, results sent back by nurses, and requests from the Behaviour team (the banner says how many came from Behaviour). Tap the page, or the <b>alert sound</b> button, once at the start of your shift so the browser allows sound.</p></div></details>
       <details><summary>A nurse sent a result back to me — where is it?</summary><div><p>It arrives as a normal <b>shelter request</b> in the Cases board, in the Emergency column if the nurse chose "Within 2–4 hours" or the Urgent column for "Within 12–24 hours". The problem line gives the test, the result the nurse wrote, and what is wanted from you: <b>interpret the results</b>, <b>upload them to ShelterMate</b>, or something else (see the comment). Pick it up and press DONE like any other case.</p><p>While this page is open, every new request — including a result sent back — raises a red <b>NEW REQUEST</b> banner with one count (for example “3 new requests sent through”), flashes the tab title and beeps. The sound is on by default; browsers need one tap on the page before they will play it, and the sound button at the top mutes it.</p></div></details>
       <h3 class="faq-group">Behaviour</h3>
@@ -476,6 +480,7 @@
     checkForNewRequests();
     if (BF) BF.refresh();
     MEMOS = memosRes.data || [];
+    MemoExtras.load(sb).then(d => memoExtras().setDate(d));
     NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || [];
     ROSTER = {};
@@ -523,7 +528,7 @@
     LDHLogic.reasonsOf(t).filter(r => r.extra).forEach(r => metaBits.push('<b>also flagged ' + esc(fmtTime(r.at)) + (r.by ? ' by ' + esc(r.by) : '') + ':</b> ' + (r.text ? esc(r.text) : 'no detail')));
     if (t.red_flags && t.red_flags.length) metaBits.push('signs: ' + t.red_flags.map(k => esc(LDHLogic.signLabel(k))).join(', '));
     if (stage === 'waiting_medication') metaBits.push('Vet check done — waiting on medication');
-    else if (stage === 'picked_up') metaBits.push('Picked up ' + esc(fmtTime(t.claimed_at)));
+    else if (stage === 'picked_up') metaBits.push('Picked up ' + esc(fmtTime(t.claimed_at)) + (t.claimed_by ? ' by <b>' + esc(t.claimed_by) + '</b>' : ''));
     else if (stage === 'flagged' && t.put_back_at) metaBits.push('Put back ' + esc(fmtTime(t.put_back_at)));
     return `
       <div class="attn-item" data-id="${esc(t.id)}">
@@ -657,11 +662,13 @@
   document.getElementById('batch-pickup-btn').addEventListener('click', async () => {
     const tasks = TASKS.filter(t => selectedPickup.has(t.id) && !t.claimed_at);
     if (!tasks.length) return;
+    const who = askPickupInitials(tasks.length > 1 ? tasks.length + ' cases' : tasks[0].title);
+    if (!who) return;
     // .is('claimed_at', null) makes the update only succeed against rows
     // still unclaimed — guards against two vets picking up overlapping
     // cases at once (TOCTOU). .select() reports which ones actually won.
     const { data, error } = await sb.from('tasks')
-      .update({ claimed_at: new Date().toISOString(), claimed_by: null })
+      .update({ claimed_at: new Date().toISOString(), claimed_by: who })
       .in('id', tasks.map(t => t.id)).is('claimed_at', null).select();
     if (error) { alert('Could not record the pick-up: ' + error.message); return; }
     const claimedIds = new Set((data || []).map(r => r.id));
@@ -747,6 +754,12 @@
     if (putBackBtn) {
       const t = TASKS.find(x => x.id === putBackBtn.dataset.id);
       if (!t || !t.claimed_at || t.done) return;
+      // only the vet who picked it up can put it back (a case picked up before initials were recorded has no owner)
+      if (t.claimed_by) {
+        const me = askVetInitials();
+        if (!me) return;
+        if (me !== t.claimed_by) { alert(t.title + ' was picked up by ' + t.claimed_by + '. Only ' + t.claimed_by + ' can put it back.'); return; }
+      }
       // .not('claimed_at','is',null) + .eq('done',false): only release a case that is still picked up and open.
       const { data, error } = await sb.from('tasks')
         .update({ claimed_at: null, claimed_by: null, put_back_at: new Date().toISOString() })
@@ -760,10 +773,12 @@
     if (pickBtn) {
       const t = TASKS.find(x => x.id === pickBtn.dataset.id);
       if (!t || t.claimed_at) return;
+      const who = askPickupInitials(t.title);
+      if (!who) return;
       // .is('claimed_at', null) + .select(): only claim it if it's still
       // unclaimed, and tell us whether we actually won the race.
       const { data, error } = await sb.from('tasks')
-        .update({ claimed_at: new Date().toISOString(), claimed_by: null })
+        .update({ claimed_at: new Date().toISOString(), claimed_by: who })
         .eq('id', t.id).is('claimed_at', null).select();
       if (error) { alert('Could not record the pick-up: ' + error.message); return; }
       if (!data || !data.length) {
@@ -863,8 +878,15 @@
       ${isDone ? `<button type="button" class="secondary memo-del" data-id="${esc(m.id)}" style="padding:3px 10px; font-size:0.7rem; margin-top:6px;">Delete</button>` : ''}
     </div>`;
   }
+  // Next clinic meeting date + "Tick all off" (lib/memo-extras.js)
+  let memoExtrasUi = null;
+  function memoExtras() {
+    if (!memoExtrasUi) memoExtrasUi = MemoExtras.mount({ sb, el: document.getElementById('memo-extras'), getOpenCount: () => LDHLogic.splitMemos(MEMOS).active.length, reload: () => loadAll() });
+    return memoExtrasUi;
+  }
   function renderMemos() {
     const { active, completed } = LDHLogic.splitMemos(MEMOS);
+    memoExtras().refresh();
     document.getElementById('memo-list').innerHTML =
       active.map(m => memoRowHtml(m, false)).join('') || '<p class="empty-state">No open memos.</p>';
     const toggle = document.getElementById('memo-completed-toggle');
@@ -925,10 +947,31 @@
   const VET_INIT_KEY = 'ldh_vets_initials_v1';
   const cleanVetInit = v => String(v || '').replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 4);
   function storedVetInit() {
+    const box = document.getElementById('vet-initials'), typed = box ? cleanVetInit(box.value) : '';
+    if (typed) return typed;
     try { const o = JSON.parse(localStorage.getItem(VET_INIT_KEY) || '{}'); return o.d === LDHLogic.localISO(new Date()) ? (o.v || '') : ''; } catch (e) { return ''; }
   }
-  function rememberVetInit(v) { try { localStorage.setItem(VET_INIT_KEY, JSON.stringify({ d: LDHLogic.localISO(new Date()), v })); } catch (e) { /* only for this visit */ } }
+  function rememberVetInit(v) { const box = document.getElementById('vet-initials'); if (box && box.value !== v) box.value = v; try { localStorage.setItem(VET_INIT_KEY, JSON.stringify({ d: LDHLogic.localISO(new Date()), v })); } catch (e) { /* only for this visit */ } }
   document.querySelectorAll('.vet-init').forEach(el => { el.value = storedVetInit(); el.addEventListener('input', () => { el.value = cleanVetInit(el.value); }); });
+  // Picking a case up puts the vet's initials on it; the box starts with the initials remembered for the day.
+  // The one initials box (top left) is typed once at the start of the day; pick up and put back use it with no prompt.
+  function focusVetInit() {
+    const box = document.getElementById('vet-initials');
+    box.scrollIntoView({ block: 'center' }); box.focus(); box.style.outline = '3px solid #d9534f'; setTimeout(() => { box.style.outline = ''; }, 3000);
+  }
+  function askVetInitials() {
+    const v = storedVetInit();
+    if (v) return v;
+    focusVetInit();
+    alert('Enter your initials in the box at the top left first (once for the day), then try again.');
+    return '';
+  }
+  const askPickupInitials = askVetInitials;
+  (function () {
+    const box = document.getElementById('vet-initials');
+    box.value = storedVetInit();
+    box.addEventListener('input', () => { box.value = cleanVetInit(box.value); rememberVetInit(box.value); document.querySelectorAll('.vet-init').forEach(x => { x.value = box.value; }); });
+  })();
   // the initials typed in this request; remembered so the next request starts filled in
   function vetInitFrom(el) {
     const v = cleanVetInit(el && el.value);
@@ -1024,9 +1067,9 @@
     document.getElementById('app-root').style.display = 'grid';
     // One request card, the same on every page: the vets ask the nurses (a treatment course or a one-animal task) or the behaviour team.
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'vets', onDone: showPlanBanner });
-    SendCard.mount(document.getElementById('send-request'), { sb, role: 'vets', tabs: ['nurses', 'behaviour'], initials: storedVetInit(), saveInitials: rememberVetInit, onSent: () => loadAll() });
+    SendCard.mount(document.getElementById('send-request'), { sb, role: 'vets', tabs: ['nurses', 'behaviour'], getInitials: storedVetInit, initialsWhere: 'at the top left', focusInitials: focusVetInit, saveInitials: rememberVetInit, onSent: () => loadAll() });
     await loadAll();
-    OpsCore.subscribe(['tasks', 'memos', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'behaviour_tasks'], loadAll);
+    OpsCore.subscribe(['tasks', 'memos', 'clinic_meeting', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'behaviour_tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {
       await sb.auth.signOut();
       location.reload();

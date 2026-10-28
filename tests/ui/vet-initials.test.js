@@ -3,27 +3,26 @@ const { open } = require('./harness');
 const t = require('./check')('vet-initials');
 const ago = ms => new Date(Date.now() - ms).toISOString();
 (async () => {
-  const v = await open({ tasks: [{ title: 'CASE-1', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', done: false, created_at: ago(3600e3) }] }, 'vets.html');
+  const v = await open({ tasks: [{ title: 'CASE-1', location: 'Pound 1', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', done: false, created_at: ago(3600e3) }] }, 'vets.html', { noVetInit: true });
   try {
-    await v.page.waitForSelector('#send-request [data-f="initials"]');
+    await v.page.waitForSelector('#vet-initials');
     const F = f => '#send-request .sc-panel[data-to="nurses"] [data-f="' + f + '"]';
     const msg = () => v.page.textContent('#send-request .sc-panel[data-to="nurses"] [data-msg]');
-    t.ok(await v.page.locator('#vet-initials').count() === 0, 'no separate "vet initials for today" box on the vets page');
-    t.ok(await v.page.isVisible('#send-request [data-f="initials"]'), 'the one request card has an initials box');
+    t.ok(await v.page.isVisible('#vet-initials') && await v.page.locator('#send-request [data-f="initials"]').count() === 0, 'one initials box for the page (top left); the request card has none of its own');
     // nurse task (one animal): blocked without initials
     await v.page.selectOption(F('kind'), 'blood');
     await v.page.fill(F('animal'), 'INI-1');
     await v.page.click('[data-send="nurses"]'); await v.page.waitForTimeout(200);
     t.ok((await v.db()).noga_requests.length === 0 && /initials/i.test(await msg()), 'a nurse task cannot be sent without initials');
-    await v.page.fill('#send-request [data-f="initials"]', 'ab3c');
-    t.ok((await v.page.inputValue('#send-request [data-f="initials"]')) === 'ABC', 'initials are letters only, upper case');
+    await v.page.fill('#vet-initials', 'ab3c');
+    t.ok((await v.page.inputValue('#vet-initials')) === 'ABC', 'initials are letters only, upper case');
     await v.page.click('[data-send="nurses"]');
     await v.page.waitForFunction(() => window.__db.noga_requests.length === 1);
     t.ok((await v.db()).noga_requests[0].added_by === 'ABC', 'a nurse task carries the vet\'s initials');
     t.ok(/requested by ABC/.test(await v.page.textContent('#misc-list')), 'and the vet sees who asked in the list');
     // treatment course: uses the same initials box, which keeps the last initials typed
-    t.ok((await v.page.inputValue('#send-request [data-f="initials"]')) === 'ABC', 'the card keeps the initials just used');
-    await v.page.fill('#send-request [data-f="initials"]', 'xy');
+    t.ok((await v.page.inputValue('#vet-initials')) === 'ABC', 'the box keeps the initials');
+    await v.page.fill('#vet-initials', 'xy');
     await v.page.selectOption(F('kind'), 'course');
     await v.page.fill(F('animal'), 'INI-2'); await v.page.fill(F('treatment'), 'flush'); await v.page.click('[data-send="nurses"]');
     await v.page.waitForFunction(() => window.__db.nurse_treatments.length === 1);

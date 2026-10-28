@@ -45,7 +45,7 @@ async function finish(page, id) {
   try {
     await v.page.waitForSelector('#send-request .sc-tab[data-sc="behaviour"]'); await v.page.click('#send-request .sc-tab[data-sc="behaviour"]');
     const P = '#send-request .sc-panel[data-to="behaviour"] ';
-    await v.page.fill('#send-request [data-f="initials"]', 'jx'); await v.page.fill(P + '[data-f="animal"]', 'ROLE-1'); await v.page.selectOption(P + '[data-f="kind"]', 'courthold');
+    await v.page.fill('#vet-initials', 'jx'); await v.page.fill(P + '[data-f="animal"]', 'ROLE-1'); await v.page.selectOption(P + '[data-f="kind"]', 'courthold');
     await v.page.click(P + '[data-send="behaviour"]');
     await v.page.waitForFunction(() => window.__db.behaviour_tasks.length === 1);
     t.ok((await v.db()).behaviour_tasks[0].requested_by_role === 'vets', 'a task from the Vets page is stamped vets');
@@ -54,7 +54,7 @@ async function finish(page, id) {
   try {
     await n.page.waitForSelector('#send-request .sc-tab[data-sc="behaviour"]'); await n.page.click('#send-request .sc-tab[data-sc="behaviour"]');
     const P = '#send-request .sc-panel[data-to="behaviour"] ';
-    await n.page.fill('#send-request [data-f="initials"]', 'ab'); await n.page.fill(P + '[data-f="animal"]', 'ROLE-2'); await n.page.selectOption(P + '[data-f="kind"]', 'courthold');
+    await n.page.fill('#initials-welfare', 'ab'); await n.page.fill(P + '[data-f="animal"]', 'ROLE-2'); await n.page.selectOption(P + '[data-f="kind"]', 'courthold');
     await n.page.click(P + '[data-send="behaviour"]');
     await n.page.waitForFunction(() => window.__db.behaviour_tasks.length === 1);
     t.ok((await n.db()).behaviour_tasks[0].requested_by_role === 'nurses', 'a task from the Nurses page is stamped nurses');

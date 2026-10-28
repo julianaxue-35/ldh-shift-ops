@@ -17,7 +17,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     await n.page.fill('#initials-welfare', 'ab'); await n.page.dispatchEvent('#initials-welfare', 'change');
     await n.page.reload(); await n.page.waitForSelector('#send-request .sc-tab');
     t.ok(JSON.stringify(await n.page.$$eval('#send-request .sc-tab', bs => bs.map(b => b.textContent))) === '["Vets","Behaviour"]', 'with a Vets and a Behaviour tab');
-    t.ok((await n.page.inputValue('#send-request [data-f="initials"]')) === 'AB', 'the nurse\'s initials are filled in from the column box');
+    t.ok(await n.page.locator('#send-request [data-f="initials"]').count() === 0, 'the request card has no initials box of its own: it uses the column box');
     // validation
     await n.page.click('[data-send="vets"]');
     t.ok(/animal ID/i.test(await n.page.textContent(P + '[data-msg]')), 'it asks for the animal ID');

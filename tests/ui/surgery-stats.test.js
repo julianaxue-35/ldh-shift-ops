@@ -13,12 +13,17 @@ const t = require('./check')('surgery-stats');
   ] };
   const s = await open(seed, 'stats.html');
   try {
-    await s.page.waitForSelector('#surgery-breakdown-grid .totals-period');
-    const year = (await s.page.innerText('#surgery-breakdown-grid [data-period="year"]')).replace(/\s+/g, ' ');
-    t.ok(/Cats 2 routine \u00b7 0 non-routine/.test(year), 'cats: 2 routine: ' + year);
-    t.ok(/Dogs 0 routine \u00b7 1 non-routine/.test(year) && /Rabbits 1 routine \u00b7 0 non-routine/.test(year), 'dogs and rabbits are separate');
-    t.ok(/Other species 0 routine \u00b7 1 non-routine/.test(year), 'other species only appear when there are some');
-    t.ok(/Routine \(spey \/ castrate\) 3/.test(year) && /Non-routine 2/.test(year) && /Total surgeries 5/.test(year), 'totals: 3 routine, 2 non-routine, 5 in all');
+    await s.page.waitForSelector('#surgery-breakdown-grid .kpi-row');
+    const G = '#surgery-breakdown-grid ';
+    const text = async () => (await s.page.innerText(G + '.kpi-row')).replace(/\s+/g, ' ');
+    const chart = async () => (await s.page.innerText(G)).replace(/\s+/g, ' ');
+    await s.page.click(G + '[data-seg="sur-period"] [data-v="year"]');
+    t.ok(/5 TOTAL SURGERIES/i.test(await text()) && /3 ROUTINE/i.test(await text()) && /2 NON-ROUTINE/i.test(await text()), 'totals: 3 routine, 2 non-routine, 5 in all: ' + await text());
+    t.ok(/Cats/.test(await chart()) && /Dogs/.test(await chart()) && /Rabbits/.test(await chart()) && /Other species/.test(await chart()), 'cats, dogs, rabbits and other species each have a line');
+    await s.page.click(G + '[data-seg="sur-kind"] [data-v="routine"]');
+    t.ok(await s.page.locator(G + '[data-seg="sur-kind"] [data-v="routine"].on').count() === 1, 'the Routine filter can be chosen');
+    await s.page.click(G + '[data-seg="sur-kind"] [data-v="other"]');
+    t.ok(await s.page.locator(G + '[data-seg="sur-kind"] [data-v="other"].on').count() === 1 && /5 TOTAL SURGERIES/i.test(await text()), 'the Non-routine filter can be chosen');
     t.ok(await s.page.isVisible('#surgery-breakdown'), 'the card is on the stats page');
     t.ok(s.errors.length === 0, 'no page errors: ' + s.errors.join('; '));
   } finally { await s.browser.close(); }

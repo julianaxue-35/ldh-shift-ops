@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js"></script>
 <script src="lib/ops-core.js"></script>
 <script src="lib/send-card.js"></script>
+<script src="lib/memo-extras.js"></script>
 <script src="lib/behaviour-feedback.js"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="lib/report7.js"></script>
@@ -379,6 +380,7 @@
       <div id="memo-list"></div>
       <button class="secondary" id="memo-completed-toggle" style="display:none; padding:6px 12px; font-size:0.75rem; margin-bottom:10px;"></button>
       <div id="memo-completed-list"></div>
+      <div id="memo-extras" style="border-top:1px solid rgba(30,34,56,0.08);padding-top:10px;margin-top:4px;"></div>
       <div id="memo-post">
         <textarea id="memo-text" placeholder="Post a memo..." rows="2"></textarea>
         <button id="memo-submit">Post</button>
@@ -1054,8 +1056,15 @@
       ${isDone ? `<button type="button" class="secondary memo-del" data-id="${esc(m.id)}" style="padding:3px 10px; font-size:0.7rem; margin-top:6px;">Delete</button>` : ''}
     </div>`;
   }
+  // Next clinic meeting date + "Tick all off" (lib/memo-extras.js)
+  let memoExtrasUi = null;
+  function memoExtras() {
+    if (!memoExtrasUi) memoExtrasUi = MemoExtras.mount({ sb, el: document.getElementById('memo-extras'), getOpenCount: () => LDHLogic.splitMemos(MEMOS).active.length, reload: () => loadAll() });
+    return memoExtrasUi;
+  }
   function renderMemos() {
     const { active, completed } = LDHLogic.splitMemos(MEMOS);
+    memoExtras().refresh();
     document.getElementById('memo-list').innerHTML = active.map(m => memoRowHtml(m, false)).join('') || '<p class="empty-state">No open memos.</p>';
     const toggle = document.getElementById('memo-completed-toggle');
     toggle.textContent = (showCompletedMemos ? 'Hide' : 'Show') + ' completed (' + completed.length + ')';
@@ -1541,6 +1550,7 @@
     ]);
     TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];
     NURSE_DOSES = ndRes.data || []; NOGA_REQUESTS = ngRes.data || []; MEMOS = memosRes.data || [];
+    MemoExtras.load(sb).then(d => memoExtras().setDate(d));
     await loadNurseCounts();
     vaccPull();
     if (!window.__onDutySynced) { window.__onDutySynced = true; syncOnDuty(); }
@@ -1553,15 +1563,16 @@
     const { sb: client } = await OpsCore.init({ page: 'nurses', gateRole: 'nurse' });
     sb = client;
     // ONE request card for the whole page (not one per nurse column): a nurse asks the vets or the Behaviour team for something.
-    // Initials: this card remembers its own for the day, starting from whichever nurse column has initials in it.
-    const REQ_KEY = 'ldh_nurse_request_initials_v1';
+    // It has no initials box of its own: it uses the Welfare nurse initials (or the Processing nurse initials if only those are filled in).
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });
     SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
-      initials: OpsCore.readInitials(REQ_KEY) || cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
-      saveInitials: (v) => OpsCore.saveInitials(REQ_KEY, v), onSent: () => loadAll() });
+      getInitials: () => cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
+      initialsWhere: 'under Welfare nurse initials for today',
+      focusInitials: () => { const i = document.getElementById('initials-welfare'); i.scrollIntoView({ block: 'center' }); i.focus(); i.style.outline = '3px solid #d9534f'; setTimeout(() => { i.style.outline = ''; }, 3000); },
+      onSent: () => loadAll() });
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
-    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos', 'vacc_list', 'behaviour_tasks'], loadAll);
+    OpsCore.subscribe(['tasks', 'nurse_requests', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'memos', 'clinic_meeting', 'vacc_list', 'behaviour_tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
   })();
 </script>

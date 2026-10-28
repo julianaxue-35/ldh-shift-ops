@@ -554,9 +554,8 @@
     $('bh-initials').value = OpsCore.readInitials(INIT_KEY);
     $('app-root').style.display = 'grid';
     // One request card, same as the other pages: here for asking the vets (shelter stress medication, post adoption pack, other).
-    SendCard.mount($('send-request'), { sb, tabs: ['vets'], vetsFrom: 'behaviour', initials: initials(),
-      saveInitials: v => { OpsCore.saveInitials(INIT_KEY, v); $('bh-initials').value = v; } });
-    $('bh-initials').addEventListener('change', () => { const w = document.querySelector('#send-request [data-f="initials"]'); if (w) w.value = initials(); });
+    SendCard.mount($('send-request'), { sb, tabs: ['vets'], vetsFrom: 'behaviour', getInitials: initials, initialsWhere: 'at the top left',
+      focusInitials: () => { const i = $('bh-initials'); i.scrollIntoView({ block: 'center' }); i.focus(); i.style.outline = '3px solid #d9534f'; setTimeout(() => { i.style.outline = ''; }, 3000); } });
     // FIR room + Feline Spectrum Assessment: a tab inside this page, so it is behind the same Behaviour passcode
     const showTab = (tab) => {
       $('bh-tab-tasks').hidden = tab !== 'tasks'; $('bh-tab-fir').hidden = tab !== 'fir';
