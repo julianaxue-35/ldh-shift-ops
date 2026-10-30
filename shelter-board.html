@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shelter Board</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js"></script>
+<script src="lib/ldh-logic.js?v=20261030c"></script>
 <script src="lib/ops-core.js"></script>
 <style>
   /* Same tokens, fonts and sizes as the main dashboard (index.html). */
@@ -218,7 +218,7 @@
   async function loadAll() {
     const since = new Date(Date.now() - LDHLogic_HISTORY_DAYS * 86400000).toISOString();
     const [tasksRes, lcRes, histRes, behRes] = await Promise.all([
-      sb.from('tasks').select('*').order('created_at', { ascending: false }),
+      LDHLogic.fetchAll(() => sb.from('tasks').select('*').order('created_at', { ascending: false }).order('id')),
       sb.from('locations').select('*').order('sort', { ascending: true }),
       sb.from('flag_history').select('*').gte('flagged_at', since),
       sb.from('behaviour_tasks').select('id,created_at,kind,animal_id,location,lane,due_window,reason,courthold,flagged_by,status,done_at,done_note,done_by')
