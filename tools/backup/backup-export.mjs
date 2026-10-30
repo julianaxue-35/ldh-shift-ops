@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* LDH Shift Ops: monthly hard-copy backup (2026-10-30).
    Signs in with the same staff login the pages use (the LDH code is read from ~/.ldh-backup/code, which only you can read),
-   then saves each table as a CSV in ~/Downloads/LDH_Backup_YYYY-MM/. It only READS; it never changes the database.
+   then saves each table as a CSV in LDH_Backup_YYYY-MM inside the Dropbox 'monthly and yearly dashboard report' folder (Downloads if that is not writable). It only READS; it never changes the database.
    Run by hand:  node backup-export.mjs        Scheduled: see install-backup.sh (1st of each month, 7:00 am). */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -30,8 +30,13 @@ async function main() {
   if (!auth.ok) throw new Error('Sign-in failed (' + auth.status + '). Is the LDH code in ' + codeFile + ' current?');
   const token = (await auth.json()).access_token;
   const now = new Date();
-  const dir = path.join(os.homedir(), 'Downloads', 'LDH_Backup_' + now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0'));
-  fs.mkdirSync(dir, { recursive: true });
+  const name = 'LDH_Backup_' + now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  // Saved in Juliana's Dropbox (LDH Leadership > COO Reports > monthly and yearly dashboard report). If that folder is missing or
+  // this scheduled job is not allowed to write there, it falls back to Downloads so a month is never lost.
+  const DROPBOX = path.join(os.homedir(), 'Library/CloudStorage/Dropbox/work docs/job related info/LDH docs/LDH Leadership/COO Reports/monthly and yearly dashboard report');
+  let dir = path.join(DROPBOX, name);
+  try { fs.mkdirSync(dir, { recursive: true }); fs.accessSync(dir, fs.constants.W_OK); }
+  catch { dir = path.join(os.homedir(), 'Downloads', name); fs.mkdirSync(dir, { recursive: true }); console.error('Dropbox folder not writable: saved in Downloads instead.'); }
   const summary = [];
   for (const t of TABLES) {
     const rows = [];

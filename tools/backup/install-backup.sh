@@ -3,9 +3,12 @@
 # then schedules backup-export.mjs for 7:00 am on the 1st of every month (if the Mac is asleep it runs when it wakes).
 # To remove it later:  launchctl bootout gui/$(id -u)/au.ldh.backup && rm ~/Library/LaunchAgents/au.ldh.backup.plist
 set -e
-DIR="$(cd "$(dirname "$0")" && pwd)"
+SRC="$(cd "$(dirname "$0")" && pwd)"
 NODE="$(command -v node)"
 mkdir -p ~/.ldh-backup && chmod 700 ~/.ldh-backup
+# keep our own copy of the script, so the schedule works whichever branch of the project is open
+cp "$SRC/backup-export.mjs" ~/.ldh-backup/backup-export.mjs
+DIR="$HOME/.ldh-backup"
 if [ ! -s ~/.ldh-backup/code ]; then
   printf "LDH access code (hidden): "; read -s CODE; echo
   printf '%s' "$CODE" > ~/.ldh-backup/code; chmod 600 ~/.ldh-backup/code
