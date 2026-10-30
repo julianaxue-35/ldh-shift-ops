@@ -20,9 +20,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Vets</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261030c"></script>
+<script src="lib/ldh-logic.js?v=20261030d"></script>
 <script src="lib/animal-history-view.js"></script>
-<script src="lib/ops-core.js"></script>
+<script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js"></script>
 <script src="lib/memo-extras.js"></script>
 <script src="lib/behaviour-feedback.js"></script>
@@ -468,8 +468,8 @@
   }
   async function loadAll() {
     const [tasksRes, memosRes, ntRes, ndRes, rosterRes, ngRes] = await Promise.all([
-      LDHLogic.fetchAll(() => sb.from('tasks').select('*').order('created_at', { ascending: false }).order('id')),
-      sb.from('memos').select('*').order('created_at', { ascending: false }),
+      LDHLogic.loadRecentTasks(sb),
+      LDHLogic.recentMemos(sb),
       sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
