@@ -79,7 +79,14 @@ const STUB = `
         if (window.__fail && window.__fail[name]) { res({ data: null, error: { message: 'boom' } }); return; }
         try {
           // Mirrors the tasks_log_done trigger + backfill (0043): the completion log is every finished task.
-          const rows = name === 'task_done_log' ? db.tasks.filter(t => t.done && t.completed_at).map(t => ({ id: t.id + '|' + t.completed_at, task_id: t.id, shift: t.shift, title: t.title, completed_at: t.completed_at })) : db[name];
+          const rows = name === 'stats_daily' ? (() => {   // what migration 0046 keeps: finished checks per day and shift (practice animals left out)
+            const by = {};
+            db.tasks.filter(t => t.done && t.completed_at && !/^TEST[ -]?\d*$/i.test(String(t.title).trim())).forEach(t => {
+              const d = new Date(t.completed_at), day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'), k = day + '|' + t.shift;
+              by[k] = by[k] || { day, shift: t.shift, n: 0 }; by[k].n++;
+            });
+            return Object.values(by);
+          })() : name === 'task_done_log' ? db.tasks.filter(t => t.done && t.completed_at).map(t => ({ id: t.id + '|' + t.completed_at, task_id: t.id, shift: t.shift, title: t.title, completed_at: t.completed_at })) : db[name];
           const match = () => rows.filter(r => filters.every(f => f(r)));
           const hold = row => (name === 'tasks' ? applyMedicationHold(row) : row);
           let data;

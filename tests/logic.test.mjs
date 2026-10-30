@@ -836,3 +836,17 @@ test('loadRecentTasks / recentMemos / surveyRows: ask only for open or recent ro
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'not'), 'survey rows only those with a condition');
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, created_at'), 'survey reads four columns');
 });
+
+test('doneRowsSince: reads the daily summary and expands it to one row per finished check, falling back to the log without it', async () => {
+  const mk = (tables) => ({ from: (name) => { const t = tables[name];
+    const b = { select() { return b; }, gte() { return b; }, eq() { return b; }, order() { return b; },
+      range: async () => (t === undefined ? { data: null, error: { message: 'relation does not exist' } } : { data: t, error: null }) }; return b; } });
+  const daily = await L.doneRowsSince(mk({ stats_daily: [{ day: '2026-10-28', shift: 'sick_injured', n: 3 }, { day: '2026-10-29', shift: 'surgery', n: 1 }] }), '2026-01-01T00:00:00');
+  assert.equal(daily.data.length, 4);
+  const t = L.periodTotals(daily.data, new Date('2026-10-30T10:00:00').getTime());
+  assert.equal(t.month.sick_injured, 3);
+  assert.equal(t.month.surgery, 1);
+  assert.equal(t.year.total, 4);
+  const fb = await L.doneRowsSince(mk({ task_done_log: [{ title: 'A1', shift: 'processing', completed_at: '2026-10-29T01:00:00Z' }] }), '2026-01-01T00:00:00');
+  assert.equal(fb.data.length, 1, 'no daily summary: the log is used');
+});
