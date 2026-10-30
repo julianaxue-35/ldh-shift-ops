@@ -50,7 +50,7 @@ const STUB = `
   }
   const listeners = [];
   function table(name) {
-    let op = null, payload = null, filters = [], orderCol = null, limitN = null, rangeTo = null, rangeFrom = 0, asc = true, single = false, conflictCols = ['id'];
+    let op = null, payload = null, filters = [], orders = [], limitN = null, rangeTo = null, rangeFrom = 0, asc = true, single = false, conflictCols = ['id'];
     const b = {
       select() { if (!op) op = 'select'; return b; },
       insert(rows) { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return b; },
@@ -67,21 +67,23 @@ const STUB = `
       not(k, op, v) { if (op === 'is' && v === null) filters.push(r => r[k] != null); return b; },
       ilike(k, pat) { const parts = String(pat).toLowerCase().split('%').filter(Boolean); filters.push(r => { let i = 0; const v = String(r[k] == null ? '' : r[k]).toLowerCase(); return parts.every(p => { const j = v.indexOf(p, i); if (j < 0) return false; i = j + p.length; return true; }); }); return b; },  // test stub: handles the lookup's %a%b% patterns only
       is(k, v) { filters.push(r => (v === null ? r[k] == null : r[k] === v)); return b; },
-      order(c, o) { orderCol = c; asc = !(o && o.ascending === false); return b; },
+      order(c, o) { orders.push({ c, asc: !(o && o.ascending === false) }); return b; },
       limit(n) { limitN = n; return b; },
       single() { single = true; return b; },
       then(res, rej) {
         if (window.__fail && window.__fail[name]) { res({ data: null, error: { message: 'boom' } }); return; }
         try {
-          const rows = db[name];
+          // Mirrors the tasks_log_done trigger + backfill (0043): the completion log is every finished task.
+          const rows = name === 'task_done_log' ? db.tasks.filter(t => t.done && t.completed_at).map(t => ({ id: t.id + '|' + t.completed_at, task_id: t.id, shift: t.shift, title: t.title, completed_at: t.completed_at })) : db[name];
           const match = () => rows.filter(r => filters.every(f => f(r)));
           const hold = row => (name === 'tasks' ? applyMedicationHold(row) : row);
           let data;
           // Mirrors the log_flag() trigger (0013_shelter_board.sql): real flags are logged to flag_history.
           const logFlag = r => { if (name === 'tasks' && r.type !== 'check_recheck') db.flag_history.push({ id: uuid(), task_id: r.id, title: r.title, flagged_at: r.created_at, location: r.location, reason: (r.problem || '').trim() || null, condition: r.condition || null }); };
           if (op === 'insert') {
-            // Opt-in mirror of tasks_title_location_shift_idx: a test sets window.__uniqueTasks = true.
-            if (name === 'tasks' && window.__uniqueTasks && payload.some(p => rows.some(r => r.title === p.title && r.location === p.location && r.shift === p.shift))) {
+            // Opt-in mirror of tasks_title_location_shift_kind_idx (0044): a test sets window.__uniqueTasks = true. A request and a list entry are different kinds.
+            const kindOf = x => (x.type === undefined || x.type === 'check_recheck') ? 'list' : 'request';
+            if (name === 'tasks' && window.__uniqueTasks && payload.some(p => rows.some(r => r.title === p.title && r.location === p.location && r.shift === p.shift && kindOf(r) === kindOf(p)))) {
               res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "tasks_title_location_shift_idx"' } }); return;
             }
             data = payload.map(p => hold(Object.assign({ id: uuid() }, defaults[name](), p))); data.forEach(d => { rows.push(d); logFlag(d); });
@@ -97,7 +99,7 @@ const STUB = `
             });
           }
           else if (op === 'delete') { data = match(); data.forEach(r => rows.splice(rows.indexOf(r), 1)); }
-          else { data = match(); if (orderCol) data = data.slice().sort((x, y) => (x[orderCol] > y[orderCol] ? 1 : -1) * (asc ? 1 : -1)); if (limitN != null) data = data.slice(0, limitN); if (rangeTo != null) data = data.slice(rangeFrom, rangeTo + 1); }
+          else { data = match(); if (orders.length) data = data.slice().sort((x, y) => { for (const { c, asc } of orders) { if (x[c] !== y[c]) return (x[c] > y[c] ? 1 : -1) * (asc ? 1 : -1); } return 0; }); if (limitN != null) data = data.slice(0, limitN); if (rangeTo != null) data = data.slice(rangeFrom, rangeTo + 1); }
           if (op !== 'select') listeners.filter(l => l.table === name).forEach(l => setTimeout(l.cb, 0));
           const out = JSON.parse(JSON.stringify(data));
           res({ data: single ? out[0] : out, error: null });

@@ -804,3 +804,19 @@ test('rings: a staff request and a list check for the same animal and pen are tw
   assert.equal(ring.total, 1); assert.equal(ring.done, 1, 'the request counts in the flagged ring');
   assert.equal(L.todayTasks(rows, now).length, 4, 'even mixed together, the request and the list check are not merged');
 });
+
+test('fetchAll: reads every page, so a list over 1000 rows is not cut short', async () => {
+  const all = Array.from({ length: 2500 }, (_, i) => ({ id: i }));
+  const calls = [];
+  const build = () => ({ range: async (a, b) => { calls.push([a, b]); return { data: all.slice(a, b + 1), error: null }; } });
+  const r = await L.fetchAll(build);
+  assert.equal(r.data.length, 2500); assert.equal(r.error, null);
+  assert.deepEqual(calls, [[0, 999], [1000, 1999], [2000, 2999]]);
+  // exactly 1000 rows needs a second (empty) page to know it is finished
+  let n = 0;
+  const exact = await L.fetchAll(() => ({ range: async (a, b) => { n++; return { data: a === 0 ? all.slice(0, 1000) : [], error: null }; } }));
+  assert.equal(exact.data.length, 1000); assert.equal(n, 2);
+  // an error on any page is reported, not hidden behind a partial list
+  const bad = await L.fetchAll(() => ({ range: async (a) => a === 0 ? { data: all.slice(0, 1000), error: null } : { data: null, error: { message: 'boom' } } }));
+  assert.equal(bad.data, null); assert.equal(bad.error.message, 'boom');
+});
