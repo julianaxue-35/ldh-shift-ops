@@ -557,7 +557,7 @@
      the shelter-staff page; 2026-09-26: she wants this here too) ---------- */
   function renderCompletion() {
     document.getElementById('kpi-date').textContent = new Date().toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' });
-    const today = LDHLogic.todayTasks(TASKS, Date.now());
+    const today = LDHLogic.todayTasks(LDHLogic.listChecks(TASKS), Date.now());
     const total = today.length || 1;
     const done = today.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
@@ -576,7 +576,7 @@
   function renderShiftProgress() {
     const container = document.getElementById('shift-progress-row');
     container.innerHTML = '';
-    const today = LDHLogic.todayTasks(TASKS, Date.now());
+    const today = LDHLogic.todayTasks(LDHLogic.listChecks(TASKS), Date.now());
     for (const shift of ['processing', 'sick_injured', 'surgery']) {
       const items = today.filter(t => t.shift === shift);
       const total = items.length;

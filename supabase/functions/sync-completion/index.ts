@@ -222,6 +222,36 @@ function behaviourResendHistory(history, by, nowISO) {
 // behaviour-validate-end
 
 // Completed Admission AA cards are kept 7 days (so a note the AA missed can be put back), then removed. Best effort.
+// status-match-start
+// (2026-10-30) The offline tools and the dashboard spell the same animal/pen differently (case, spaces, "CR1-30" vs
+// "Cat Room 1 / 30"), so the read-back compares a normalised ID + location, and answers with the CALLER's own spelling.
+function statusKey(title, location) {
+  const id = String(title == null ? '' : title).replace(/\s+/g, '').toLowerCase();
+  const loc = String(location == null ? '' : location).toLowerCase().replace(/[^a-z0-9]/g, '')
+    .replace(/^catroom/, 'cr').replace(/^adoption/, 'ca').replace(/^pound/, 'p').replace(/^rabbitroom/, 'rr');
+  return id + '|' + loc;
+}
+function doneAmong(asked, rows) {
+  const have = new Set(rows.map((r) => statusKey(r.title, r.location)));
+  return asked.filter((it) => have.has(statusKey(it.title, it.location))).map((it) => ({ title: it.title, location: it.location }));
+}
+// status-match-end
+
+// list-refresh-start
+// (2026-10-30) A list entry (type check_recheck) left over from an EARLIER day — still open, or finished on an earlier day — is
+// the same animal being listed again today. The insert is ignore-duplicates, so without this it never counted toward today's
+// total (22 of 37 on a 48-animal list). Re-listing makes it a fresh, open check for today. Rows already created or completed
+// today are left alone, so a list sent twice in a day can never undo a completion.
+function staleToRefresh(rows, wantedKeys, midnightISO) {
+  const start = new Date(midnightISO).getTime();
+  return rows.filter((r) => {
+    if (r.type !== 'check_recheck' || !wantedKeys.has(r.title + '|' + r.location)) return false;
+    if (r.done) return r.completed_at ? new Date(r.completed_at).getTime() < start : new Date(r.created_at).getTime() < start;
+    return new Date(r.created_at).getTime() < start;
+  });
+}
+// list-refresh-end
+
 async function purgeCompletedAa(supabase) {
   try {
     await supabase.from('aa_items').delete().not('completed_at', 'is', null)
@@ -393,7 +423,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'delete needs title, location and a valid shift' }), { status: 400, headers: CORS_HEADERS });
     }
     const { error } = await supabase.from('tasks').delete()
-      .eq('title', dTitle).eq('location', dLocation).eq('shift', dShift);
+      .eq('title', dTitle).eq('location', dLocation).eq('shift', dShift).eq('type', 'check_recheck');   // the list entry only: a staff request for the same animal+pen is a separate log
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }
@@ -418,7 +448,7 @@ Deno.serve(async (req) => {
     }
     const { error } = await supabase.from('tasks')
       .update({ med_label: cLabel, med_chart_done: body.chart.med_chart_done === true })
-      .eq('title', cTitle).eq('location', cLocation).eq('shift', cShift);
+      .eq('title', cTitle).eq('location', cLocation).eq('shift', cShift).neq('type', 'check_recheck');   // a flagged request only (a plain list entry has no vet case to chart)
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }
@@ -467,17 +497,17 @@ Deno.serve(async (req) => {
     if (!VALID_SHIFTS.includes(sShift) || !asked.length) {
       return new Response(JSON.stringify({ error: 'status needs a valid shift and at least one title+location' }), { status: 400, headers: CORS_HEADERS });
     }
-    const titles = [...new Set(asked.map((it) => it.title))];
+    // (2026-10-30) Matched ignoring case, spaces and location spelling ("CR1-30" = "Cat Room 1 / 30"), so it needs every
+    // completion from today on this shift, not an exact title filter. Only the caller's own pairs are ever answered.
     const { data, error } = await supabase.from('tasks')
       .select('title,location')
-      .eq('shift', sShift).eq('done', true)
+      .eq('shift', sShift).eq('done', true).eq('type', 'check_recheck')   // list entries only: a vet finishing a staff request is not "this list animal registered elsewhere"
       .gte('completed_at', melbourneMidnightISO())
-      .in('title', titles);
+      .limit(5000);
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }
-    const wanted = new Set(asked.map((it) => `${it.title}|${it.location}`));
-    const done = (data ?? []).filter((r) => wanted.has(`${r.title}|${r.location}`)).map((r) => ({ title: r.title, location: r.location }));
+    const done = doneAmong(asked, data ?? []);
     return new Response(JSON.stringify({ ok: true, done }), {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
@@ -500,7 +530,7 @@ Deno.serve(async (req) => {
     }
 
     const { error } = await supabase.from('tasks').upsert(rows, {
-      onConflict: 'title,location,shift',
+      onConflict: 'title,location,shift,kind',
       ignoreDuplicates: true,
     });
 
@@ -508,7 +538,35 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     }
 
-    return new Response(JSON.stringify({ ok: true, count: rows.length }), {
+    // Re-listed animals whose row is from an earlier day become today's again (see staleToRefresh). The earlier completion is
+    // written to task_done_log FIRST (migration 0043): if that fails (migration not run yet) nothing is reset, so no history is lost.
+    // Never fails the list-load.
+    let refreshed = 0;
+    try {
+      const now = new Date().toISOString();
+      for (const sh of [...new Set(rows.map((r) => r.shift))]) {
+        const inShift = rows.filter((r) => r.shift === sh);
+        const keys = new Set(inShift.map((r) => r.title + '|' + r.location));
+        const { data: existing } = await supabase.from('tasks')
+          .select('id,title,location,shift,type,done,created_at,completed_at')
+          .eq('shift', sh).in('title', [...new Set(inShift.map((r) => r.title))]);
+        const stale = staleToRefresh(existing ?? [], keys, melbourneMidnightISO());
+        if (!stale.length) continue;
+        const finished = stale.filter((r) => r.done && r.completed_at);
+        if (finished.length) {
+          const { error: eLog } = await supabase.from('task_done_log').upsert(
+            finished.map((r) => ({ task_id: r.id, shift: r.shift, title: r.title, completed_at: r.completed_at })),
+            { onConflict: 'task_id,completed_at', ignoreDuplicates: true });
+          if (eLog) continue;
+        }
+        const { error: e2 } = await supabase.from('tasks')
+          .update({ created_at: now, done: false, completed_at: null, note: null })
+          .in('id', stale.map((r) => r.id));
+        if (!e2) refreshed += stale.length;
+      }
+    } catch (_e) { /* a refresh problem must never block the list-load */ }
+
+    return new Response(JSON.stringify({ ok: true, count: rows.length, refreshed }), {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     });
@@ -535,7 +593,7 @@ Deno.serve(async (req) => {
 
   const { error } = await supabase.from('tasks').upsert(
     { title, location, shift, done: true, completed_at: new Date().toISOString(), note },
-    { onConflict: 'title,location,shift' },
+    { onConflict: 'title,location,shift,kind' },
   );
 
   if (error) {
