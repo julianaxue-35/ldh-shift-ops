@@ -836,3 +836,12 @@ test('loadRecentTasks / recentMemos / surveyRows: ask only for open or recent ro
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'not'), 'survey rows only those with a condition');
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, created_at'), 'survey reads four columns');
 });
+
+test('public holidays: 2027 and 2028 are listed, only Mon-Fri holidays cost Surgery a working day, weekends are unaffected', () => {
+  const H = L.PUBLIC_HOLIDAYS;
+  ['2027-03-26', '2027-03-29', '2027-11-02', '2027-12-27', '2028-01-03', '2028-04-17', '2028-11-07'].forEach(d => assert.ok(H.includes(d), d));
+  assert.equal(L.isWorkingDay(new Date('2027-11-02T12:00:00'), 'weekdays_no_holidays'), false, 'Melbourne Cup 2027: no surgery');
+  assert.equal(L.isWorkingDay(new Date('2027-11-03T12:00:00'), 'weekdays_no_holidays'), true);
+  assert.equal(L.isWorkingDay(new Date('2027-11-02T12:00:00'), 'weekdays'), true, 'Processing still runs');
+  assert.ok(H.filter(d => d >= '2027').every(d => { const w = new Date(d + 'T12:00:00').getDay(); return w !== 0 && w !== 6; }), 'every 2027-28 holiday listed falls on a weekday');
+});
