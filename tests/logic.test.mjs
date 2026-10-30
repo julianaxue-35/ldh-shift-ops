@@ -792,3 +792,15 @@ test('the "quarter" window is the season, and statsSince reaches back to last De
   assert.equal(L.localDayKey(L.statsSince(at('2026-01-20'))), '2025-12-01');
   assert.equal(L.localDayKey(L.statsSince(at('2026-07-20'))), '2026-01-01');
 });
+
+test('rings: a staff request and a list check for the same animal and pen are two logs, each in its own ring', () => {
+  const now = Date.now(), iso = new Date(now - 3600e3).toISOString();
+  const row = (o) => Object.assign({ title: 'A1', location: 'CR1-30', shift: 'sick_injured', done: false, created_at: iso, completed_at: null, type: 'check_recheck' }, o);
+  const rows = [row({}), row({ type: 'shelter', done: true, completed_at: iso }), row({ title: 'A2' }), row({ title: 'A3', done: true, completed_at: iso })];
+  const checks = L.todayTasks(L.listChecks(rows), now);
+  assert.equal(checks.length, 3, 'list: A1, A2, A3 (different IDs in one pen stay separate)');
+  assert.equal(checks.filter(t => t.done).length, 1, 'only A3 finished: the finished request does not tick A1');
+  const ring = L.requestRing(rows, now);
+  assert.equal(ring.total, 1); assert.equal(ring.done, 1, 'the request counts in the flagged ring');
+  assert.equal(L.todayTasks(rows, now).length, 4, 'even mixed together, the request and the list check are not merged');
+});

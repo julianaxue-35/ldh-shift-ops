@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261028a"></script>
+<script src="lib/ldh-logic.js?v=20261030b"></script>
 <script src="lib/surveillance-view.js?v=20261028a"></script>
 <script src="lib/trend-chart.js?v=20261028a"></script>
 <link rel="stylesheet" href="lib/surveillance.css?v=20261028a">
@@ -423,7 +423,7 @@
   async function loadTrends() {
     const now = new Date();
     const yearStart = LDHLogic.statsSince(now.getTime());
-    const { data, error } = await sb.from('tasks').select('title, shift, completed_at').eq('done', true).gte('completed_at', yearStart.toISOString());
+    const { data, error } = await LDHLogic.doneRowsSince(sb, yearStart.toISOString());
     const rows = error ? [] : (data || []).filter(x => !LDHLogic.isTestAnimal(x.title));   // TEST1, TEST 2 ... are practice animals
     YEAR_ROWS = rows; // reused by renderPeriodTotals — same completed-this-year rows, no second query
 

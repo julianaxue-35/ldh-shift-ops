@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js"></script>
+<script src="lib/ldh-logic.js?v=20261030b"></script>
 <script src="lib/ops-core.js"></script>
 <script src="lib/surveillance-view.js"></script>
 <script src="lib/animal-history-view.js"></script>
@@ -610,7 +610,7 @@
       sb.from('tasks').select('*').order('created_at', { ascending: false }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('tasks').select('title, shift, completed_at').eq('done', true).gte('completed_at', yearStart),
+      LDHLogic.doneRowsSince(sb, yearStart),
       sb.from('flag_history').select('*').gte('flagged_at', new Date(Date.now() - 92 * 86400000).toISOString()),
     ]);
     HISTORY = histRes.error ? [] : (histRes.data || []);   // a nice-to-have: the page works without it
@@ -715,7 +715,7 @@
            (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
            flag_history, so the earlier flag is remembered); if it is still open, add the new reason to it. */
         if (error && error.code === '23505') {
-          const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift);
+          const { data: found } = await sb.from('tasks').select('*').eq('title', row.title).eq('location', row.location).eq('shift', row.shift).neq('type', 'check_recheck');
           const old = found && found[0];
           if (old && !old.done) {
             // Already open in this pen: add this person's reason to the SAME case rather than refusing or duplicating it.
@@ -801,7 +801,7 @@
     document.getElementById('request-older').textContent = r.older ? `+ ${r.older} older still open` : '';
   }
   function renderCompletion() {
-    const today = LDHLogic.todayTasks(TASKS, Date.now());
+    const today = LDHLogic.todayTasks(LDHLogic.listChecks(TASKS), Date.now());   // list checks only: staff requests have their own ring
     const total = today.length || 1;
     const done = today.filter(t => t.done).length;
     const pct = Math.round((done / total) * 100);
@@ -826,7 +826,7 @@
   function renderShiftProgress() {
     const container = document.getElementById('shift-progress-row');
     container.innerHTML = '';
-    const today = LDHLogic.todayTasks(TASKS, Date.now());
+    const today = LDHLogic.todayTasks(LDHLogic.listChecks(TASKS), Date.now());
     for (const shift of ['processing', 'sick_injured', 'surgery']) {
       const items = today.filter(t => t.shift === shift);
       const total = items.length;
