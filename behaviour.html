@@ -336,7 +336,7 @@
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
     if (!error) { ROWS = data || []; checkForNewTasks(); }
-    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').or('done.eq.false,completed_at.gte.' + new Date(Date.now() - 3 * 86400000).toISOString()).order('created_at', { ascending: true });   // open ones, plus those the vets finished (shown for 24 h)
+    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').or('done.eq.false,completed_at.gte.' + new Date(Date.now() - 24 * 3600000).toISOString()).order('created_at', { ascending: true });   // open ones, plus those the vets finished (shown for 24 h)
     if (!vr.error) WAITING = vr.data || [];
     render(); renderWaiting();
     await loadCounts(); renderStats();

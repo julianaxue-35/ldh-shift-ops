@@ -831,8 +831,8 @@ test('loadRecentTasks / recentMemos / surveyRows: ask only for open or recent ro
   await L.recentMemos(sb);
   await L.surveyRows(sb);
   const orT = seen.find(s => s[0] === 'tasks' && s[1] === 'or')[2];
-  assert.match(orT, /^done\.eq\.false,created_at\.gte\.\d{4}-.*,completed_at\.gte\.\d{4}-/);
-  assert.match(seen.find(s => s[0] === 'memos' && s[1] === 'or')[2], /^done\.eq\.false,created_at\.gte\./);
+  assert.match(orT, /^done\.eq\.false,completed_at\.gte\.\d{4}-/);
+  assert.match(seen.find(s => s[0] === 'memos' && s[1] === 'or')[2], /^done\.eq\.false,done_at\.gte\./);
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'not'), 'survey rows only those with a condition');
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, created_at'), 'survey reads four columns');
 });
