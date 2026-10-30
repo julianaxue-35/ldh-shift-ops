@@ -820,3 +820,19 @@ test('fetchAll: reads every page, so a list over 1000 rows is not cut short', as
   const bad = await L.fetchAll(() => ({ range: async (a) => a === 0 ? { data: all.slice(0, 1000), error: null } : { data: null, error: { message: 'boom' } } }));
   assert.equal(bad.data, null); assert.equal(bad.error.message, 'boom');
 });
+
+test('loadRecentTasks / recentMemos / surveyRows: ask only for open or recent rows (free-plan data use)', async () => {
+  const seen = [];
+  const q = (name) => { const b = { select(c) { seen.push([name, 'select', c]); return b; }, or(e) { seen.push([name, 'or', e]); return b; },
+    not() { seen.push([name, 'not']); return b; }, gte(k) { seen.push([name, 'gte', k]); return b; }, order() { return b; }, range: async () => ({ data: [], error: null }),
+    then(res) { return Promise.resolve({ data: [], error: null }).then(res); } }; return b; };
+  const sb = { from: q };
+  await L.loadRecentTasks(sb, 7);
+  await L.recentMemos(sb);
+  await L.surveyRows(sb);
+  const orT = seen.find(s => s[0] === 'tasks' && s[1] === 'or')[2];
+  assert.match(orT, /^done\.eq\.false,created_at\.gte\.\d{4}-.*,completed_at\.gte\.\d{4}-/);
+  assert.match(seen.find(s => s[0] === 'memos' && s[1] === 'or')[2], /^done\.eq\.false,created_at\.gte\./);
+  assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'not'), 'survey rows only those with a condition');
+  assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, created_at'), 'survey reads four columns');
+});

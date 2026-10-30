@@ -20,8 +20,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261030c"></script>
-<script src="lib/ops-core.js"></script>
+<script src="lib/ldh-logic.js?v=20261030d"></script>
+<script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/surveillance-view.js"></script>
 <script src="lib/animal-history-view.js"></script>
 <link rel="stylesheet" href="lib/surveillance.css">
@@ -603,16 +603,18 @@
   }
 
   /* ---------- data loading ---------- */
-  let YTD_ROWS = [];
+  let YTD_ROWS = [], SURVEY_ROWS = [];
   async function loadAll() {
     const yearStart = LDHLogic.statsSince(Date.now()).toISOString();
-    const [tasksRes, rosterRes, lcRes, ytdRes, histRes] = await Promise.all([
-      LDHLogic.fetchAll(() => sb.from('tasks').select('*').order('created_at', { ascending: false }).order('id')),
+    const [tasksRes, rosterRes, lcRes, ytdRes, histRes, surveyRes] = await Promise.all([
+      LDHLogic.loadRecentTasks(sb),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
       sb.from('locations').select('*').order('sort', { ascending: true }),
       LDHLogic.doneRowsSince(sb, yearStart),
       sb.from('flag_history').select('*').gte('flagged_at', new Date(Date.now() - 92 * 86400000).toISOString()),
+      LDHLogic.surveyRows(sb),
     ]);
+    SURVEY_ROWS = surveyRes.error ? [] : (surveyRes.data || []);
     HISTORY = histRes.error ? [] : (histRes.data || []);   // a nice-to-have: the page works without it
     TASKS = tasksRes.data || [];
     LOCATION_ROWS = lcRes.data || [];
@@ -1100,7 +1102,7 @@
   function renderDiseaseWatch() {
     const card = document.getElementById('disease-watch');
     if (!LOCATION_ROWS.length) { card.style.display = 'none'; return; }
-    const survey = LDHLogic.buildSurvey(TASKS, LOCATION_ROWS, LDHLogic.windowStart('30d', Date.now()));
+    const survey = LDHLogic.buildSurvey(SURVEY_ROWS, LOCATION_ROWS, LDHLogic.windowStart('30d', Date.now()));
     document.getElementById('disease-watch-map').innerHTML = SurveillanceView.heatMapHtml(survey) + SurveillanceView.unmappedHtml(survey);
     card.style.display = 'block';
   }

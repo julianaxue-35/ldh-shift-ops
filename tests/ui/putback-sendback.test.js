@@ -39,7 +39,7 @@ const H = 3600 * 1000;
     await rb.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none');
     t.ok((await rb.page.textContent('#new-item-banner-text')).includes('1 new request sent through'), 'a new nurse result raises the banner as one new request');
     await rb.page.evaluate(() => sb.from('tasks').insert({ title: 'OTHER', location: 'Pound 3', shift: 'sick_injured', type: 'shelter', urgency: 'routine', problem: 'limping' }));
-    await rb.page.waitForTimeout(300);
+    await rb.page.waitForTimeout(1500);   // the page now reloads 1 s after changes settle
     t.ok((await rb.page.textContent('#new-item-banner-text')).includes('2 new requests sent through'), 'an ordinary new case is a new request too — the banner just counts');
     // a second result appended to the already-open case also alerts
     await rb.page.evaluate(() => { const r = window.__db.tasks.find(x => x.title === 'NEW-RES'); return sb.from('tasks').update({ problem: r.problem + ' — Result back from nurse — FIV test: neg. Vet to: upload results.' }).eq('id', r.id); });

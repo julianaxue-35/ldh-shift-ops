@@ -60,6 +60,11 @@ const STUB = `
       eq(k, v) { filters.push(r => r[k] === v); return b; },
       gte(k, v) { filters.push(r => r[k] >= v); return b; },
       neq(k, v) { filters.push(r => r[k] !== v); return b; },
+      or(expr) {   // 'col.op.value,col.op.value' (eq / gte), true when any part matches
+        const parts = String(expr).split(',').map(p => { const m = p.match(/^([^.]+)\.(eq|gte)\.(.*)$/); return m && { k: m[1], op: m[2], v: m[3] }; }).filter(Boolean);
+        filters.push(r => parts.some(p => { const x = r[p.k]; return p.op === 'eq' ? String(x) === p.v : (x != null && String(x) >= p.v); }));
+        return b;
+      },
       like(k, pat) { return b.ilike(k, pat); },
       range(from, to) { rangeFrom = from; rangeTo = to; return b; },
       lt(k, v) { filters.push(r => r[k] < v); return b; },

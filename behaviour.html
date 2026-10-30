@@ -20,8 +20,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Behaviour</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261030c"></script>
-<script src="lib/ops-core.js"></script>
+<script src="lib/ldh-logic.js?v=20261030d"></script>
+<script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js"></script>
 <script src="lib/trend-chart.js"></script>
 <script src="lib/fsa.js"></script>
@@ -336,7 +336,7 @@
   async function loadAll() {
     const { data, error } = await sb.from('behaviour_tasks').select('*').order('created_at', { ascending: true });
     if (!error) { ROWS = data || []; checkForNewTasks(); }
-    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').order('created_at', { ascending: true });   // open ones, plus those the vets finished (shown for 24 h)
+    const vr = await sb.from('tasks').select('*').like('problem', 'Behaviour team request%').or('done.eq.false,completed_at.gte.' + new Date(Date.now() - 3 * 86400000).toISOString()).order('created_at', { ascending: true });   // open ones, plus those the vets finished (shown for 24 h)
     if (!vr.error) WAITING = vr.data || [];
     render(); renderWaiting();
     await loadCounts(); renderStats();
