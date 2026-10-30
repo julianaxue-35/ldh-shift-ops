@@ -579,13 +579,13 @@
     SURVEY_LOCATIONS = loc.data || [];
     SURVEY_ROWS_RETURNED = pages.length >= 10000 ? 1000 : 0;   // only warn if even ten pages were not enough
     SURVEY_TASKS = pages.filter(t => t.condition && !LDHLogic.isTestAnimal(t.title));
-    // Baseline day count: read ONE space's 'any' rows (one per night, so at most ~400 for a year) — reading every space
+    // Baseline day count: read ONE space's 'any' rows (one per night) — reading every space
     // would hit the API's 1000-row cap after about 80 days.
     SNAPSHOT_DATES = []; SNAPSHOT_LAST = null;
     if (SURVEY_LOCATIONS.length) {
-      const snap = await sb.from('surveillance_snapshots').select('snapshot_date')
+      const snap = await LDHLogic.fetchAll(() => sb.from('surveillance_snapshots').select('snapshot_date')
         .eq('condition', 'any').eq('space', SURVEY_LOCATIONS[0].name)
-        .order('snapshot_date', { ascending: true }).limit(400);
+        .order('snapshot_date', { ascending: true }));   // paged: a plain .limit(400) would stop counting nights after 13 months
       SNAPSHOT_DATES = (snap.data || []).map(r => r.snapshot_date);
       const last = await sb.from('surveillance_snapshots').select('snapshot_date')
         .eq('condition', 'any').eq('space', SURVEY_LOCATIONS[0].name)
