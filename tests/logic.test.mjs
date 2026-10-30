@@ -845,3 +845,17 @@ test('public holidays: 2027 and 2028 are listed, only Mon-Fri holidays cost Surg
   assert.equal(L.isWorkingDay(new Date('2027-11-02T12:00:00'), 'weekdays'), true, 'Processing still runs');
   assert.ok(H.filter(d => d >= '2027').every(d => { const w = new Date(d + 'T12:00:00').getDay(); return w !== 0 && w !== 6; }), 'every 2027-28 holiday listed falls on a weekday');
 });
+
+test('doneRowsSince: reads the daily summary and expands it to one row per finished check, falling back to the log without it', async () => {
+  const mk = (tables) => ({ from: (name) => { const t = tables[name];
+    const b = { select() { return b; }, gte() { return b; }, eq() { return b; }, order() { return b; },
+      range: async () => (t === undefined ? { data: null, error: { message: 'relation does not exist' } } : { data: t, error: null }) }; return b; } });
+  const daily = await L.doneRowsSince(mk({ stats_daily: [{ day: '2026-10-28', shift: 'sick_injured', n: 3 }, { day: '2026-10-29', shift: 'surgery', n: 1 }] }), '2026-01-01T00:00:00');
+  assert.equal(daily.data.length, 4);
+  const t = L.periodTotals(daily.data, new Date('2026-10-30T10:00:00').getTime());
+  assert.equal(t.month.sick_injured, 3);
+  assert.equal(t.month.surgery, 1);
+  assert.equal(t.year.total, 4);
+  const fb = await L.doneRowsSince(mk({ task_done_log: [{ title: 'A1', shift: 'processing', completed_at: '2026-10-29T01:00:00Z' }] }), '2026-01-01T00:00:00');
+  assert.equal(fb.data.length, 1, 'no daily summary: the log is used');
+});
