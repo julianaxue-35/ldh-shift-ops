@@ -930,3 +930,8 @@ test('every sign group has a label and every legacy key folds into a sign group'
   for (const k of L.SIGN_KEYS) assert.ok(typeof L.CONDITION_LABELS[k] === 'string' && L.CONDITION_LABELS[k].trim().length > 0, 'label for ' + k);
   for (const [legacy, g] of Object.entries(L.LEGACY_GROUP)) assert.ok(L.SIGN_KEYS.includes(g), legacy + ' -> ' + g);
 });
+
+test('speciesOfLocation: cat / dog / rabbit by room, either when unknown', () => {
+  for (const [loc, sp] of [['Cat Room 1', 'cat'], ['Cat Room 3', 'cat'], ['Pound 1', 'dog'], ['Pound 2 / Run 4', 'dog'], ['Rabbit Room', 'rabbit'], ['Rabbit Room / 1', 'rabbit'], ['Offsite', 'either']])
+    assert.equal(L.speciesOfLocation(loc), sp, loc);
+});

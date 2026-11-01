@@ -15,6 +15,10 @@ const KEYS = 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelli
   t.ok(!(await page.locator('details.sign-diff[data-group="gi"] li').first().isVisible()), 'differential text is hidden until opened');
   await page.click('details.sign-diff[data-group="gi"] summary');
   t.ok(await page.locator('details.sign-diff[data-group="gi"] li').first().isVisible() && /Parvovirus/.test(await page.textContent('details.sign-diff[data-group="gi"]')) && /not a diagnosis/.test(await page.textContent('details.sign-diff[data-group="gi"]')), 'opening shows the differentials and the note');
+  const sums = await page.$$eval('details.sign-diff summary', os => os.map(o => o.textContent.trim()));
+  t.ok(new Set(sums).size === 10 && sums.every(x => /^Possible causes \(reference\) \u2014 \S/.test(x)) && sums.some(x => x.startsWith('Possible causes (reference) \u2014 GI signs')), 'each differentials summary names its group: ' + sums.join(' | '));
+  t.ok(await page.locator('fieldset#req-signs-wrap > legend').count() === 1 && /Signs you can see/.test(await page.textContent('fieldset#req-signs-wrap > legend')), 'sign list is a fieldset with a legend');
+  t.ok(/Oral foreign body/.test(await page.textContent('details.sign-diff[data-group="gi"]')), 'GI differentials include the oral causes');
   t.ok(await page.locator('#req-birthing').count() === 1, 'separate cat birthing checkbox');
   t.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no horizontal scroll');
 
@@ -22,6 +26,7 @@ const KEYS = 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelli
   await page.click('#triage-drawer summary');
   await page.check('.req-sign[value="gi"]'); await page.check('.req-flag >> nth=0');
   await page.waitForTimeout(300);
+  t.ok(await page.$eval('.req-sign[value="gi"]', el => getComputedStyle(el.closest('label').querySelector('small')).opacity) === '1', 'checked sign chip example text is full opacity');
   const bg = sel => page.$eval(sel, el => getComputedStyle(el.closest('label')).backgroundColor);
   const signBg = await bg('.req-sign[value="gi"]'), flagBg = await bg('.req-flag');
   t.ok(signBg !== flagBg, 'checked sign chip colour differs from checked emergency chip (' + signBg + ' vs ' + flagBg + ')');

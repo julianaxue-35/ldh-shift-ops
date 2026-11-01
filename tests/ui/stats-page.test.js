@@ -67,7 +67,7 @@ const D = 24 * 3600 * 1000;
   const grp = (title, loc, extra) => Object.assign({ title, location: loc, shift: 'sick_injured', type: 'shelter', urgency: 'routine', done: false, created_at: new Date().toISOString() }, extra);
   const gseed = { locations: LOCATION_ROWS, tasks: [
     grp('K1', 'Pound 1 / 2', { condition: 'kennel_cough' }), grp('C1', 'Cat Room 1 / 2', { condition: 'cat_flu' }),
-    grp('TWO', 'Cat Room 1 / 3', { conditions: ['gi', 'urinary'], condition: 'gi' }), grp('OLD', 'Pound 1 / 5', { condition: 'vomiting' })] };
+    grp('TWO', 'Cat Room 1 / 3', { conditions: ['gi', 'urinary'], condition: 'gi' }), grp('OLD', 'Pound 1 / 5', { condition: 'vomiting' }), grp('RAB', 'Rabbit Room / 1', { conditions: ['skin'], condition: 'skin' })] };
   const g = await open(gseed, 'stats.html');
   try {
     await g.page.waitForSelector('#surv-dash .heat-tile');
@@ -86,6 +86,7 @@ const D = 24 * 3600 * 1000;
     t.ok(lines.some(l => /^"Cat Room 1 \/ 3",cat,"GI signs",1$/.test(l)), 'the per-location section has a Species column (cat for a Cat Room)');
     t.ok(lines.some(l => /^"Pound 1 \/ 5",dog,"GI signs",1$/.test(l)), 'dog for Pound 1');
     t.ok(lines.some(l => /,"TWO","Cat Room 1 \/ 3",cat,"GI signs; Urinary signs"$/.test(l)), 'the animal row shows both labels joined with "; " and the species: ' + lines.filter(l => /TWO/.test(l)).join('|'));
+    t.ok(lines.some(l => /^"Rabbit Room \/ 1",rabbit,"Skin signs",1$/.test(l)) && lines.some(l => /,"RAB","Rabbit Room \/ 1",rabbit,"Skin signs"$/.test(l)), 'a Rabbit Room row reads rabbit in both sections: ' + lines.filter(l => /Rabbit/.test(l)).join('|'));
     t.ok(lines.includes('Location,Species,Condition,Count') && lines.includes('Date,Animal ID,Location,Species,Condition'), 'both sections have a Species header');
     t.ok(g.errors.length === 0, 'no page errors: ' + g.errors.join('; '));
   } finally { await g.browser.close(); }

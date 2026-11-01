@@ -10,7 +10,8 @@ test('every sign group except other has 4-10 differentials', () => {
     if (g.key === 'other') { assert.equal(SD.BY_GROUP.other, undefined); continue; }
     const list = SD.BY_GROUP[g.key];
     assert.ok(Array.isArray(list), g.key);
-    assert.ok(list.length >= 4 && list.length <= 10, g.key + ' has ' + list.length);
+    // upper bound 13: the GI group now also lists the three oral causes its label (mouth) promises
+    assert.ok(list.length >= 4 && list.length <= 13, g.key + ' has ' + list.length);
   }
 });
 test('entries are short differential names only', () => {

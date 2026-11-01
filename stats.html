@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101b"></script>
+<script src="lib/ldh-logic.js?v=20261101c"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/trend-chart.js?v=20261028a"></script>
 <link rel="stylesheet" href="lib/surveillance.css?v=20261101b">
@@ -661,13 +661,13 @@
     csv += '\nBy location\nLocation,Species,Condition,Count\n';
     Object.keys(byLocation).sort().forEach(loc => {
       Object.keys(byLocation[loc]).forEach(cond => {
-        csv += `${csvCell(loc)},${LDHLogic.behaviourSpecies(loc)},${csvCell(CONDITION_LABELS[cond] || cond)},${byLocation[loc][cond]}\n`;
+        csv += `${csvCell(loc)},${LDHLogic.speciesOfLocation(loc)},${csvCell(CONDITION_LABELS[cond] || cond)},${byLocation[loc][cond]}\n`;
       });
     });
     csv += '\nFull list (flagged cases only)\nDate,Animal ID,Location,Species,Condition\n';
     flagged.forEach(t => {
       const d = new Date(t.created_at).toLocaleDateString('en-AU');
-      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${LDHLogic.behaviourSpecies(t.location)},${csvCell(LDHLogic.conditionsOf(t).map(k => CONDITION_LABELS[k] || k).join('; '))}\n`;
+      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${LDHLogic.speciesOfLocation(t.location)},${csvCell(LDHLogic.conditionsOf(t).map(k => CONDITION_LABELS[k] || k).join('; '))}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });

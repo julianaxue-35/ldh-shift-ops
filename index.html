@@ -20,8 +20,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101b"></script>
-<script src="lib/sign-differentials.js?v=20261101b"></script>
+<script src="lib/ldh-logic.js?v=20261101c"></script>
+<script src="lib/sign-differentials.js?v=20261101c"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
@@ -256,7 +256,9 @@
   .req-chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
   .req-chip:has(input:checked) { background: var(--critical); border-color: var(--critical); color: #fff; }
   #req-signs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-  .sign-head { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; }
+  #req-signs-wrap { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .sign-head { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; padding: 0; }
+  .sign-item .req-chip:has(input:checked) small { opacity: 1; }
   .sign-item { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 100%; }
   .sign-item .req-chip { max-width: 100%; flex-wrap: wrap; border-radius: 14px; }
   .sign-item .req-chip:has(input:checked) { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -398,11 +400,11 @@
             <option value="urgent">Urgent — within 12–24 h</option>
             <option value="red_flag">Emergency — within 2–4 h</option>
           </select></label>
-          <div class="sr-wide" id="req-signs-wrap">
-            <div class="sign-head">Signs you can see (optional — tick any that apply)</div>
+          <fieldset class="sr-wide" id="req-signs-wrap">
+            <legend class="sign-head">Signs you can see (optional — tick any that apply)</legend>
             <div id="req-signs"></div>
             <label class="req-chip req-birthing-chip"><input type="checkbox" id="req-birthing">🚨 Cat birthing — urgent check</label>
-          </div>
+          </fieldset>
           <label class="sr-wide">Reason / clinical notes<textarea id="req-problem" rows="3" placeholder="Describe the issue in detail, e.g. limping on front-left leg, not eating for 2 days..."></textarea></label>
         </div>
 
@@ -1025,7 +1027,7 @@
     const diff = (window.SignDifferentials && SignDifferentials.BY_GROUP) || {};
     document.getElementById('req-signs').innerHTML = LDHLogic.SIGN_GROUPS.map(g => `<div class="sign-item">
       <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label>${diff[g.key] ? `
-      <details class="sign-diff" data-group="${g.key}"><summary>Possible causes (reference)</summary><ul>${diff[g.key].map(d => `<li>${esc(d)}</li>`).join('')}</ul><p>${esc(SignDifferentials.NOTE)}</p></details>` : ''}</div>`).join('');
+      <details class="sign-diff" data-group="${g.key}"><summary>Possible causes (reference) — ${esc(g.label)}</summary><ul>${diff[g.key].map(d => `<li>${esc(d)}</li>`).join('')}</ul><p>${esc(SignDifferentials.NOTE)}</p></details>` : ''}</div>`).join('');
   }
   function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
   // The urgent cat-birthing reason rides along in red_flags, so it is Red flag tier like any emergency sign.
