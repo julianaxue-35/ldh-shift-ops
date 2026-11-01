@@ -16,7 +16,7 @@ const survey = L.buildSurvey([
 test('heat map: one tile per space with rate, cage counts and leading sign; escapes names', () => {
   const h = V.heatMapHtml(survey);
   assert.match(h, /class="heat-grid"/);
-  assert.match(h, /data-space="Cat Room 1"[\s\S]*6\.7%[\s\S]*2 cases · 30 cages<\/div>[\s\S]*<b>2<\/b> Cat flu \(URI\)/);
+  assert.match(h, /data-space="Cat Room 1"[\s\S]*6\.7%[\s\S]*2 cases · 30 cages<\/div>[\s\S]*<b>2<\/b> Respiratory signs/);
   assert.ok(h.includes('Pound &lt;2&gt;') && !h.includes('Pound <2>'), 'space names are escaped');
   assert.match(h, /data-space="Pound &lt;2&gt;"[\s\S]*0%[\s\S]*0 cases · 26 cages/);
 });
@@ -31,7 +31,7 @@ test('groups and ranked tables', () => {
   const g = V.groupsHtml(survey);
   assert.match(g, /Cat rooms[\s\S]*2[\s\S]*30[\s\S]*6\.7%/, '2 cases in 30 cages');
   const r = V.rankedHtml(survey);
-  assert.match(r, /Cat flu \(URI\)[\s\S]*2[\s\S]*67%/, '2 of the 3 flagged animals');
+  assert.match(r, /Respiratory signs[\s\S]*2[\s\S]*67%/, '2 of the 3 flagged animals');
   assert.match(V.rankedHtml(L.buildSurvey([], LOC, new Date())), /No signs flagged in this period\./);
 });
 
@@ -44,7 +44,7 @@ test('baseline banner shows the last snapshot, or that none has been taken', () 
 
 test('tile sub-line says cases, singular for one', () => {
   const one = L.buildSurvey([{ title: 'A1', location: 'Cat Room 1 / 4', condition: 'cat_flu', created_at: new Date(now).toISOString() }], LOC, new Date(now - 3 * 24 * 3600 * 1000));
-  assert.match(V.heatMapHtml(one), /1 case · 30 cages<\/div>[\s\S]*<b>1<\/b> Cat flu/);
+  assert.match(V.heatMapHtml(one), /1 case · 30 cages<\/div>[\s\S]*<b>1<\/b> Respiratory/);
 });
 
 test('unmapped spaces are reported, never dropped silently', () => {
