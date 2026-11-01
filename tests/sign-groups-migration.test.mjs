@@ -127,3 +127,24 @@ test('take_surveillance_snapshot matches buildSurvey with groups, legacy folding
   assert.equal(get('Pound 1', 'respiratory'), 1);
   assert.equal(snap.filter(r => r.space === 'Cat Room 1').length, 12, '11 groups + any');
 });
+
+test('an old page re-flagging with only condition replaces the stale conditions (and flag_history sees the new value)', async () => {
+  const d = await db();
+  await d.exec(`insert into public.tasks (title,location,shift,type,conditions,created_at) values ('r','Cat Room 1 / 1','sick_injured','shelter','{gi}', now() - interval '2 days')`);
+  await d.exec(`update public.tasks set condition='skin', created_at=now() where title='r'`);
+  assert.deepEqual(await one(d, `select condition, conditions from public.tasks where title='r'`), { condition: 'skin', conditions: ['skin'] });
+  const h = (await d.query(`select conditions from public.flag_history where title='r' order by flagged_at desc`)).rows;
+  assert.deepEqual(h[0].conditions, ['skin']);
+  assert.deepEqual(h[1].conditions, ['gi']);
+  await d.exec(`update public.tasks set condition=null where title='r'`);
+  assert.deepEqual(await one(d, `select condition, conditions from public.tasks where title='r'`), { condition: null, conditions: [] });
+});
+
+test('updating only conditions re-derives condition; updating both follows conditions', async () => {
+  const d = await db();
+  await d.exec(`insert into public.tasks (title,location,shift,conditions) values ('u','Cat Room 1 / 1','sick_injured','{gi}')`);
+  await d.exec(`update public.tasks set conditions='{urinary,ears}' where title='u'`);
+  assert.deepEqual(await one(d, `select condition, conditions from public.tasks where title='u'`), { condition: 'urinary', conditions: ['urinary', 'ears'] });
+  await d.exec(`update public.tasks set condition='skin', conditions='{neuro,eyes}' where title='u'`);
+  assert.deepEqual(await one(d, `select condition, conditions from public.tasks where title='u'`), { condition: 'neuro', conditions: ['neuro', 'eyes'] });
+});

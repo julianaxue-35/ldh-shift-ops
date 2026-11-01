@@ -36,6 +36,11 @@ create or replace function public.sync_conditions() returns trigger language plp
 declare
   ord text[] := array['respiratory','gi','urinary','skin','msk','neuro','eyes','ears','wounds_pain_swelling','neonatal','other'];
 begin
+  -- An OLD cached page changes only `condition` on an existing row: its value wins over the stale list.
+  if tg_op = 'UPDATE' and new.condition is distinct from old.condition and new.conditions is not distinct from old.conditions then
+    new.conditions := case when new.condition is null then '{}'::text[] else array[new.condition] end;
+  end if;
+  -- (On INSERT, if condition and a non-empty conditions disagree, conditions wins.)
   if coalesce(cardinality(new.conditions), 0) = 0 then
     if new.condition is not null then new.conditions := array[new.condition]; end if;
   else
