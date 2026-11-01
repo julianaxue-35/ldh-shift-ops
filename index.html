@@ -254,17 +254,31 @@
   .req-chip:hover { border-color: rgba(208,59,59,0.5); }
   .req-chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
   .req-chip:has(input:checked) { background: var(--critical); border-color: var(--critical); color: #fff; }
-  #req-signs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  .sign-dd { border: 1.5px solid var(--border); border-radius: 12px; background: #fff; margin-bottom: 8px; }
+  .sign-dd > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; font-size: 1rem; font-weight: 600; min-height: 44px; }
+  .sign-dd > summary::-webkit-details-marker { display: none; }
+  .sign-dd > summary::after { content: '\25BE'; font-size: 0.9rem; color: var(--muted); flex: none; }
+  .sign-dd[open] > summary::after { content: '\25B4'; }
+  .sign-dd.has-picks { border-color: var(--blue); }
+  .sign-dd > summary:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; border-radius: 12px; }
+  #req-signs-label.empty { color: var(--muted); font-weight: 400; }
+  #req-signs { display: flex; flex-direction: column; max-height: 340px; overflow-y: auto; border-top: 1px solid var(--border); }
   #req-signs-wrap { border: 0; padding: 0; margin: 0; min-width: 0; }
   .sign-head { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; padding: 0; }
   .sign-item .req-chip:has(input:checked) small { opacity: 1; }
-  .sign-item { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 100%; }
-  .sign-item .req-chip { max-width: 100%; flex-wrap: wrap; border-radius: 14px; }
-  .sign-item .req-chip:has(input:checked) { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .sign-item .req-chip small { font-weight: 400; margin-left: 6px; opacity: .85; }
+  .sign-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; margin: 0; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 0.95rem; font-weight: 600; }
+  .sr-form label.sign-item { flex-direction: row; align-items: flex-start; gap: 12px; }
+  .sr-form label.sign-item input { width: 20px; height: 20px; padding: 0; margin: 2px 0 0; flex: none; }
+  .sign-item:last-child { border-bottom: 0; }
+  .sign-item:hover { background: rgba(67,56,202,0.05); }
+  .sign-item input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; }
+  .sign-item .sign-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .sign-item small { font-weight: 400; font-size: 0.78rem; color: var(--muted); }
+  .sign-item:has(input:checked) { background: rgba(67,56,202,0.09); }
   .req-chip:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
   @media (max-width: 760px) { .sr-body { padding: 18px 16px 22px; } .sr-banner { padding: 16px; } .sr-to { grid-template-columns: minmax(0, 1fr); } .sr-form { grid-template-columns: minmax(0, 1fr); } }
-  .sr-send { position: sticky; bottom: 16px; z-index: 5; margin-top: 18px; padding: 14px 36px; font-size: 1rem; border-radius: 12px; box-shadow: 0 6px 18px rgba(30,34,56,0.28); transition: transform .08s, box-shadow .15s, filter .15s; }
+  .sr-send { margin-top: 18px; padding: 14px 36px; font-size: 1rem; border-radius: 12px; box-shadow: 0 6px 18px rgba(30,34,56,0.28); transition: transform .08s, box-shadow .15s, filter .15s; }
+  @media (min-width: 1025px) and (hover: hover) { .sr-send { position: sticky; bottom: 16px; z-index: 5; } }
   .sr-send:hover { filter: brightness(1.12); box-shadow: 0 8px 22px rgba(30,34,56,0.34); }
   .sr-send:active { transform: translateY(1px) scale(0.99); box-shadow: 0 3px 10px rgba(30,34,56,0.3); filter: brightness(0.95); }
   .sr-send:focus-visible { outline: 3px solid #fff; box-shadow: 0 0 0 6px var(--blue); }
@@ -397,10 +411,11 @@
           </select></label>
           <fieldset class="sr-wide" id="req-signs-wrap">
             <legend class="sign-head">Signs you can see (optional — tick any that apply)</legend>
-            <div id="req-signs"></div>
+            <details class="sign-dd" id="req-signs-dd"><summary><span id="req-signs-label" class="empty">Select signs…</span></summary>
+              <div id="req-signs"></div></details>
             <label class="req-chip req-birthing-chip"><input type="checkbox" id="req-birthing">🚨 Cat birthing — urgent check</label>
           </fieldset>
-          <label class="sr-wide">Reason / clinical notes<textarea id="req-problem" rows="3" placeholder="Describe the issue in detail, e.g. limping on front-left leg, not eating for 2 days..."></textarea></label>
+          <label class="sr-wide">Symptoms<textarea id="req-problem" rows="3" placeholder="Describe the symptoms, e.g. limping on front-left leg, not eating for 2 days..."></textarea></label>
         </div>
 
       <div id="req-birthing-wrap" style="display:none; margin:10px 0 0; padding:10px 12px; border:2px solid var(--critical); border-radius:12px; background:rgba(208,59,59,0.06);">
@@ -774,7 +789,7 @@
     document.getElementById('req-pen').value = '';
     document.getElementById('req-location-detail').value = '';
     document.getElementById('req-problem').value = '';
-    document.querySelectorAll('.req-sign').forEach(cb => { cb.checked = false; });
+    document.querySelectorAll('.req-sign').forEach(cb => { cb.checked = false; }); updateSignSummary();
     document.getElementById('req-birthing').checked = false;
     document.getElementById('req-urgency-pick').value = 'routine';
     document.getElementById('req-type').value = 'shelter';
@@ -1036,9 +1051,18 @@
   function renderSignForm() {
     if (!SIGN_ORDER_USED) { const st = readSignOrder(); SIGN_ORDER_USED = st ? repairSignOrder(st.order) : repairSignOrder([]); }
     const by = k => LDHLogic.SIGN_GROUPS.find(g => g.key === k);
-    document.getElementById('req-signs').innerHTML = SIGN_ORDER_USED.map(by).map(g => `<div class="sign-item">
-      <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label></div>`).join('');
+    document.getElementById('req-signs').innerHTML = SIGN_ORDER_USED.map(by).map(g => `<label class="sign-item"><input type="checkbox" class="req-sign" value="${g.key}"><span class="sign-txt">${esc(g.label)}<small>${esc(g.examples)}</small></span></label>`).join('');
+    updateSignSummary();
   }
+  function updateSignSummary() {
+    const picked = Array.from(document.querySelectorAll('.req-sign:checked')).map(cb => cb.closest('label').querySelector('.sign-txt').firstChild.textContent);
+    const lab = document.getElementById('req-signs-label');
+    lab.textContent = picked.length ? picked.join(', ') : 'Select signs…';
+    lab.classList.toggle('empty', !picked.length);
+    document.getElementById('req-signs-dd').classList.toggle('has-picks', picked.length > 0);
+  }
+  document.addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('req-sign')) updateSignSummary(); });
+  document.addEventListener('click', e => { const dd = document.getElementById('req-signs-dd'); if (dd && dd.open && !dd.contains(e.target)) dd.open = false; });
   // Called after loadAll fills HISTORY (flag_history, already read for the Animal history card): no extra query.
   function storeSignOrder() {
     if (!HISTORY.length) return;
