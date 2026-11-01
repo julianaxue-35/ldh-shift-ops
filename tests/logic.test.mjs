@@ -925,3 +925,8 @@ test('mergeReason unions raw stored keys, primary by group order; reasonText and
   assert.equal(L.flagReason({ reason: 'note', conditions: ['gi'] }), 'note');
   assert.equal(L.flagReason({}), '');
 });
+
+test('every sign group has a label and every legacy key folds into a sign group', () => {
+  for (const k of L.SIGN_KEYS) assert.ok(typeof L.CONDITION_LABELS[k] === 'string' && L.CONDITION_LABELS[k].trim().length > 0, 'label for ' + k);
+  for (const [legacy, g] of Object.entries(L.LEGACY_GROUP)) assert.ok(L.SIGN_KEYS.includes(g), legacy + ' -> ' + g);
+});

@@ -18,6 +18,16 @@ const KEYS = 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelli
   t.ok(await page.locator('#req-birthing').count() === 1, 'separate cat birthing checkbox');
   t.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no horizontal scroll');
 
+  // a ticked sign must not look like a ticked emergency sign
+  await page.click('#triage-drawer summary');
+  await page.check('.req-sign[value="gi"]'); await page.check('.req-flag >> nth=0');
+  await page.waitForTimeout(300);
+  const bg = sel => page.$eval(sel, el => getComputedStyle(el.closest('label')).backgroundColor);
+  const signBg = await bg('.req-sign[value="gi"]'), flagBg = await bg('.req-flag');
+  t.ok(signBg !== flagBg, 'checked sign chip colour differs from checked emergency chip (' + signBg + ' vs ' + flagBg + ')');
+  await page.uncheck('.req-sign[value="gi"]'); await page.uncheck('.req-flag >> nth=0');
+  await page.click('#triage-drawer summary');
+
   // gi + urinary
   await page.fill('#req-title', 'S1');
   await page.check('.req-sign[value="urinary"]'); await page.check('.req-sign[value="gi"]');

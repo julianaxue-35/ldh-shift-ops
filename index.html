@@ -20,12 +20,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101a"></script>
-<script src="lib/sign-differentials.js?v=20261101a"></script>
+<script src="lib/ldh-logic.js?v=20261101b"></script>
+<script src="lib/sign-differentials.js?v=20261101b"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
-<script src="lib/surveillance-view.js"></script>
-<script src="lib/animal-history-view.js"></script>
-<link rel="stylesheet" href="lib/surveillance.css">
+<script src="lib/surveillance-view.js?v=20261101b"></script>
+<script src="lib/animal-history-view.js?v=20261101b"></script>
+<link rel="stylesheet" href="lib/surveillance.css?v=20261101b">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -259,6 +259,7 @@
   .sign-head { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; }
   .sign-item { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 100%; }
   .sign-item .req-chip { max-width: 100%; flex-wrap: wrap; border-radius: 14px; }
+  .sign-item .req-chip:has(input:checked) { background: var(--blue); border-color: var(--blue); color: #fff; }
   .sign-item .req-chip small { font-weight: 400; margin-left: 6px; opacity: .85; }
   details.sign-diff { font-size: 0.75rem; margin-left: 8px; max-width: 100%; }
   details.sign-diff summary { cursor: pointer; color: var(--muted, #555); }
@@ -716,7 +717,7 @@
       if (needsVet) {
         if (window.staffInitials()) row.problem = [row.problem, '(sent by ' + window.staffInitials() + ')'].filter(Boolean).join(' — ');
         ({ error } = await sb.from('tasks').insert(row));
-        if (error && /conditions/.test(error.message || '') && !/duplicate/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
+        if (error && /column.*conditions|conditions.*column|schema cache/i.test(error.message || '') && !/duplicate/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
         /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
            (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
            flag_history, so the earlier flag is remembered); if it is still open, add the new reason to it. */
@@ -734,7 +735,7 @@
             if (!confirm(title + ' is already flagged in that pen for: ' + had + '.\n\nAdd your reason to the same case?')) return false;
             ({ error } = await sb.from('tasks').update(LDHLogic.mergeReason(old, entry)).eq('id', old.id));
             if (error && /extra_reasons/.test(error.message || '')) error = { message: 'The database needs migration 0019 (extra reasons) run first.' };
-            if (error && /conditions/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
+            if (error && /column.*conditions|conditions.*column|schema cache/i.test(error.message || '') && !/duplicate/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
           } else if (old) {
             ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
               created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,

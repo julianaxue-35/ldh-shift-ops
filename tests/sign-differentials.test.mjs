@@ -14,7 +14,7 @@ test('every sign group except other has 4-10 differentials', () => {
   }
 });
 test('entries are short differential names only', () => {
-  const bad = /treat|give|dose|mg|recommend|should|fracture|neoplasia|cancer|tumou?r/i;
+  const bad = /treat|give|dose|mg|recommend|should|fracture|neoplasia|cancer|tumou?r|neoplas|sarcoma|lymphoma|carcinoma|surgery|antibiotic|euthan|\bmg\b/i;
   for (const [k, list] of Object.entries(SD.BY_GROUP)) {
     assert.equal(new Set(list).size, list.length, k + ' duplicates');
     for (const e of list) { assert.equal(typeof e, 'string'); assert.ok(e.length > 0 && e.length <= 60, e); assert.ok(!bad.test(e), e); }
@@ -22,4 +22,9 @@ test('entries are short differential names only', () => {
 });
 test('NOTE is the exact reference-only text', () => {
   assert.equal(SD.NOTE, 'For reference only. This is a list of possible causes, not a diagnosis.');
+});
+test('respiratory group names cat flu and kennel cough', () => {
+  const r = SD.BY_GROUP.respiratory.join(' | ');
+  assert.match(r, /cat flu|feline herpes|calicivirus/i);
+  assert.match(r, /kennel cough|canine infectious respiratory/i);
 });
