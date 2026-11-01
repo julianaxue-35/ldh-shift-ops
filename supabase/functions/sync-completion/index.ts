@@ -176,6 +176,12 @@ function validateFlagDone(c) {
   return { id: flagId(title), plan: plan };
 }
 // flag-validate-end
+// conditions-of-start
+// The sign groups of a flagged row as stored: `conditions` if a non-empty array, else the old single `condition`, else none. Raw keys; the tools fold legacy keys into groups.
+function conditionsOfRow(r) {
+  return Array.isArray(r.conditions) && r.conditions.length ? r.conditions : (r.condition ? [r.condition] : []);
+}
+// conditions-of-end
 
 // surgery-validate-start
 // Surgery stats: the Surgery tool reports each registered surgery (species + procedure only). Routine = spey / castrate.
@@ -302,7 +308,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(PROJECT_URL, SERVICE_KEY);
 
-  // Shapes 10 and 11 (2026-10-19): { flag_check: {titles:[...]} } -> {ok, flags:[{title,location,condition,problem,type,created_at,needs_medication}]}
+  // Shapes 10 and 11 (2026-10-19): { flag_check: {titles:[...]} } -> {ok, flags:[{title,location,condition,conditions,problem,type,created_at,needs_medication}]}
   // for the OPEN staff requests on those animals; { flag_done: {title, plan} } marks them done with a quick plan.
   if ((body.flag_check && typeof body.flag_check === 'object') || (body.flag_done && typeof body.flag_done === 'object')) {
     const isDone = !!body.flag_done;
@@ -310,13 +316,13 @@ Deno.serve(async (req) => {
     if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const { data, error } = await supabase.from('tasks')
-      .select('id,title,location,condition,problem,type,created_at,needs_medication,med_done_at')
+      .select('id,title,location,condition,conditions,problem,type,created_at,needs_medication,med_done_at')
       .eq('done', false).neq('type', 'check_recheck').gte('created_at', since).limit(1000);
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
     const want = new Set(isDone ? [v.id] : v.ids);
     const hits = (data ?? []).filter((r) => want.has(flagId(r.title)));
     if (!isDone) {
-      return new Response(JSON.stringify({ ok: true, flags: hits.map((r) => ({ title: r.title, location: r.location, condition: r.condition, problem: r.problem, type: r.type, created_at: r.created_at, needs_medication: !!r.needs_medication })) }), { status: 200, headers: CORS_HEADERS });
+      return new Response(JSON.stringify({ ok: true, flags: hits.map((r) => ({ title: r.title, location: r.location, condition: r.condition, conditions: conditionsOfRow(r), problem: r.problem, type: r.type, created_at: r.created_at, needs_medication: !!r.needs_medication })) }), { status: 200, headers: CORS_HEADERS });
     }
     const waiting = hits.filter((r) => r.needs_medication && !r.med_done_at).length;   // a medication case stays open until the nurse has made the label
     let updated = 0;
