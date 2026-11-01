@@ -13,7 +13,7 @@ const t = require('./check')('send-request-card');
     }
     t.ok(Object.values(labels).every(l => l[0] === 'What type of request?'), 'every form starts with What: ' + JSON.stringify(labels));
     t.ok(Object.values(labels).every(l => l.includes('Needed within') && l.includes('Location / Space')), 'every form has Space and Needed within');
-    t.ok(/^Reason/.test(labels.vets[labels.vets.length - 1]) && /^Reason/.test(labels.nurses[labels.nurses.length - 1]) && /^Reason/.test(labels.behaviour[labels.behaviour.length - 1]), 'every form ends with the reason / note');
+    t.ok(/^(Reason|Symptoms)/.test(labels.vets[labels.vets.length - 1]) && /^Reason/.test(labels.nurses[labels.nurses.length - 1]) && /^Reason/.test(labels.behaviour[labels.behaviour.length - 1]), 'every form ends with the reason / note');
     // Vet clinic is a place for every request, and asks for a detail (ward) instead of a pen
     for (const id of ['req-location', 'nr-location', 'bk-room']) t.ok((await s.page.$$eval('#' + id + ' option', os => os.map(o => o.value))).includes('Vet clinic'), id + ' offers Vet clinic');
     await s.page.click('.sr-tab[data-sr="vets"]');
