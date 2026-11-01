@@ -52,7 +52,7 @@ const STUB = `
   function table(name) {
     let op = null, payload = null, filters = [], orders = [], limitN = null, rangeTo = null, rangeFrom = 0, asc = true, single = false, conflictCols = ['id'];
     const b = {
-      select() { if (!op) op = 'select'; return b; },
+      select(cols) { if (!op) op = 'select'; if (name === 'flag_history') (window.__fhSelects = window.__fhSelects || []).push(String(cols)); return b; },
       insert(rows) { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return b; },
       update(v) { op = 'update'; payload = v; return b; },
       upsert(rows, upsertOpts) { op = 'upsert'; payload = Array.isArray(rows) ? rows : [rows]; conflictCols = (upsertOpts && upsertOpts.onConflict ? upsertOpts.onConflict : 'id').split(',').map(c => c.trim()); return b; },

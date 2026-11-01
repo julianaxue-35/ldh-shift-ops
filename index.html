@@ -621,7 +621,7 @@
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
-    refreshSignOrder();   // once a day per device; stored for the next page load
+    storeSignOrder();   // stored for the next page load
   }
 
   document.getElementById('req-location').addEventListener('change', updateLocationFields);
@@ -1020,7 +1020,7 @@
   }
   function selectedSigns() { return Array.from(document.querySelectorAll('.req-sign:checked')).map(cb => cb.value); }
   /* Form order of the sign chips: respiratory / GI / wounds first, the rest by how often they were reported in the last 90 days
-     (computed at most once a day per device from flag_history, stored, and applied at the NEXT page load so chips never move mid-use). */
+     (counted from the flag_history already loaded in HISTORY, stored, and applied at the NEXT page load so chips never move mid-use). */
   const SIGN_ORDER_KEY = 'ldh:signOrder:v1';
   function readSignOrder() {
     try { const v = JSON.parse(localStorage.getItem(SIGN_ORDER_KEY)); return v && Array.isArray(v.order) ? v : null; } catch (e) { return null; }
@@ -1039,18 +1039,15 @@
     document.getElementById('req-signs').innerHTML = SIGN_ORDER_USED.map(by).map(g => `<div class="sign-item">
       <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label></div>`).join('');
   }
-  let signOrderTried = false;   // at most one attempt per page load, even when the read fails or finds nothing
-  async function refreshSignOrder() {
-    const st = readSignOrder(), today = LDHLogic.localDayKey(new Date());
-    if (signOrderTried || (st && st.day === today)) return;
-    signOrderTried = true;
-    try {
-      const since = new Date(Date.now() - 90 * 86400000).toISOString();
-      const r = await LDHLogic.fetchAll(() => sb.from('flag_history').select('title, condition, conditions, flagged_at').gte('flagged_at', since).order('flagged_at', { ascending: false }).order('id'));
-      if (r.error || !r.data || !r.data.length) return;   // keep the default / previous order silently
-      const counts = LDHLogic.countSignGroups(r.data.filter(h => !LDHLogic.isTestAnimal(h.title)));
-      try { localStorage.setItem(SIGN_ORDER_KEY, JSON.stringify({ day: today, order: LDHLogic.orderSignGroups(counts).map(g => g.key) })); } catch (e) {}
-    } catch (e) { /* nice-to-have only */ }
+  // Called after loadAll fills HISTORY (flag_history, already read for the Animal history card): no extra query.
+  function storeSignOrder() {
+    if (!HISTORY.length) return;
+    const since = Date.now() - 90 * 86400000, today = LDHLogic.localDayKey(new Date());
+    const counts = LDHLogic.countSignGroups(HISTORY.filter(h => new Date(h.flagged_at).getTime() >= since && !LDHLogic.isTestAnimal(h.title)));
+    if (!LDHLogic.SIGN_KEYS.some(k => counts[k])) return;
+    const order = LDHLogic.orderSignGroups(counts).map(g => g.key), st = readSignOrder();
+    if (st && st.day === today && st.order.join() === order.join()) return;   // no write on every realtime reload
+    try { localStorage.setItem(SIGN_ORDER_KEY, JSON.stringify({ day: today, order })); } catch (e) {}
   }
   function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
   // The urgent cat-birthing reason rides along in red_flags, so it is Red flag tier like any emergency sign.

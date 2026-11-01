@@ -79,6 +79,8 @@ const KEYS = 'respiratory,gi,wounds_pain_swelling,urinary,skin,msk,neuro,eyes,ea
     const stored = await a.page.evaluate(() => JSON.parse(localStorage.getItem('ldh:signOrder:v1')));
     t.ok(stored && stored.order[3] === 'urinary' && stored.order[4] === 'eyes' && stored.order.length === 11, 'order stored once computed (got ' + JSON.stringify(stored) + ')');
     t.ok(stored.order[5] !== 'ears' || stored.order.indexOf('ears') > stored.order.indexOf('eyes'), 'test animals and rows older than 90 days are not counted');
+    const sels = await a.page.evaluate(() => window.__fhSelects || []);
+    t.ok(sels.length > 0 && sels.every(c => c === '*'), 'ordering adds no flag_history query of its own (only the existing select * ran: ' + sels.join(' | ') + ')');
     const b = await a.page.context().newPage();
     await b.goto(a.page.url()); await b.waitForTimeout(700);
     const second = await b.$$eval('.req-sign', os => os.map(o => o.value));
