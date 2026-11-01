@@ -22,7 +22,7 @@
 @media print { .cond-chart { break-inside: avoid; } }
 
 /* ---- species dashboard (2026-10-27): white cards on a soft page, one condition = one colour everywhere ---- */
-:root { --cond-0:#2a78d6; --cond-1:#eb6834; --cond-2:#1baf7a; --cond-3:#eda100; --cond-4:#e87ba4; --cond-5:#008300; --cond-6:#6250d6; --cond-7:#e34948; }
+:root { --cond-0:#2a78d6; --cond-1:#eb6834; --cond-2:#1baf7a; --cond-3:#eda100; --cond-4:#e87ba4; --cond-5:#008300; --cond-6:#6250d6; --cond-7:#e34948; --cond-8:#19a7c9; --cond-9:#b04fb8; --cond-10:#8a94a6; }
 .surv-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 12px; }
 .surv-tab { width: auto; margin: 0; padding: 9px 22px; border-radius: 12px; font-weight: 700; background: var(--card-bg, #fff); color: var(--ink, #222); border: 2px solid var(--border, #d6d9e0); box-shadow: none; cursor: pointer; }
 .surv-tab[aria-selected="true"] { background: #2a78d6; border-color: #2a78d6; color: #fff; }

@@ -20,8 +20,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Vets</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261030e"></script>
-<script src="lib/animal-history-view.js"></script>
+<script src="lib/ldh-logic.js?v=20261101d"></script>
+<script src="lib/animal-history-view.js?v=20261101b"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js"></script>
 <script src="lib/memo-extras.js"></script>
@@ -325,8 +325,8 @@
       <details><summary>I am worried about an animal&rsquo;s behaviour while writing a note in a shift tool.</summary><div><p>In <b>Processing</b>, <b>Sick &amp; Injured</b> or <b>Surgery</b>, press <b>Send to Behaviour</b> on the animal&rsquo;s card. The animal goes to the Behaviour page with your <b>whole current note</b> attached. The note is <b>deleted from the database when the Behaviour team ticks Done</b> (or within 7 days). Their Done comment shows on the Shelter board.</p></div></details>
       <details><summary>Do I need to give my initials?</summary><div><p>Yes. Whenever you send something to the nurses or to Behaviour, you are asked for your initials. They are remembered on this device for the day.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
-      <details><summary>What is being tracked and why does it matter to me?</summary><div><p>Shelter staff pick a <b>Suspected condition</b> when they flag an animal. The eight reported signs are counted per space against its cages over the last 3 days (Disease watch on the staff page, full board on Stats). The aim is to spot a cluster in one space early, before a diagnosis, so you can act on isolation, cleaning and vaccination decisions sooner.</p></div></details>
-      <details><summary>Should I correct the suspected condition?</summary><div><p>The count reflects what staff noticed, not your diagnosis, so there is no need to edit it. Diagnoses such as Giardia are deliberately kept out of the sign list. Please make sure animals are flagged with some condition — blank ones are not counted.</p></div></details>
+      <details><summary>What is being tracked and why does it matter to me?</summary><div><p>Shelter staff tick the <b>signs</b> they see (one or more groups, such as respiratory, GI or urinary signs) when they flag an animal; they do not diagnose. The eleven sign groups are counted per space against its cages over the last 3 days (Disease watch on the staff page, full board on Stats). The aim is to spot a cluster in one space early, before a diagnosis, so you can act on isolation, cleaning and vaccination decisions sooner.</p></div></details>
+      <details><summary>Should I correct the signs staff flagged?</summary><div><p>The count reflects what staff noticed, not your diagnosis, so there is no need to edit it. Diagnoses such as Giardia are deliberately kept out of the sign groups. An animal with two groups ticked is counted once under each. Please make sure animals are flagged with at least one sign group — blank ones are not counted.</p></div></details>
       <details><summary>What is the baseline?</summary><div><p>Snapshots are taken nightly for a full year because disease changes with the season. After that, each period is compared with the same time last year. Until then rates are shown as they are, with no "high" line.</p></div></details>
     </div>
     </div>
@@ -364,7 +364,7 @@
       return {
         id: t.title, location: t.location || '', problem,
         redFlags: (t.red_flags || []).map(k => LDHLogic.signLabel(k)),
-        condition: t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : ''
+        condition: LDHLogic.conditionsOf(t).map(k => LDHLogic.CONDITION_LABELS[k] || k).join(', ')
       };
     });
   }
@@ -523,7 +523,8 @@
       esc(locationText(t)),
       TYPE_LABELS[t.type] || t.type
     ];
-    if (t.condition) metaBits.push(esc(LDHLogic.CONDITION_LABELS[t.condition] || t.condition));
+    const sgn = LDHLogic.conditionsOf(t).map(k => LDHLogic.CONDITION_LABELS[k] || k).join(', ');
+    if (sgn) metaBits.push(esc(sgn));
     if (t.problem) metaBits.push(esc(t.problem));
     LDHLogic.reasonsOf(t).filter(r => r.extra).forEach(r => metaBits.push('<b>also flagged ' + esc(fmtTime(r.at)) + (r.by ? ' by ' + esc(r.by) : '') + ':</b> ' + (r.text ? esc(r.text) : 'no detail')));
     if (t.red_flags && t.red_flags.length) metaBits.push('signs: ' + t.red_flags.map(k => esc(LDHLogic.signLabel(k))).join(', '));

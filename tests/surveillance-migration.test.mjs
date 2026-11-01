@@ -97,6 +97,8 @@ test('0009 can be applied twice, and only the owner may run the snapshot functio
 
 test('the SQL snapshot and the JS buildSurvey count the same rows the same way', async () => {
   const d = await db();
+  // snapshot now counts sign GROUPS (0047); 0047 also extends flag_history, so 0013 goes first
+  for (const f of ['0013_shelter_board.sql', '0047_sign_groups.sql']) await d.exec(fs.readFileSync(path.join(MIG, f), 'utf8'));
   const now = Date.now(), iso = (msAgo) => new Date(now - msAgo).toISOString(), H = 3600 * 1000, D = 24 * H;
   const rows = [
     { title: 'A1', location: 'Cat Room 1 / 4', condition: 'cat_flu', created_at: iso(1 * H), shift: 'sick_injured' },
@@ -117,7 +119,7 @@ test('the SQL snapshot and the JS buildSurvey count the same rows the same way',
   const survey = LDHLogic.buildSurvey(rows, locationRows, new Date(now - 3 * D));
   const snap = (await d.query(`select space, condition, animals from public.surveillance_snapshots`)).rows;
   const get = (space, cond) => snap.find(r => r.space === space && r.condition === cond).animals;
-  assert.equal(survey.spaces.length, 12);
+  assert.equal(survey.spaces.length, 13);
   for (const sp of survey.spaces) {
     assert.equal(get(sp.name, 'any'), sp.cases, sp.name + ': cases');
     for (const k of LDHLogic.SIGN_KEYS) assert.equal(get(sp.name, k), sp.by[k] || 0, sp.name + ' / ' + k);

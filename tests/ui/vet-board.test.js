@@ -14,7 +14,8 @@ const H = 3600 * 1000, M = 60 * 1000;
   const seed = { locations: LOCATION_ROWS, tasks: [
     mk('A-AMBER', 'red_flag', 1.75 * H),
     mk('B-RED', 'red_flag', 3 * H, { problem: 'limping front-left leg', red_flags: ['bleeding_wound', 'not_eating_48h'], condition: 'wounds_injury' }),
-    mk('C-URG', 'urgent', 13 * H),
+    mk('C-URG', 'urgent', 13 * H, { conditions: ['gi', 'urinary'], condition: 'gi' }),
+    mk('C-OLD', 'routine', 2 * H, { condition: 'vomiting' }),
     mk('D-R25', 'routine', 25 * H),
     mk('E-R50', 'routine', 50 * H),
     mk('F-NEW', 'routine', 10 * M),
@@ -38,6 +39,13 @@ const H = 3600 * 1000, M = 60 * 1000;
     t.ok(openText.indexOf('A-AMBER') < openText.indexOf('C-URG'), 'Emergency cases come before Urgent');
     t.ok(openText.indexOf('C-URG') < openText.indexOf('E-R50'), 'Urgent comes before Request checks');
     t.ok(openText.indexOf('E-R50') < openText.indexOf('D-R25') && openText.indexOf('D-R25') < openText.indexOf('F-NEW'), 'Request checks ordered red, amber, ok');
+
+    // Sign groups: a two-group case lists both labels; an old vomiting case reads as GI signs; an old wounds_injury case as its new group.
+    // the reason sits in the case's drawer row just under it: read the case row and the row after it
+    const rowTxt = id => page.evaluate(id => { const r = [...document.querySelectorAll('#cases-open-tbody tr.case-row')].find(x => x.textContent.includes(id)); return (r.textContent + ' ' + ((r.nextElementSibling && !r.nextElementSibling.classList.contains('case-row')) ? r.nextElementSibling.textContent : '')).replace(/\s+/g, ' '); }, id);
+    t.ok(/GI signs, Urinary signs/.test(await rowTxt('C-URG')), 'a case with two groups shows both labels');
+    t.ok(/GI signs/.test(await rowTxt('C-OLD')) && !/Vomiting/.test(await rowTxt('C-OLD')), 'an old vomiting case shows GI signs');
+    t.ok(/Wounds/.test(await rowTxt('B-RED')), 'an old wounds_injury case shows its group label');
 
     // Tier labels use the new wording.
     t.ok(openText.includes('Emergency') && openText.includes('Urgent') && openText.includes('Request checks'), 'tier column uses the new labels');

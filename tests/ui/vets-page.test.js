@@ -94,7 +94,7 @@ const H = 3600 * 1000;
     t.ok(items.length === 1 && items[0].id === 'PICKUP-1' && items[0].location === 'Pound 1' && items[0].problem === 'limping front-left leg',
       'hand-off payload carries id/location/problem');
     t.ok(items[0].redFlags.join() === "Bleeding wound (large cut / can't stop the bleeding)", 'hand-off redFlags use signLabel() text');
-    t.ok(items[0].condition === 'Wounds / injury / trauma', 'hand-off condition uses the label, not the raw key');
+    t.ok(items[0].condition === 'Wounds / pain / swelling', 'hand-off condition uses the label, not the raw key');
 
     /* ---------- Bump: immediate, no prompt ---------- */
     await a.page.locator('.attn-item', { hasText: 'BUMP-1' }).locator('.bump-btn').click();

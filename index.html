@@ -20,11 +20,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261030e"></script>
+<script src="lib/ldh-logic.js?v=20261101d"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
-<script src="lib/surveillance-view.js"></script>
-<script src="lib/animal-history-view.js"></script>
-<link rel="stylesheet" href="lib/surveillance.css">
+<script src="lib/surveillance-view.js?v=20261101b"></script>
+<script src="lib/animal-history-view.js?v=20261101b"></script>
+<link rel="stylesheet" href="lib/surveillance.css?v=20261101b">
 <style>
   /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
      crisp borders and a soft drop shadow, replacing the earlier neumorphic
@@ -254,6 +254,14 @@
   .req-chip:hover { border-color: rgba(208,59,59,0.5); }
   .req-chip input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
   .req-chip:has(input:checked) { background: var(--critical); border-color: var(--critical); color: #fff; }
+  #req-signs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+  #req-signs-wrap { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .sign-head { font-size: 0.78rem; font-weight: 700; margin-bottom: 6px; padding: 0; }
+  .sign-item .req-chip:has(input:checked) small { opacity: 1; }
+  .sign-item { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 100%; }
+  .sign-item .req-chip { max-width: 100%; flex-wrap: wrap; border-radius: 14px; }
+  .sign-item .req-chip:has(input:checked) { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .sign-item .req-chip small { font-weight: 400; margin-left: 6px; opacity: .85; }
   .req-chip:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
   @media (max-width: 760px) { .sr-body { padding: 18px 16px 22px; } .sr-banner { padding: 16px; } .sr-to { grid-template-columns: minmax(0, 1fr); } .sr-form { grid-template-columns: minmax(0, 1fr); } }
   .sr-send { position: sticky; bottom: 16px; z-index: 5; margin-top: 18px; padding: 14px 36px; font-size: 1rem; border-radius: 12px; box-shadow: 0 6px 18px rgba(30,34,56,0.28); transition: transform .08s, box-shadow .15s, filter .15s; }
@@ -387,20 +395,11 @@
             <option value="urgent">Urgent — within 12–24 h</option>
             <option value="red_flag">Emergency — within 2–4 h</option>
           </select></label>
-          <label>Suspected condition (optional)
-        <select id="req-condition">
-          <option value="">None / not sure</option>
-          <option value="cat_flu">Cat flu (URI)</option>
-          <option value="kennel_cough">Kennel cough</option>
-          <option value="diarrhoea">Diarrhoea / GI upset</option>
-          <option value="vomiting">Vomiting</option>
-          <option value="eye_condition">Eye condition</option>
-          <option value="skin_condition">Skin condition</option>
-          <option value="wounds_injury">Wounds / injury / trauma</option>
-          <option value="cat_birthing">🚨 Cat birthing — urgent check</option>
-          <option value="other">Other</option>
-        </select>
-          </label>
+          <fieldset class="sr-wide" id="req-signs-wrap">
+            <legend class="sign-head">Signs you can see (optional — tick any that apply)</legend>
+            <div id="req-signs"></div>
+            <label class="req-chip req-birthing-chip"><input type="checkbox" id="req-birthing">🚨 Cat birthing — urgent check</label>
+          </fieldset>
           <label class="sr-wide">Reason / clinical notes<textarea id="req-problem" rows="3" placeholder="Describe the issue in detail, e.g. limping on front-left leg, not eating for 2 days..."></textarea></label>
         </div>
 
@@ -559,7 +558,7 @@
       <p class="subtle">Quick answers for logging requests and following a case.</p>
       <h3 class="faq-group">Logging requests</h3>
       <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival (microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
-      <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Pick a <b>Suspected condition</b> if you can, and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
+      <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Tick the <b>signs you can see</b> (one or more groups; you are flagging signs, not diagnosing), and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
       <details><summary>What do the tiers mean?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2–4 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>
       <details><summary>How do I ask the nurses for a vaccination, FIV test, blood test, microchip or UV check?</summary><div><p>In <b>Send a request</b>, pick <b>Nurses</b> at the top. Choose <b>What</b>, space, species, how many animals and <b>Needed within</b>. Tick <i>Not here yet</i> to schedule it for a later arrival. For a single foster / rescue animal you can also tick Microchip and / or UV on the <b>Vets</b> form — these go to the Processing nurse.</p></div></details>
@@ -574,9 +573,9 @@
       <details><summary>A case went back from "picked up" to "flagged" — why?</summary><div><p>Vets can <b>put a case back</b> if they are called away. It returns to its tier and any vet can pick it up. The time target keeps running from when it was first flagged.</p></div></details>
       <details><summary>What are the numbers and rings at the top?</summary><div><p>The big ring is tasks completed today across all shifts, with a ring per shift. Only today's checks are counted. Older unfinished list entries are shown separately as "older still open" so they don't inflate today's total.</p></div></details>
       <h3 class="faq-group">Disease tracking</h3>
-      <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and pick a <b>Suspected condition</b>, that sign is counted. We track eight <b>reported signs</b>: cat flu (URI), kennel cough, diarrhoea / GI upset, vomiting, eye condition, skin condition, wounds / injury and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 30 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
+      <details><summary>What is disease tracking, and what are we tracking?</summary><div><p>Every time you flag an animal and tick a sign group, that sign is counted (an animal with two groups ticked counts once under each). We track eleven <b>reported sign groups</b>: respiratory, GI, urinary, skin, musculoskeletal / lameness, neurological, eyes, ears, wounds / pain / swelling, neonatal (kitten or puppy) and other. The <b>Disease watch</b> card on this page and the full board on the Stats page show, for each space, how many animals were flagged in the last 30 days as a share of that space's cages.</p><p>These are <i>signs staff noticed</i>, not diagnoses. A vet diagnosis (for example Giardia) is deliberately not counted here.</p></div></details>
       <details><summary>Why do we track it?</summary><div><ul><li><b>Catch clusters early.</b> Several animals with the same sign in one space is the first clue to an outbreak, often before anyone has diagnosed anything.</li><li><b>Back decisions with numbers.</b> Moving animals, tightening cleaning or biosecurity, or isolating a room is easier to justify with a count.</li><li><b>Learn our own seasonal pattern.</b> A baseline is being collected for a full year because disease varies with the season. Once it is complete, each period is compared with the same time last year. Until then there is no "high" line.</li></ul></div></details>
-      <details><summary>What do I need to do so the tracking is accurate?</summary><div><ul><li>Choose a <b>Suspected condition</b> every time you flag an animal. If you leave it blank the animal is flagged but is <b>not</b> counted in disease tracking.</li><li>Pick the right <b>space</b> and pen — counts are per space.</li><li>An animal counts once for the same sign, so there is no harm in re-flagging an animal that is still sick.</li><li>Only flagged animals are counted, so the rate reads lower than a full vet-exam prevalence. Compare it with our own baseline, not with older prevalence figures.</li></ul></div></details>
+      <details><summary>What do I need to do so the tracking is accurate?</summary><div><ul><li>Tick the <b>signs you can see</b> every time you flag an animal (as many groups as apply; you only flag signs, you do not diagnose). If you tick none the animal is flagged but is <b>not</b> counted in disease tracking.</li><li>Pick the right <b>space</b> and pen — counts are per space.</li><li>An animal counts once for the same sign, so there is no harm in re-flagging an animal that is still sick.</li><li>Only flagged animals are counted, so the rate reads lower than a full vet-exam prevalence. Compare it with our own baseline, not with older prevalence figures.</li></ul></div></details>
     </div>
     </div>
   </main>
@@ -622,11 +621,12 @@
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
+    storeSignOrder();   // stored for the next page load
   }
 
   document.getElementById('req-location').addEventListener('change', updateLocationFields);
-  document.getElementById('req-condition').addEventListener('change', () => {
-    document.getElementById('req-birthing-wrap').style.display = document.getElementById('req-condition').value === 'cat_birthing' ? '' : 'none';
+  document.getElementById('req-birthing').addEventListener('change', () => {
+    document.getElementById('req-birthing-wrap').style.display = document.getElementById('req-birthing').checked ? '' : 'none';
     updateTierPreview();
   });
   document.getElementById('req-birthing-reason').addEventListener('change', () => updateTierPreview());
@@ -667,7 +667,8 @@
     const isAdmin = document.getElementById('req-type').value === 'admin';   // stored as an ordinary shelter request whose note starts "Admin / paperwork review"
     const isOther = document.getElementById('req-type').value === 'other' || isAdmin;   // 'Other' is stored as an ordinary shelter request whose note says what is wanted
     if (isOther && !document.getElementById('req-problem').value.trim()) { alert(isAdmin ? 'Say what paperwork the vets need to review (e.g. vet history for A123456).' : 'Describe what you need the vets for.'); return; }
-    const isBirthing = document.getElementById('req-condition').value === 'cat_birthing';
+    const isBirthing = document.getElementById('req-birthing').checked;
+    const signs = selectedSigns();
     if (isBirthing && !birthingReason()) { alert('Choose the reason for the urgent cat birthing check.'); return; }
     const btn = document.getElementById('req-submit');
     btn.disabled = true;
@@ -699,12 +700,13 @@
       red_flags: allFlags(),
       needs_medication: needsMed,
       problem: [isAdmin ? 'Admin / paperwork review' : '', isBirthing ? 'Cat birthing — ' + LDHLogic.signLabel(birthingReason()) : '', document.getElementById('req-problem').value.trim()].filter(Boolean).join(' — ') || null,
-      condition: isBirthing ? null : (document.getElementById('req-condition').value || null),   // birthing is not a surveillance condition; it is carried by red_flags + problem
+      conditions: signs,   // ticked sign groups only; cat birthing is not a surveillance condition, it is carried by red_flags + problem
+      condition: LDHLogic.primaryCondition(signs),
       done: false,
     };
     const wantMedPlan = reqType === 'foster' && document.getElementById('req-x-medplan').checked;
     if (wantMedPlan) baseRow.problem = ['Foster med plan added \u2014 meds dispensed', baseRow.problem].filter(Boolean).join(' \u2014 ');
-    const needsVet = wantMedPlan || (!asked.length && !wantTreatment) || allFlags().length > 0 || !!baseRow.condition || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
+    const needsVet = wantMedPlan || (!asked.length && !wantTreatment) || allFlags().length > 0 || signs.length > 0 || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine';
 
     async function submitOne(title) {
       const row = Object.assign({}, baseRow, { title, sm_number: needsMed ? title : null });
@@ -713,6 +715,7 @@
       if (needsVet) {
         if (window.staffInitials()) row.problem = [row.problem, '(sent by ' + window.staffInitials() + ')'].filter(Boolean).join(' — ');
         ({ error } = await sb.from('tasks').insert(row));
+        if (error && /column.*conditions|conditions.*column|schema cache/i.test(error.message || '') && !/duplicate/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
         /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
            (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
            flag_history, so the earlier flag is remembered); if it is still open, add the new reason to it. */
@@ -721,15 +724,16 @@
           const old = found && found[0];
           if (old && !old.done) {
             // Already open in this pen: add this person's reason to the SAME case rather than refusing or duplicating it.
-            const entry = { at: new Date().toISOString(), by: 'Shelter Staff', condition: row.condition, problem: row.problem, red_flags: row.red_flags, urgency: row.urgency };
+            const entry = { at: new Date().toISOString(), by: 'Shelter Staff', conditions: row.conditions, condition: row.condition, problem: row.problem, red_flags: row.red_flags, urgency: row.urgency };
             const had = LDHLogic.reasonsOf(old).map(r => r.text).filter(Boolean).join(' · ') || 'no reason given';
-            if (!entry.condition && !entry.problem && !entry.red_flags.length) {
+            if (!entry.conditions.length && !entry.problem && !entry.red_flags.length) {
               alert(title + ' is already flagged in that pen (' + had + ').\n\nTo add another reason, choose a sign or type what is wrong, then submit again.');
               return false;
             }
             if (!confirm(title + ' is already flagged in that pen for: ' + had + '.\n\nAdd your reason to the same case?')) return false;
             ({ error } = await sb.from('tasks').update(LDHLogic.mergeReason(old, entry)).eq('id', old.id));
             if (error && /extra_reasons/.test(error.message || '')) error = { message: 'The database needs migration 0019 (extra reasons) run first.' };
+            if (error && /column.*conditions|conditions.*column|schema cache/i.test(error.message || '') && !/duplicate/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
           } else if (old) {
             ({ error } = await sb.from('tasks').update(Object.assign({}, row, {
               created_at: new Date().toISOString(), done: false, completed_at: null, completed_by_role: null,
@@ -770,7 +774,8 @@
     document.getElementById('req-pen').value = '';
     document.getElementById('req-location-detail').value = '';
     document.getElementById('req-problem').value = '';
-    document.getElementById('req-condition').value = '';
+    document.querySelectorAll('.req-sign').forEach(cb => { cb.checked = false; });
+    document.getElementById('req-birthing').checked = false;
     document.getElementById('req-urgency-pick').value = 'routine';
     document.getElementById('req-type').value = 'shelter';
     document.getElementById('req-nurse-extras').style.display = 'none';
@@ -1013,10 +1018,41 @@
       if (el) el.innerHTML = LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
     });
   }
+  function selectedSigns() { return Array.from(document.querySelectorAll('.req-sign:checked')).map(cb => cb.value); }
+  /* Form order of the sign chips: respiratory / GI / wounds first, the rest by how often they were reported in the last 90 days
+     (counted from the flag_history already loaded in HISTORY, stored, and applied at the NEXT page load so chips never move mid-use). */
+  const SIGN_ORDER_KEY = 'ldh:signOrder:v1';
+  function readSignOrder() {
+    try { const v = JSON.parse(localStorage.getItem(SIGN_ORDER_KEY)); return v && Array.isArray(v.order) ? v : null; } catch (e) { return null; }
+  }
+  // Repair: drop unknown / repeated keys, append missing groups in default order, keep the top 3 first and Other last, so all 11 always show.
+  function repairSignOrder(order) {
+    const def = LDHLogic.orderSignGroups().map(g => g.key), seen = [];
+    (order || []).forEach(k => { if (def.includes(k) && !seen.includes(k)) seen.push(k); });
+    const all = seen.concat(def.filter(k => !seen.includes(k))), top = LDHLogic.SIGN_FORM_TOP;
+    return top.concat(all.filter(k => !top.includes(k) && k !== 'other'), ['other']);   // top 3 first and Other last, whatever was stored
+  }
+  let SIGN_ORDER_USED = null;   // fixed at first render so a background refresh can never reorder the form in place
+  function renderSignForm() {
+    if (!SIGN_ORDER_USED) { const st = readSignOrder(); SIGN_ORDER_USED = st ? repairSignOrder(st.order) : repairSignOrder([]); }
+    const by = k => LDHLogic.SIGN_GROUPS.find(g => g.key === k);
+    document.getElementById('req-signs').innerHTML = SIGN_ORDER_USED.map(by).map(g => `<div class="sign-item">
+      <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label></div>`).join('');
+  }
+  // Called after loadAll fills HISTORY (flag_history, already read for the Animal history card): no extra query.
+  function storeSignOrder() {
+    if (!HISTORY.length) return;
+    const since = Date.now() - 90 * 86400000, today = LDHLogic.localDayKey(new Date());
+    const counts = LDHLogic.countSignGroups(HISTORY.filter(h => new Date(h.flagged_at).getTime() >= since && !LDHLogic.isTestAnimal(h.title)));
+    if (!LDHLogic.SIGN_KEYS.some(k => counts[k])) return;
+    const order = LDHLogic.orderSignGroups(counts).map(g => g.key), st = readSignOrder();
+    if (st && st.day === today && st.order.join() === order.join()) return;   // no write on every realtime reload
+    try { localStorage.setItem(SIGN_ORDER_KEY, JSON.stringify({ day: today, order })); } catch (e) {}
+  }
   function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
   // The urgent cat-birthing reason rides along in red_flags, so it is Red flag tier like any emergency sign.
   function birthingReason() {
-    return document.getElementById('req-condition').value === 'cat_birthing' ? document.getElementById('req-birthing-reason').value : '';
+    return document.getElementById('req-birthing').checked ? document.getElementById('req-birthing-reason').value : '';
   }
   function allFlags() { const r = birthingReason(); return selectedFlags().concat(r ? [r] : []); }
   function updateTierPreview() {
@@ -1031,6 +1067,7 @@
     if (n) document.getElementById('triage-drawer').open = true;
   }
   function renderRedFlagForm() {
+    renderSignForm();
     const wrap = document.getElementById('req-redflags');
     wrap.innerHTML = LDHLogic.EMERGENCY_SIGNS.map(f =>
       `<label class="req-chip"><input type="checkbox" class="req-flag" value="${f.key}">${esc(f.label)}</label>`).join('');

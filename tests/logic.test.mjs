@@ -133,17 +133,17 @@ test('summariseConditions counts every condition, ignores unknown values, and gr
     { condition: 'made_up', location: 'Pound 1 / 2', created_at: '2026-09-03T03:00:00Z' }
   ];
   const r = L.summariseConditions(rows);
-  assert.equal(r.counts.cat_flu, 2); assert.equal(r.counts.kennel_cough, 1);
+  assert.equal(r.counts.respiratory, 3, 'cat flu and kennel cough fold into Respiratory');
   assert.equal(r.counts.none, 2, 'no condition and unknown condition both count as none flagged');
   assert.equal(r.total, 5);
   assert.deepEqual(Object.keys(r.counts), [...L.SIGN_KEYS, 'none'], 'sign keys first, none flagged last');
   assert.equal(r.flaggedTotal, 4, 'flagged = has any condition value');
-  assert.equal(r.byLocation['Cat Room 1 / 4'].cat_flu, 1);
+  assert.equal(r.byLocation['Cat Room 1 / 4'].respiratory, 1);
   assert.deepEqual(r.flagged.map(t => t.created_at)[0], '2026-09-01T01:00:00Z', 'flagged list is oldest first');
 });
 
-test('SIGN_KEYS and CONDITION_LABELS: the eight reported signs, no diagnoses', () => {
-  assert.deepEqual(L.SIGN_KEYS, ['cat_flu', 'kennel_cough', 'diarrhoea', 'vomiting', 'eye_condition', 'skin_condition', 'wounds_injury', 'other']);
+test('SIGN_KEYS and CONDITION_LABELS: the eleven sign groups, no diagnoses; legacy labels kept', () => {
+  assert.equal(L.SIGN_KEYS.length, 11);
   assert.equal(L.CONDITION_LABELS.vomiting, 'Vomiting');
   assert.equal(L.CONDITION_LABELS.eye_condition, 'Eye condition');
   assert.equal(L.CONDITION_LABELS.skin_condition, 'Skin condition');
@@ -191,8 +191,8 @@ test('buildSurvey: cases (animal + sign), rates, leading sign, groups, ranking, 
   const s1 = r.spaces.find(s => s.name === 'Cat Room 1');
   assert.equal(s1.cases, 3, 'A1+cat_flu, A2+cat_flu, A1+vomiting');
   assert.equal(s1.rate, 10, '3 / 30 cages = 10.0%');
-  assert.equal(s1.leading, 'cat_flu');
-  assert.deepEqual(s1.by, { cat_flu: 2, vomiting: 1 }, 'distinct animals per sign');
+  assert.equal(s1.leading, 'respiratory');
+  assert.deepEqual(s1.by, { respiratory: 2, gi: 1 }, 'distinct animals per sign');
   assert.equal(r.spaces.find(s => s.name === 'Cat Room 2').cases, 0, 'old flag and unflagged task are not counted');
   assert.equal(r.spaces.find(s => s.name === 'Cat Room 2').leading, null);
   assert.equal(r.spaces.find(s => s.name === 'Pound 2').rate, 3.8, '1 / 26 cages = 3.8%');
@@ -201,8 +201,8 @@ test('buildSurvey: cases (animal + sign), rates, leading sign, groups, ranking, 
   assert.deepEqual([g.cases, g.cages, g.rate], [3, 54, 5.6], 'group = 3 cases / 54 cages');
   assert.equal(r.totalCases, 5, 'A1+flu, A2+flu, A1+vomiting, B1+kennel_cough and the unmapped E1+other');
   assert.equal(r.unmapped, 1);
-  assert.deepEqual(r.ranked.map(x => [x.key, x.animals]), [['cat_flu', 2], ['kennel_cough', 1], ['vomiting', 1], ['other', 1]]);
-  assert.equal(r.ranked[0].share, 40, '2 of 5 cases');
+  assert.deepEqual(r.ranked.map(x => [x.key, x.animals]), [['respiratory', 3], ['gi', 1], ['other', 1]], 'legacy keys fold into groups');
+  assert.equal(r.ranked[0].share, 60, '3 of 5 cases');
 });
 
 test('buildSurvey: each space lists every condition reported (with animal IDs) and its top 3', () => {
@@ -213,9 +213,9 @@ test('buildSurvey: each space lists every condition reported (with animal IDs) a
     trow('A5', 'Cat Room 1 / 8', 'eye_condition', 2 * H), trow('A6', 'Cat Room 1 / 9', 'diarrhoea', 3 * H)
   ];
   const s1 = L.buildSurvey(tasks, LOC, since).spaces.find(s => s.name === 'Cat Room 1');
-  assert.deepEqual(s1.conditions.map(c => [c.key, c.animals]), [['cat_flu', 2], ['diarrhoea', 2], ['vomiting', 1], ['eye_condition', 1]]);
-  assert.deepEqual(s1.conditions[0].ids, ['A1', 'A2']);
-  assert.deepEqual(s1.top3.map(c => c.key), ['cat_flu', 'diarrhoea', 'vomiting'], 'top 3 only; ties keep the usual sign order');
+  assert.deepEqual(s1.conditions.map(c => [c.key, c.animals]), [['gi', 3], ['respiratory', 2], ['eyes', 1]]);
+  assert.deepEqual(s1.conditions[0].ids, ['A3', 'A4', 'A6']);
+  assert.deepEqual(s1.top3.map(c => c.key), ['gi', 'respiratory', 'eyes'], 'top 3 only');
   assert.deepEqual(L.buildSurvey([], LOC, since).spaces[0].top3, []);
 });
 test('buildSurvey: per-condition top 3 spaces and the space where each is most prevalent', () => {
@@ -226,10 +226,10 @@ test('buildSurvey: per-condition top 3 spaces and the space where each is most p
     trow('C1', 'Pound 2 / 7', 'cat_flu', 1 * H), trow('D1', 'Pound 2 / 8', 'vomiting', 1 * H)
   ];
   const r = L.buildSurvey(tasks, LOC, since);
-  const flu = r.byCondition.find(c => c.key === 'cat_flu');
+  const flu = r.byCondition.find(c => c.key === 'respiratory');
   assert.deepEqual(flu.top3.map(s => [s.name, s.animals]), [['Cat Room 2', 3], ['Cat Room 1', 2], ['Pound 2', 1]]);
   assert.equal(flu.peak.name, 'Cat Room 2', 'most animals per cage');
-  assert.equal(r.byCondition.find(c => c.key === 'vomiting').peak.name, 'Pound 2');
+  assert.equal(r.byCondition.find(c => c.key === 'gi').peak.name, 'Pound 2');
 });
 test('buildSurvey with no data gives zero rates, not errors', () => {
   const r = L.buildSurvey([], LOC, new Date(NOW - 3 * 24 * H));
@@ -250,7 +250,7 @@ test('baselineStatus counts distinct snapshot days up to a full year (365)', () 
 test('summariseConditions covers the widened sign list', () => {
   const r = L.summariseConditions([{ condition: 'vomiting', location: 'Pound 1 / 1', created_at: '2026-09-01T00:00:00Z' },
     { condition: 'skin_condition', location: 'Pound 1 / 2', created_at: '2026-09-02T00:00:00Z' }]);
-  assert.equal(r.counts.vomiting, 1); assert.equal(r.counts.skin_condition, 1); assert.equal(r.counts.eye_condition, 0);
+  assert.equal(r.counts.gi, 1); assert.equal(r.counts.skin, 1); assert.equal(r.counts.eyes, 0);
   assert.equal(r.counts.none, 0);
 });
 
@@ -382,9 +382,9 @@ test('flagsBefore: only EARLIER flags of the same animal in the last 3 months, n
     { title: 'B2', flagged_at: at(5), reason: 'someone else' }
   ];
   const before = L.flagsBefore(hist, task, now);
-  assert.deepEqual(before.map(h => L.flagReason(h)), ['Vomiting', 'Cat flu (URI)']);
+  assert.deepEqual(before.map(h => L.flagReason(h)), ['Vomiting', 'Respiratory signs']);
   const txt = L.flagHistoryText(before);
-  assert.match(txt, /^Flagged before 2× — .*Vomiting.* · .*Cat flu \(URI\)$/);
+  assert.match(txt, /^Flagged before 2× — .*Vomiting.* · .*Respiratory signs$/);
   assert.equal(L.flagHistoryText([]), '');
   const many = [1, 2, 3, 4, 5].map(n => ({ title: 'A1', flagged_at: at(n * 3), reason: 'r' + n }));
   assert.match(L.flagHistoryText(L.flagsBefore(many, task, now)), /5× — .*r1.*r2.*r3 · \+2 more$/);
@@ -602,7 +602,7 @@ test('reasonsOf lists the first reason then each extra; mergeReason adds one, un
   const task = { created_at: '2026-10-19T08:00:00Z', urgency: 'routine', condition: 'vomiting', problem: 'twice since breakfast', red_flags: [], extra_reasons: [] };
   const r1 = L.reasonsOf(task);
   assert.equal(r1.length, 1);
-  assert.equal(r1[0].text, 'Vomiting — twice since breakfast');
+  assert.equal(r1[0].text, 'GI signs — twice since breakfast');
   assert.equal(r1[0].extra, false);
   const patch = L.mergeReason(task, { at: '2026-10-19T09:00:00Z', by: 'Shelter Staff', condition: 'diarrhoea', problem: 'watery', red_flags: ['collapse'], urgency: 'routine' });
   assert.equal(patch.extra_reasons.length, 1);
@@ -611,7 +611,7 @@ test('reasonsOf lists the first reason then each extra; mergeReason adds one, un
   const merged = Object.assign({}, task, patch);
   const r2 = L.reasonsOf(merged);
   assert.equal(r2.length, 2);
-  assert.match(r2[1].text, /Diarrhoea/i);
+  assert.match(r2[1].text, /GI signs/);
   assert.equal(r2[1].extra, true);
   const p2 = L.mergeReason({ urgency: 'urgent', red_flags: [], extra_reasons: [{ at: 'x' }] }, { condition: 'other', urgency: 'routine', red_flags: [] });
   assert.equal(p2.urgency, 'urgent', 'a later routine comment never lowers an urgent case');
@@ -834,7 +834,7 @@ test('loadRecentTasks / recentMemos / surveyRows: ask only for open or recent ro
   assert.match(orT, /^done\.eq\.false,completed_at\.gte\.\d{4}-/);
   assert.match(seen.find(s => s[0] === 'memos' && s[1] === 'or')[2], /^done\.eq\.false,done_at\.gte\./);
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'not'), 'survey rows only those with a condition');
-  assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, created_at'), 'survey reads four columns');
+  assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, conditions, created_at'), 'survey reads five columns (both condition columns)');
 });
 
 test('public holidays: 2027 and 2028 are listed, only Mon-Fri holidays cost Surgery a working day, weekends are unaffected', () => {
@@ -858,4 +858,80 @@ test('doneRowsSince: reads the daily summary and expands it to one row per finis
   assert.equal(t.year.total, 4);
   const fb = await L.doneRowsSince(mk({ task_done_log: [{ title: 'A1', shift: 'processing', completed_at: '2026-10-29T01:00:00Z' }] }), '2026-01-01T00:00:00');
   assert.equal(fb.data.length, 1, 'no daily summary: the log is used');
+});
+
+// ---- Sign groups (1 Nov 2026) ----
+test('SIGN_GROUPS: 11 groups in display order, SIGN_KEYS matches, legacy keys fold in at read time', () => {
+  assert.deepEqual(L.SIGN_KEYS, ['respiratory', 'gi', 'urinary', 'skin', 'msk', 'neuro', 'eyes', 'ears', 'wounds_pain_swelling', 'neonatal', 'other']);
+  assert.deepEqual(L.SIGN_GROUPS.map(g => g.key), L.SIGN_KEYS);
+  L.SIGN_GROUPS.forEach(g => assert.ok(g.label && g.examples, g.key));
+  assert.equal(L.SIGN_GROUPS[1].label, 'GI signs (incl. mouth)');
+  assert.deepEqual(L.LEGACY_GROUP, { cat_flu: 'respiratory', kennel_cough: 'respiratory', vomiting: 'gi', diarrhoea: 'gi',
+    eye_condition: 'eyes', skin_condition: 'skin', wounds_injury: 'wounds_pain_swelling', other: 'other' });
+  assert.equal(L.groupOf('vomiting'), 'gi'); assert.equal(L.groupOf('urinary'), 'urinary'); assert.equal(L.groupOf('future_key'), 'future_key');
+  assert.equal(L.CONDITION_LABELS.gi, 'GI signs'); assert.equal(L.CONDITION_LABELS.respiratory, 'Respiratory signs');
+  assert.equal(L.CONDITION_LABELS.vomiting, 'Vomiting'); assert.equal(L.CONDITION_LABELS.none, 'None flagged');
+});
+test('conditionsOf: array, legacy single, folding, de-dup, empty', () => {
+  assert.deepEqual(L.conditionsOf({ conditions: ['gi', 'urinary'] }), ['gi', 'urinary']);
+  assert.deepEqual(L.conditionsOf({ condition: 'vomiting' }), ['gi']);
+  assert.deepEqual(L.conditionsOf({ conditions: [], condition: 'cat_flu' }), ['respiratory']);
+  assert.deepEqual(L.conditionsOf({ conditions: ['vomiting', 'diarrhoea'] }), ['gi']);
+  assert.deepEqual(L.conditionsOf({ condition: 'kennel_cough' }), ['respiratory']);
+  assert.deepEqual(L.conditionsOf({ conditions: ['gi', 'vomiting', 'skin', 'gi'] }), ['gi', 'skin']);
+  assert.deepEqual(L.conditionsOf({}), []); assert.deepEqual(L.conditionsOf({ condition: null, conditions: null }), []);
+  assert.deepEqual(L.conditionsOf({ conditions: ['future_key'] }), ['future_key']);
+});
+test('primaryCondition: earliest in SIGN_GROUPS order, unknown last, null when empty', () => {
+  assert.equal(L.primaryCondition(['urinary', 'gi']), 'gi');
+  assert.equal(L.primaryCondition(['future_key', 'other']), 'other');
+  assert.equal(L.primaryCondition(['vomiting', 'cat_flu']), 'cat_flu', 'raw key returned, earliest group wins');
+  assert.equal(L.primaryCondition(['future_key']), 'future_key');
+  assert.equal(L.primaryCondition([]), null);
+});
+test('buildSurvey: a two-group row is two cases for that animal, one per group', () => {
+  const LOC2 = [{ name: 'Cat Room 1', grp: 'Cat rooms', cages: 10, sort: 1 }];
+  const since = new Date(NOW - 3 * 24 * H);
+  const t = (o) => Object.assign({ title: 'A1', location: 'Cat Room 1 / 1', created_at: new Date(NOW).toISOString() }, o);
+  const r = L.buildSurvey([t({ conditions: ['gi', 'urinary'] }), t({ title: 'A2', condition: 'vomiting' }), t({ title: 'A2', conditions: ['vomiting', 'diarrhoea'] })], LOC2, since);
+  assert.equal(r.totalCases, 3); assert.equal(r.animals, 2);
+  assert.equal(r.spaces[0].cases, 3); assert.equal(r.spaces[0].by.gi, 2); assert.equal(r.spaces[0].by.urinary, 1);
+  const none = L.buildSurvey([t({ conditions: [] }), t({ condition: null })], LOC2, since);
+  assert.equal(none.totalCases, 0);
+  const unk = L.buildSurvey([t({ conditions: ['future_key'] })], LOC2, since);
+  assert.equal(unk.spaces[0].by.future_key, 1);
+});
+test('summariseConditions: a two-group row counts under both; zero groups = none; unknown key is not counted as a sign', () => {
+  const rows = [{ conditions: ['gi', 'urinary'], location: 'Pound 1', created_at: '2026-09-01T00:00:00Z' },
+    { condition: 'diarrhoea', location: 'Pound 1', created_at: '2026-09-02T00:00:00Z' },
+    { conditions: [], condition: null }, { conditions: ['future_key'] }];
+  const r = L.summariseConditions(rows);
+  assert.equal(r.counts.gi, 2); assert.equal(r.counts.urinary, 1); assert.equal(r.counts.none, 2);
+  assert.equal(r.flaggedTotal, 3); assert.equal(r.total, 4);
+  assert.deepEqual(r.byLocation['Pound 1'], { gi: 2, urinary: 1 });
+});
+test('mergeReason unions raw stored keys, primary by group order; reasonText and flagReason list every group', () => {
+  const m = L.mergeReason({ conditions: ['urinary', 'gi'], condition: 'urinary', urgency: 'routine' }, { condition: 'vomiting', conditions: ['vomiting', 'skin'] });
+  assert.deepEqual(m.conditions, ['urinary', 'gi', 'vomiting', 'skin']);
+  assert.equal(m.condition, 'gi');
+  const o = L.mergeReason({ condition: 'cat_flu', urgency: 'routine' }, { conditions: ['respiratory'] });
+  assert.deepEqual(o.conditions, ['cat_flu', 'respiratory']); assert.equal(o.condition, 'cat_flu');
+  const e = L.mergeReason({ urgency: 'routine' }, { urgency: 'routine' });
+  assert.deepEqual(e.conditions, []); assert.equal(e.condition, null);
+  assert.equal(L.reasonText({ conditions: ['gi', 'urinary'], problem: 'x' }), 'GI signs, Urinary signs — x');
+  assert.equal(L.reasonText({ condition: 'vomiting' }), 'GI signs');
+  assert.equal(L.reasonText({ conditions: ['future_key'] }), 'future_key');
+  assert.equal(L.flagReason({ conditions: ['gi', 'urinary'] }), 'GI signs, Urinary signs');
+  assert.equal(L.flagReason({ reason: 'note', conditions: ['gi'] }), 'note');
+  assert.equal(L.flagReason({}), '');
+});
+
+test('every sign group has a label and every legacy key folds into a sign group', () => {
+  for (const k of L.SIGN_KEYS) assert.ok(typeof L.CONDITION_LABELS[k] === 'string' && L.CONDITION_LABELS[k].trim().length > 0, 'label for ' + k);
+  for (const [legacy, g] of Object.entries(L.LEGACY_GROUP)) assert.ok(L.SIGN_KEYS.includes(g), legacy + ' -> ' + g);
+});
+
+test('speciesOfLocation: cat / dog / rabbit by room, either when unknown', () => {
+  for (const [loc, sp] of [['Cat Room 1', 'cat'], ['Cat Room 3', 'cat'], ['Pound 1', 'dog'], ['Pound 2 / Run 4', 'dog'], ['Rabbit Room', 'rabbit'], ['Rabbit Room / 1', 'rabbit'], ['Offsite', 'either']])
+    assert.equal(L.speciesOfLocation(loc), sp, loc);
 });

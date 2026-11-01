@@ -20,3 +20,18 @@ test('flag_done: needs an ID and a quick plan; the plan is trimmed and capped', 
   assert.match(validateFlagDone({ plan: 'x' }).error, /animal ID/i);
   assert.equal(flagId('1170 123'), '1170123');
 });
+
+// flag_check returns the sign groups of each flag as `conditions` (raw stored keys), keeping `condition` for old tool versions.
+const m = src.match(/\/\/ conditions-of-start([\s\S]*?)\/\/ conditions-of-end/);
+test('flag_check: conditions is the stored list, else the single old condition, else empty (raw keys, no folding)', () => {
+  assert.ok(m, 'conditionsOfRow block is marked in the Edge Function');
+  const { conditionsOfRow } = new Function(m[1] + '\nreturn { conditionsOfRow };')();
+  assert.deepEqual(conditionsOfRow({ condition: 'vomiting', conditions: [] }), ['vomiting']);
+  assert.deepEqual(conditionsOfRow({ condition: 'vomiting', conditions: null }), ['vomiting']);
+  assert.deepEqual(conditionsOfRow({ condition: 'gi', conditions: ['gi', 'urinary'] }), ['gi', 'urinary']);
+  assert.deepEqual(conditionsOfRow({ condition: null, conditions: ['gi', 'urinary'] }), ['gi', 'urinary']);
+  assert.deepEqual(conditionsOfRow({ condition: null, conditions: [] }), []);
+  assert.deepEqual(conditionsOfRow({}), []);
+  assert.match(src, /select\('id,title,location,condition,conditions,/, 'the select asks for conditions');
+  assert.match(src, /conditions: conditionsOfRow\(r\)/, 'each returned flag carries conditions');
+});
