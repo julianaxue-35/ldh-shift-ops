@@ -21,7 +21,6 @@
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js?v=20261101c"></script>
-<script src="lib/sign-differentials.js?v=20261101c"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
@@ -263,10 +262,6 @@
   .sign-item .req-chip { max-width: 100%; flex-wrap: wrap; border-radius: 14px; }
   .sign-item .req-chip:has(input:checked) { background: var(--blue); border-color: var(--blue); color: #fff; }
   .sign-item .req-chip small { font-weight: 400; margin-left: 6px; opacity: .85; }
-  details.sign-diff { font-size: 0.75rem; margin-left: 8px; max-width: 100%; }
-  details.sign-diff summary { cursor: pointer; color: var(--muted, #555); }
-  details.sign-diff ul { margin: 4px 0 4px 18px; padding: 0; }
-  details.sign-diff p { margin: 2px 0; font-style: italic; }
   .req-chip:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
   @media (max-width: 760px) { .sr-body { padding: 18px 16px 22px; } .sr-banner { padding: 16px; } .sr-to { grid-template-columns: minmax(0, 1fr); } .sr-form { grid-template-columns: minmax(0, 1fr); } }
   .sr-send { position: sticky; bottom: 16px; z-index: 5; margin-top: 18px; padding: 14px 36px; font-size: 1rem; border-radius: 12px; box-shadow: 0 6px 18px rgba(30,34,56,0.28); transition: transform .08s, box-shadow .15s, filter .15s; }
@@ -1024,10 +1019,8 @@
   }
   function selectedSigns() { return Array.from(document.querySelectorAll('.req-sign:checked')).map(cb => cb.value); }
   function renderSignForm() {
-    const diff = (window.SignDifferentials && SignDifferentials.BY_GROUP) || {};
     document.getElementById('req-signs').innerHTML = LDHLogic.SIGN_GROUPS.map(g => `<div class="sign-item">
-      <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label>${diff[g.key] ? `
-      <details class="sign-diff" data-group="${g.key}"><summary>Possible causes (reference) — ${esc(g.label)}</summary><ul>${diff[g.key].map(d => `<li>${esc(d)}</li>`).join('')}</ul><p>${esc(SignDifferentials.NOTE)}</p></details>` : ''}</div>`).join('');
+      <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label></div>`).join('');
   }
   function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
   // The urgent cat-birthing reason rides along in red_flags, so it is Red flag tier like any emergency sign.

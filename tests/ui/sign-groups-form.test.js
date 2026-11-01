@@ -10,15 +10,7 @@ const KEYS = 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelli
   t.ok(await page.locator('#req-condition').count() === 0, 'old suspected-condition dropdown is gone');
   const picker = await page.textContent('#req-signs');
   t.ok(/Respiratory/.test(picker) && /Urinary/.test(picker), 'chips show the group labels');
-  t.ok(await page.locator('details.sign-diff').count() === 10 && await page.locator('details.sign-diff[data-group="other"]').count() === 0, 'ten differential panels, none for Other');
-  t.ok(await page.locator('details.sign-diff[open]').count() === 0, 'differentials start collapsed');
-  t.ok(!(await page.locator('details.sign-diff[data-group="gi"] li').first().isVisible()), 'differential text is hidden until opened');
-  await page.click('details.sign-diff[data-group="gi"] summary');
-  t.ok(await page.locator('details.sign-diff[data-group="gi"] li').first().isVisible() && /Parvovirus/.test(await page.textContent('details.sign-diff[data-group="gi"]')) && /not a diagnosis/.test(await page.textContent('details.sign-diff[data-group="gi"]')), 'opening shows the differentials and the note');
-  const sums = await page.$$eval('details.sign-diff summary', os => os.map(o => o.textContent.trim()));
-  t.ok(new Set(sums).size === 10 && sums.every(x => /^Possible causes \(reference\) \u2014 \S/.test(x)) && sums.some(x => x.startsWith('Possible causes (reference) \u2014 GI signs')), 'each differentials summary names its group: ' + sums.join(' | '));
   t.ok(await page.locator('fieldset#req-signs-wrap > legend').count() === 1 && /Signs you can see/.test(await page.textContent('fieldset#req-signs-wrap > legend')), 'sign list is a fieldset with a legend');
-  t.ok(/Oral foreign body/.test(await page.textContent('details.sign-diff[data-group="gi"]')), 'GI differentials include the oral causes');
   t.ok(await page.locator('#req-birthing').count() === 1, 'separate cat birthing checkbox');
   t.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no horizontal scroll');
 
