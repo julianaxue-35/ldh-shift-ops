@@ -99,7 +99,7 @@ const H = 3600 * 1000;
   try {
     t.ok(await s.page.locator('#faq details').count() >= 8, 'shelter staff FAQ is present');
     const txt = await s.page.textContent('#faq');
-    t.ok(txt.includes('Suspected condition') && txt.includes('Why do we track it'), 'staff FAQ explains what and why we track');
+    t.ok(txt.includes('signs you can see') && txt.includes('Why do we track it'), 'staff FAQ explains what and why we track');
     t.ok(s.errors.length === 0, 'no page errors on index: ' + JSON.stringify(s.errors));
   } finally { await s.browser.close(); }
 

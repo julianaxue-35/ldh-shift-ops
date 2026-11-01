@@ -9,9 +9,9 @@ const t = require('./check')('flag-form');
   t.ok(await page.locator('#req-urgency-pick').count() === 1 && (await page.$$eval('#req-urgency-pick option', os => os.map(o => o.value))).join() === 'routine,urgent,red_flag', 'staff can pick Request check / Urgent / Emergency');
   t.ok(await page.locator('#triage-levels').count() === 1 && /Emergency \(within 2\u20134 h\)/.test(await page.textContent('#triage-levels')), 'a small section explains the three levels, the emergency one being within 2\u20134 h');
   t.ok(await page.locator('#req-location option').count() === 18 && (await page.$$eval('#req-location option', os => os.map(o => o.value))).includes('Vet clinic'), 'location select filled from the shared list (incl. Rabbit Room, Pathway, Offsite, Vet clinic, Office)');
-  const signOpts = await page.$$eval('#req-condition option', os => os.map(o => o.value));
-  t.ok(signOpts.join() === ',cat_flu,kennel_cough,diarrhoea,vomiting,eye_condition,skin_condition,wounds_injury,cat_birthing,other', 'flag form offers the eight reported signs plus the urgent cat birthing check (got ' + signOpts.join() + ')');
-  t.ok(!(await page.textContent('#req-condition')).toLowerCase().includes('giardia'), 'no diagnoses in the sign list');
+  const signOpts = await page.$$eval('.req-sign', os => os.map(o => o.value));
+  t.ok(signOpts.join() === 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelling,neonatal,other', 'flag form offers the eleven sign groups (got ' + signOpts.join() + ')');
+  t.ok(!(await page.$$eval('#req-signs label', ls => ls.map(l => l.textContent).join(' '))).toLowerCase().includes('giardia'), 'no diagnoses on the sign chips (differentials sit in collapsed panels)');
 
   await page.fill('#req-title', 'T100');
   await page.evaluate(() => { document.getElementById('triage-drawer').open = true; }); await page.check('input.req-flag[value="bleeding_wound"]');
@@ -63,7 +63,7 @@ const t = require('./check')('flag-form');
   /* ---------- 2026-10-15: urgent cat birthing check ---------- */
   t.ok(!(await page.isVisible('#req-birthing-wrap')), 'birthing reason is hidden until Cat birthing is chosen');
   await page.fill('#req-title', 'CAT-BIRTH');
-  await page.selectOption('#req-condition', 'cat_birthing');
+  await page.check('#req-birthing');
   t.ok(await page.isVisible('#req-birthing-wrap'), 'choosing Cat birthing reveals the reason dropdown');
   t.ok((await page.$$eval('#req-birthing-reason option', os => os.map(o => o.value))).join() === ',birth_neonates,birth_discharge,birth_mum_distress', 'reason dropdown lists the three birthing reasons');
   let dialogs = []; page.on('dialog', d => dialogs.push(d.message()));   // the harness already accepts it
