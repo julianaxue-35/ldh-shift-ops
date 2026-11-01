@@ -19,9 +19,14 @@ test('the migration seeds exactly the spaces the flag form offers (same names; o
 });
 
 test('the migration allows exactly the reported signs the JS knows about', () => {
-  const check = sql.match(/condition in\s*\(([^)]*)\)/)[1];
-  const keys = [...check.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
-  assert.deepEqual(keys, L.SIGN_KEYS);
-  const arr = sql.match(/array\[([^\]]*)\]/)[1];
-  assert.deepEqual([...arr.matchAll(/'([a-z_]+)'/g)].map(m => m[1]), L.SIGN_KEYS, 'the snapshot function loops the same signs');
+  const signs = fs.readFileSync(path.resolve(import.meta.dirname, '../supabase/migrations/0047_sign_groups.sql'), 'utf8');
+  const allowed = [...L.SIGN_KEYS, ...Object.keys(L.LEGACY_GROUP).filter(k => !L.SIGN_KEYS.includes(k))];
+  const keysOf = s => [...s.matchAll(/'([a-z_]+)'/g)].map(m => m[1]);
+  assert.deepEqual(keysOf(signs.match(/condition in\s*\(([^)]*)\)/)[1]).sort(), [...allowed].sort(), 'single-condition check');
+  assert.deepEqual(keysOf(signs.match(/conditions <@ array\s*\[([^\]]*)\]/)[1]).sort(), [...allowed].sort(), 'conditions list check');
+  const loops = [...signs.matchAll(/unnest\(array\[([^\]]*)\]\)/g)];
+  assert.equal(loops.length, 1);
+  assert.deepEqual(keysOf(loops[0][1]), L.SIGN_KEYS, 'the snapshot function loops the same groups');
+  const ord = signs.match(/ord text\[\] := array\[([^\]]*)\]/)[1];
+  assert.deepEqual(keysOf(ord), L.SIGN_KEYS, 'the primary-condition order matches the display order');
 });
