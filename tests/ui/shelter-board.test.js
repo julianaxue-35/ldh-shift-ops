@@ -17,7 +17,9 @@ const H = 3600 * 1000;
     req('9990008', 'Cat Room 2 / 7', { done: true, completed_at: ago(2 * H), treatment: 'No treatment needed', plan: 'Back to normal' }),
     req('9990009', 'Cat Room 2 / 9', { done: true, completed_at: ago(40 * H) }),                 // finished > 24 h ago: not on the board
     req('9990010', 'Cat Room 3 / 2', { type: 'check_recheck' }),                                  // offline-tool list entry, never flagged: not on the board
-    req('9990011', 'Mystery room 9', { problem: 'No idea where' })
+    req('9990011', 'Mystery room 9', { problem: 'No idea where' }),
+    req('9990012', 'Pound 3 / 1', { problem: '', conditions: ['gi', 'urinary'], condition: 'gi' }),   // no free text: the board falls back to the sign labels
+    req('9990013', 'Pound 3 / 2', { problem: '', condition: 'vomiting' })                            // old row: reads as its group
   ], flag_history: [
     { title: '9990002', flagged_at: ago(10 * 24 * H), reason: 'Vomiting', location: 'Cat Room 1 / 30' },
     { title: '9990002', flagged_at: ago(40 * 24 * H), reason: '', condition: 'cat_flu', location: 'Cat Room 2 / 3' },
@@ -33,6 +35,8 @@ const H = 3600 * 1000;
       'every room shows, in walking order CR1, CR2, CA1, CA2, FIR, CR3 … Cat transport, Dog transport, P1-P4, Rabbit, Pathway, Vet clinic, Office (got ' + roomOrder.join(',') + ')');
     const room = code => b.page.locator(`#board section[data-room="${code}"]`);
     const txt = async code => (await room(code).textContent()).replace(/\s+/g, ' ');
+    t.ok((await txt('P3')).includes('GI signs, Urinary signs'), 'with no free text, a two-group case shows both labels joined');
+    t.ok((await txt('P3')).includes('GI signs') && !(await txt('P3')).includes('Vomiting'), 'an old vomiting case reads as GI signs');
     t.ok((await txt('CR1')).includes('Pen 12') && (await txt('CR1')).includes('Pen 30'), 'CR1 holds Cat Room 1 / 12 and the "CR1-30" spelling, as pens 12 and 30');
     t.ok((await txt('CR1')).includes('Mirtazapine ear gel once daily') && (await txt('CR1')).includes('Offer wet food little and often'), 'the vet\'s treatment and plan show against the pen');
     t.ok((await txt('CR1')).includes('Vet has seen — follow plan'), 'a picked-up case with a plan reads "Vet has seen — follow plan"');

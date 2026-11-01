@@ -249,7 +249,7 @@
     const hasCare = !!((t.treatment && t.treatment.trim()) || (t.plan && t.plan.trim()));
     const pill = stage === 'seen' && hasCare ? 'Vet has seen — follow plan' : label;
     const urgent = LDHLogic.normTier(t.urgency) === 'red_flag' && stage !== 'done';
-    const problem = t.problem || (t.condition ? (LDHLogic.CONDITION_LABELS[t.condition] || t.condition) : '');
+    const problem = t.problem || LDHLogic.conditionsOf(t).map(k => LDHLogic.CONDITION_LABELS[k] || k).join(', ');
     const histText = LDHLogic.flagHistoryText(LDHLogic.flagsBefore(HISTORY, t, Date.now()));
     const none = '<span class="none">Not written yet — vet to add</span>';
     const line = (title, v) => `<div class="field"><span class="lbl">${title}</span><span class="txt">${v && v.trim() ? esc(v.trim()) : none}</span></div>`;

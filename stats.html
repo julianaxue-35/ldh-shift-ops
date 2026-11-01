@@ -552,7 +552,7 @@
     const [y, m] = monthStr.split('-').map(Number);
     const start = new Date(y, m - 1, 1);
     const end = new Date(y, m, 1);
-    const { data, error } = await LDHLogic.fetchAll(() => sb.from('tasks').select('title, location, condition, created_at')
+    const { data, error } = await LDHLogic.fetchAll(() => sb.from('tasks').select('title, location, condition, conditions, created_at')
       .gte('created_at', start.toISOString()).lt('created_at', end.toISOString()).order('created_at', { ascending: true }).order('id'));
     if (error) throw new Error(error.message);
     return LDHLogic.summariseConditions((data || []).filter(x => !LDHLogic.isTestAnimal(x.title)));
@@ -567,7 +567,7 @@
     // The API hands back at most 1000 rows at a time, so a year of flagged requests is read a page at a time.
     const pages = []; let tkError = null;
     for (let from = 0; from < 10000; from += 1000) {
-      const r = await sb.from('tasks').select('title, location, condition, created_at').not('condition', 'is', null)
+      const r = await sb.from('tasks').select('title, location, condition, conditions, created_at').not('condition', 'is', null)
         .gte('created_at', since.toISOString()).order('created_at', { ascending: false }).range(from, from + 999);
       if (r.error) { tkError = r.error; break; }
       pages.push(...(r.data || []));
@@ -578,7 +578,7 @@
     SURVEY_ERROR = tk.error ? (tk.error.message || 'unknown error') : null;
     SURVEY_LOCATIONS = loc.data || [];
     SURVEY_ROWS_RETURNED = pages.length >= 10000 ? 1000 : 0;   // only warn if even ten pages were not enough
-    SURVEY_TASKS = pages.filter(t => t.condition && !LDHLogic.isTestAnimal(t.title));
+    SURVEY_TASKS = pages.filter(t => LDHLogic.conditionsOf(t).length && !LDHLogic.isTestAnimal(t.title));
     // Baseline day count: read ONE space's 'any' rows (one per night) — reading every space
     // would hit the API's 1000-row cap after about 80 days.
     SNAPSHOT_DATES = []; SNAPSHOT_LAST = null;
@@ -656,18 +656,18 @@
 
     let csv = `Disease surveillance — ${monthStr}\n`;
     csv += 'Counts are request rows in the calendar month (the on-screen board counts cases in the chosen window).\n\n';
-    csv += 'Condition,Reports (rows)\n';
-    Object.keys(conditionCounts).forEach(k => { csv += `${csvCell(CONDITION_LABELS[k])},${conditionCounts[k]}\n`; });
-    csv += '\nBy location\nLocation,Condition,Count\n';
+    csv += 'Condition,Reports (rows; an animal with two groups counts once under each)\n';
+    Object.keys(conditionCounts).forEach(k => { csv += `${csvCell(CONDITION_LABELS[k] || k)},${conditionCounts[k]}\n`; });
+    csv += '\nBy location\nLocation,Species,Condition,Count\n';
     Object.keys(byLocation).sort().forEach(loc => {
       Object.keys(byLocation[loc]).forEach(cond => {
-        csv += `${csvCell(loc)},${csvCell(CONDITION_LABELS[cond])},${byLocation[loc][cond]}\n`;
+        csv += `${csvCell(loc)},${LDHLogic.behaviourSpecies(loc)},${csvCell(CONDITION_LABELS[cond] || cond)},${byLocation[loc][cond]}\n`;
       });
     });
-    csv += '\nFull list (flagged cases only)\nDate,Animal ID,Location,Condition\n';
+    csv += '\nFull list (flagged cases only)\nDate,Animal ID,Location,Species,Condition\n';
     flagged.forEach(t => {
       const d = new Date(t.created_at).toLocaleDateString('en-AU');
-      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${csvCell(CONDITION_LABELS[t.condition])}\n`;
+      csv += `${csvCell(d)},${csvCell(t.title)},${csvCell(t.location)},${LDHLogic.behaviourSpecies(t.location)},${csvCell(LDHLogic.conditionsOf(t).map(k => CONDITION_LABELS[k] || k).join('; '))}\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv' });

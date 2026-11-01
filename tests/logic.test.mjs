@@ -834,7 +834,7 @@ test('loadRecentTasks / recentMemos / surveyRows: ask only for open or recent ro
   assert.match(orT, /^done\.eq\.false,completed_at\.gte\.\d{4}-/);
   assert.match(seen.find(s => s[0] === 'memos' && s[1] === 'or')[2], /^done\.eq\.false,done_at\.gte\./);
   assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'not'), 'survey rows only those with a condition');
-  assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, created_at'), 'survey reads four columns');
+  assert.ok(seen.some(s => s[0] === 'tasks' && s[1] === 'select' && s[2] === 'title, location, condition, conditions, created_at'), 'survey reads five columns (both condition columns)');
 });
 
 test('public holidays: 2027 and 2028 are listed, only Mon-Fri holidays cost Surgery a working day, weekends are unaffected', () => {

@@ -60,3 +60,29 @@ test('baseline banner wording and the caveat', () => {
   assert.match(c, /twice if two different signs/i, 'the counting rule is stated on screen');
   assert.match(c, /Requests synced from the shift tools carry no sign, so only cases flagged on the dashboard appear here until the vet-diagnosed conditions are added\./);
 });
+
+test('chart colour follows the group: an old key takes its group colour, unknown keys fall back to colour 0', () => {
+  const col = k => { const m = V.rankedHtml({ ranked: [{ key: k, animals: 1, share: 100, spaces: [{ name: 'X', animals: 1 }] }], byCondition: [] }).match(/background:(var\(--cond-\d+\))/); return m && m[1]; };
+  assert.equal(col('vomiting'), col('gi'));
+  assert.equal(col('kennel_cough'), col('respiratory'));
+  assert.equal(col('gi'), 'var(--cond-' + L.SIGN_KEYS.indexOf('gi') + ')');
+  assert.equal(col('other'), 'var(--cond-10)');
+  assert.equal(col('some_future_key'), 'var(--cond-0)');
+});
+
+test('stylesheet defines a colour for every sign group', () => {
+  const css = require('node:fs').readFileSync(new URL('../lib/surveillance.css', import.meta.url), 'utf8');
+  L.SIGN_KEYS.forEach((k, i) => assert.match(css, new RegExp('--cond-' + i + ':#[0-9a-f]{6}'), 'colour ' + i));
+});
+
+test('Respiratory is read per species tab: old kennel_cough in Dogs, old cat_flu in Cats', () => {
+  const LOC2 = [{ name: 'Cat Room 1', grp: 'Cat rooms', cages: 30, sort: 1 }, { name: 'Pound 1', grp: 'Pounds', cages: 26, sort: 2 }];
+  const iso = new Date(now).toISOString();
+  const by = L.surveyBySpecies([
+    { title: 'D1', location: 'Pound 1 / 2', condition: 'kennel_cough', created_at: iso },
+    { title: 'C1', location: 'Cat Room 1 / 2', condition: 'cat_flu', created_at: iso }
+  ], LOC2, new Date(now - 3 * 24 * 3600 * 1000));
+  const resp = sp => (by[sp].survey.byCondition.find(c => c.key === 'respiratory') || {}).animals;
+  assert.equal(resp('dogs'), 1);
+  assert.equal(resp('cats'), 1);
+});

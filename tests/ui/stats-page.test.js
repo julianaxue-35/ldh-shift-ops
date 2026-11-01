@@ -25,7 +25,7 @@ const D = 24 * 3600 * 1000;
     t.ok(await stats.page.locator('#surv-dash .surv-pane.on .heat-tile').count() === 7, 'a tile for each of the 7 cat spaces (the Cats pane)');
     const tile = name => stats.page.locator('#surv-dash .heat-tile', { hasText: name }).first().textContent();
     t.ok(/6\.7%/.test(await tile('Cat Room 1')) && /2 cases · 30 cages/.test(await tile('Cat Room 1')), 'Cat Room 1: 2 cases / 30 cages = 6.7%');
-    t.ok(/Cat flu \(URI\)/.test(await stats.page.textContent('#surv-dash .rk-list')) && /2 animals/.test(await stats.page.textContent('#surv-dash .rk-list')), 'the ranking lists the most commonly reported sign (cat flu, 2 animals)');
+    t.ok(/Respiratory signs/.test(await stats.page.textContent('#surv-dash .rk-list')) && /2 animals/.test(await stats.page.textContent('#surv-dash .rk-list')), 'the ranking lists the most commonly reported sign (old cat_flu rows read as Respiratory signs, 2 animals)');
     t.ok((await stats.page.textContent('#baseline-banner')).includes('Building your baseline — day 2 of 365'), 'baseline banner counts the 2 snapshot days out of a full year');
     t.ok(/Last snapshot: 20 .*2026/.test(await stats.page.textContent('#baseline-banner')), 'baseline banner shows the newest snapshot date');
     t.ok((await stats.page.$$eval('#surv-window option', os => os.map(o => o.textContent))).join() === 'This week,This month,This season,This year', 'the board can be set to this week / month / season / year');
@@ -63,6 +63,32 @@ const D = 24 * 3600 * 1000;
     await many.page.waitForSelector('#surv-dash .heat-tile');
     t.ok(/1000\s*Cases flagged|Cases flagged/.test(await many.page.textContent('#surv-dash')) && (await many.page.textContent('#surv-dash .kpi-row')).includes('1000') && !(await many.page.textContent('#heat-notes')).includes('Showing the most recent'), 'a thousand flagged requests are all read (it pages through them) and counted, with no cap warning');
   } finally { await many.browser.close(); }
+  // 1b1. sign groups: old respiratory keys count per species tab; the CSV lists a two-group row once per group and carries Species
+  const grp = (title, loc, extra) => Object.assign({ title, location: loc, shift: 'sick_injured', type: 'shelter', urgency: 'routine', done: false, created_at: new Date().toISOString() }, extra);
+  const gseed = { locations: LOCATION_ROWS, tasks: [
+    grp('K1', 'Pound 1 / 2', { condition: 'kennel_cough' }), grp('C1', 'Cat Room 1 / 2', { condition: 'cat_flu' }),
+    grp('TWO', 'Cat Room 1 / 3', { conditions: ['gi', 'urinary'], condition: 'gi' }), grp('OLD', 'Pound 1 / 5', { condition: 'vomiting' })] };
+  const g = await open(gseed, 'stats.html');
+  try {
+    await g.page.waitForSelector('#surv-dash .heat-tile');
+    const rk = sp => g.page.locator('#surv-dash .surv-pane[data-sp="' + sp + '"]').textContent();
+    t.ok(/Respiratory signs/.test(await rk('cats')), 'an old cat_flu row counts under Respiratory in the Cats tab');
+    t.ok(/Respiratory signs/.test(await rk('dogs')), 'an old kennel_cough row counts under Respiratory in the Dogs tab');
+    t.ok(!/Respiratory signs/.test(await rk('rabbits')), 'and not in the Rabbits tab');
+    await g.page.evaluate(() => { window.__blobs = []; const orig = URL.createObjectURL; URL.createObjectURL = b => { window.__blobs.push(b); return orig.call(URL, b); }; });
+    await g.page.fill('#surveillance-month', new Date().toISOString().slice(0, 7));
+    await g.page.click('#surveillance-export');
+    await g.page.waitForFunction(() => window.__blobs.length === 1);
+    const csv = await g.page.evaluate(() => window.__blobs[0].text());
+    const lines = csv.split('\n');
+    const count = k => (lines.find(l => l.startsWith('"' + k + '",')) || '').split(',').pop();
+    t.ok(count('GI signs') === '2' && count('Urinary signs') === '1', 'the per-condition section counts the two-group row once under each group (GI 2 incl. the old vomiting row, Urinary 1): ' + csv.slice(0, 300));
+    t.ok(lines.some(l => /^"Cat Room 1 \/ 3",cat,"GI signs",1$/.test(l)), 'the per-location section has a Species column (cat for a Cat Room)');
+    t.ok(lines.some(l => /^"Pound 1 \/ 5",dog,"GI signs",1$/.test(l)), 'dog for Pound 1');
+    t.ok(lines.some(l => /,"TWO","Cat Room 1 \/ 3",cat,"GI signs; Urinary signs"$/.test(l)), 'the animal row shows both labels joined with "; " and the species: ' + lines.filter(l => /TWO/.test(l)).join('|'));
+    t.ok(lines.includes('Location,Species,Condition,Count') && lines.includes('Date,Animal ID,Location,Species,Condition'), 'both sections have a Species header');
+    t.ok(g.errors.length === 0, 'no page errors: ' + g.errors.join('; '));
+  } finally { await g.browser.close(); }
   // 1b2. no snapshots yet
   const nosnap = await open({ tasks: seed.tasks, locations: LOCATION_ROWS }, 'stats.html');
   try {

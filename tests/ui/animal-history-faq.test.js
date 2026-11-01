@@ -29,7 +29,7 @@ const seed = () => ({
     const txt = await s.page.textContent('#animal-history-out');
     t.ok(txt.includes('3 flags'), 'three flags found (two cases + one flag-log-only), not the routine list entry or the 5-month-old one: ' + txt.slice(0, 80));
     t.ok(txt.includes('sneezing and eye discharge') && txt.includes('doxycycline 5 days') && txt.includes('recheck Friday') && txt.includes('eating well'), 'problem, treatment, plan and vet note show');
-    t.ok(txt.includes('Cat flu') && txt.includes('Completed'), 'suspected condition and outcome show');
+    t.ok(txt.includes('Respiratory signs') && txt.includes('Completed'), 'signs flagged (old cat_flu reads as its group) and outcome show');
     t.ok(txt.includes('limping') && txt.includes('Still open'), 'an older still-open flag shows (spaces/case in the stored ID ignored)');
     t.ok(txt.includes('kennel cough') && txt.includes('no longer held'), 'a flag known only from the flag log shows its reason, marked as such');
     t.ok(!txt.includes('way too old') && !txt.includes('other animal'), 'nothing older than 3 months, nothing for other animals');
