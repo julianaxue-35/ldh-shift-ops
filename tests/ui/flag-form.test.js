@@ -10,7 +10,7 @@ const t = require('./check')('flag-form');
   t.ok(await page.locator('#triage-levels').count() === 1 && /Emergency \(within 2\u20134 h\)/.test(await page.textContent('#triage-levels')), 'a small section explains the three levels, the emergency one being within 2\u20134 h');
   t.ok(await page.locator('#req-location option').count() === 18 && (await page.$$eval('#req-location option', os => os.map(o => o.value))).includes('Vet clinic'), 'location select filled from the shared list (incl. Rabbit Room, Pathway, Offsite, Vet clinic, Office)');
   const signOpts = await page.$$eval('.req-sign', os => os.map(o => o.value));
-  t.ok(signOpts.join() === 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelling,neonatal,other', 'flag form offers the eleven sign groups (got ' + signOpts.join() + ')');
+  t.ok(signOpts.join() === 'respiratory,gi,wounds_pain_swelling,urinary,skin,msk,neuro,eyes,ears,neonatal,other', 'flag form offers the eleven sign groups (got ' + signOpts.join() + ')');
   t.ok(!(await page.$$eval('#req-signs label', ls => ls.map(l => l.textContent).join(' '))).toLowerCase().includes('giardia'), 'no diagnoses on the sign chips (differentials sit in collapsed panels)');
 
   await page.fill('#req-title', 'T100');

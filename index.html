@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101c"></script>
+<script src="lib/ldh-logic.js?v=20261101d"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
@@ -621,6 +621,7 @@
     ROSTER = {};
     (rosterRes.data || []).forEach(r => { (ROSTER[r.shift] ??= []).push(r); });
     renderAll();
+    refreshSignOrder();   // once a day per device; stored for the next page load
   }
 
   document.getElementById('req-location').addEventListener('change', updateLocationFields);
@@ -1018,9 +1019,38 @@
     });
   }
   function selectedSigns() { return Array.from(document.querySelectorAll('.req-sign:checked')).map(cb => cb.value); }
+  /* Form order of the sign chips: respiratory / GI / wounds first, the rest by how often they were reported in the last 90 days
+     (computed at most once a day per device from flag_history, stored, and applied at the NEXT page load so chips never move mid-use). */
+  const SIGN_ORDER_KEY = 'ldh:signOrder:v1';
+  function readSignOrder() {
+    try { const v = JSON.parse(localStorage.getItem(SIGN_ORDER_KEY)); return v && Array.isArray(v.order) ? v : null; } catch (e) { return null; }
+  }
+  // Repair: drop unknown / repeated keys, append missing groups in default order, keep the top 3 first and Other last, so all 11 always show.
+  function repairSignOrder(order) {
+    const def = LDHLogic.orderSignGroups().map(g => g.key), seen = [];
+    (order || []).forEach(k => { if (def.includes(k) && !seen.includes(k)) seen.push(k); });
+    const all = seen.concat(def.filter(k => !seen.includes(k))), top = LDHLogic.SIGN_FORM_TOP;
+    return top.concat(all.filter(k => !top.includes(k) && k !== 'other'), ['other']);   // top 3 first and Other last, whatever was stored
+  }
+  let SIGN_ORDER_USED = null;   // fixed at first render so a background refresh can never reorder the form in place
   function renderSignForm() {
-    document.getElementById('req-signs').innerHTML = LDHLogic.SIGN_GROUPS.map(g => `<div class="sign-item">
+    if (!SIGN_ORDER_USED) { const st = readSignOrder(); SIGN_ORDER_USED = st ? repairSignOrder(st.order) : repairSignOrder([]); }
+    const by = k => LDHLogic.SIGN_GROUPS.find(g => g.key === k);
+    document.getElementById('req-signs').innerHTML = SIGN_ORDER_USED.map(by).map(g => `<div class="sign-item">
       <label class="req-chip"><input type="checkbox" class="req-sign" value="${g.key}">${esc(g.label)}<small>${esc(g.examples)}</small></label></div>`).join('');
+  }
+  let signOrderTried = false;   // at most one attempt per page load, even when the read fails or finds nothing
+  async function refreshSignOrder() {
+    const st = readSignOrder(), today = LDHLogic.localDayKey(new Date());
+    if (signOrderTried || (st && st.day === today)) return;
+    signOrderTried = true;
+    try {
+      const since = new Date(Date.now() - 90 * 86400000).toISOString();
+      const r = await LDHLogic.fetchAll(() => sb.from('flag_history').select('title, condition, conditions, flagged_at').gte('flagged_at', since).order('flagged_at', { ascending: false }).order('id'));
+      if (r.error || !r.data || !r.data.length) return;   // keep the default / previous order silently
+      const counts = LDHLogic.countSignGroups(r.data.filter(h => !LDHLogic.isTestAnimal(h.title)));
+      try { localStorage.setItem(SIGN_ORDER_KEY, JSON.stringify({ day: today, order: LDHLogic.orderSignGroups(counts).map(g => g.key) })); } catch (e) {}
+    } catch (e) { /* nice-to-have only */ }
   }
   function selectedFlags() { return Array.from(document.querySelectorAll('.req-flag:checked')).map(cb => cb.value); }
   // The urgent cat-birthing reason rides along in red_flags, so it is Red flag tier like any emergency sign.

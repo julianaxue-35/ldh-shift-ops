@@ -40,6 +40,9 @@ One **Respiratory signs** group covers cat flu, kennel cough and lower-respirato
 
 Existing, unchanged: `cat_birthing` (picker option + birthing-reason sub-select; not counted in surveillance). "None / not sure" = no ticks.
 
+## Display order
+The order shown on the flag form is not the table order above (that order, `SIGN_GROUPS`, still drives colours, primary condition and the SQL trigger). The form shows **Respiratory, GI, Wounds / pain / swelling** first, always; the other groups follow by how often they were reported in the last 90 days (from `flag_history`, most reported first, ties in table order); **Other** is always last. The count is computed passively, at most once a day per device (one paged read, only the needed columns, practice animals skipped), stored in the browser (`ldh:signOrder:v1`) and applied at the next page load, so chips never move while someone is using the form. If the read fails the default or previous order is kept. A stored order missing a group or holding an unknown key is repaired so all 11 always show.
+
 ## Behaviour
 - Picker is a tick list (chips or checkboxes), one chip per group. It replaces the single `<select id="req-condition">`. Cat birthing stays reachable (builder: keep it as a separate control or a distinguished chip; ticking it keeps today's behaviour exactly).
 - Each group has a small "differentials" disclosure (collapsed by default). Content is a short list of differentials only, per group. Draft content is written by Claude and signed off by Juliana before release; mark it "for reference, not a diagnosis".

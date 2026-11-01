@@ -1,12 +1,12 @@
 const { open } = require('./harness');
 const t = require('./check')('sign-groups-form');
-const KEYS = 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelling,neonatal,other';
+const KEYS = 'respiratory,gi,wounds_pain_swelling,urinary,skin,msk,neuro,eyes,ears,neonatal,other';
 (async () => {
   const { browser, page, errors, db } = await open();
   const signs = () => page.$$eval('.req-sign', os => os.map(o => o.value));
   const ticks = () => page.$$eval('.req-sign:checked', os => os.map(o => o.value));
 
-  t.ok((await signs()).join() === KEYS, 'eleven sign groups in spec order, respiratory first (got ' + (await signs()).join() + ')');
+  t.ok((await signs()).join() === KEYS, 'eleven sign groups in default display order, respiratory / GI / wounds first (got ' + (await signs()).join() + ')');
   t.ok(await page.locator('#req-condition').count() === 0, 'old suspected-condition dropdown is gone');
   const picker = await page.textContent('#req-signs');
   t.ok(/Respiratory/.test(picker) && /Urinary/.test(picker), 'chips show the group labels');
@@ -62,6 +62,39 @@ const KEYS = 'respiratory,gi,urinary,skin,msk,neuro,eyes,ears,wounds_pain_swelli
   await page.click('#req-submit'); await page.waitForTimeout(400);
   const s4 = (await db()).tasks.filter(x => x.title === 'S4');
   t.ok(s4.length === 1 && s4[0].conditions.join() === 'gi,urinary' && s4[0].condition === 'gi', 're-flag unions groups, no duplicate (got ' + JSON.stringify(s4.map(r => r.conditions)) + ')');
+
+  // ---- display order: top 3 fixed, rest by reported frequency (computed once a day, applied at the NEXT page load) ----
+  {
+    const ago = d => new Date(Date.now() - d * 86400000).toISOString();
+    const rows = [];
+    for (let i = 0; i < 4; i++) rows.push({ title: 'U' + i, flagged_at: ago(3), conditions: ['urinary'], condition: 'urinary' });
+    rows.push({ title: 'E1', flagged_at: ago(2), conditions: ['eyes'], condition: 'eyes' });
+    rows.push({ title: 'TEST1', flagged_at: ago(2), conditions: ['ears', 'ears'], condition: 'ears' });
+    rows.push({ title: 'OLD', flagged_at: ago(200), conditions: ['neuro'], condition: 'neuro' });
+    const a = await open({ flag_history: rows });
+    const first = (await a.page.$$eval('.req-sign', os => os.map(o => o.value))).join();
+    t.ok(first === KEYS, 'first load renders the default order, not re-ordered in place (got ' + first + ')');
+    await a.page.waitForTimeout(800);
+    t.ok((await a.page.$$eval('.req-sign', os => os.map(o => o.value))).join() === KEYS, 'chips do not move after the background compute');
+    const stored = await a.page.evaluate(() => JSON.parse(localStorage.getItem('ldh:signOrder:v1')));
+    t.ok(stored && stored.order[3] === 'urinary' && stored.order[4] === 'eyes' && stored.order.length === 11, 'order stored once computed (got ' + JSON.stringify(stored) + ')');
+    t.ok(stored.order[5] !== 'ears' || stored.order.indexOf('ears') > stored.order.indexOf('eyes'), 'test animals and rows older than 90 days are not counted');
+    const b = await a.page.context().newPage();
+    await b.goto(a.page.url()); await b.waitForTimeout(700);
+    const second = await b.$$eval('.req-sign', os => os.map(o => o.value));
+    t.ok(second[3] === 'urinary' && second[4] === 'eyes' && second.slice(0, 3).join() === 'respiratory,gi,wounds_pain_swelling' && second[10] === 'other', 'second load shows urinary 4th (got ' + second.join() + ')');
+
+    // repair: missing group + unknown key
+    await b.evaluate(() => localStorage.setItem('ldh:signOrder:v1', JSON.stringify({ day: '2000-01-01', order: ['zzz', 'ears', 'gi'] })));
+    await b.reload(); await b.waitForTimeout(500);
+    const rep = await b.$$eval('.req-sign', os => os.map(o => o.value));
+    t.ok(rep.length === 11 && new Set(rep).size === 11 && !rep.includes('zzz') && rep[0] === 'respiratory' && rep.slice(0, 3).join() === 'respiratory,gi,wounds_pain_swelling', 'partial / unknown stored order is repaired to all 11 (got ' + rep.join() + ')');
+    // corrupt value
+    await b.evaluate(() => localStorage.setItem('ldh:signOrder:v1', '{not json'));
+    await b.reload(); await b.waitForTimeout(500);
+    t.ok((await b.$$eval('.req-sign', os => os.map(o => o.value))).length === 11, 'corrupt localStorage falls back to a complete 11-chip list');
+    await a.browser.close();
+  }
 
   t.ok(errors.length === 0, 'no page errors (' + errors.join(' | ') + ')');
   await browser.close(); t.done();
