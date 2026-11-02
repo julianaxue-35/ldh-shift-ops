@@ -35,3 +35,24 @@ test('flag_check: conditions is the stored list, else the single old condition, 
   assert.match(src, /select\('id,title,location,condition,conditions,/, 'the select asks for conditions');
   assert.match(src, /conditions: conditionsOfRow\(r\)/, 'each returned flag carries conditions');
 });
+
+// A note / med chart sent to the Admission AA closes the animal's open requests, unless already assigned to the nurses.
+const { flagsClosedByNote } = new Function(block + '\nreturn { flagsClosedByNote };')();
+test('note sent: closes that animal\'s open requests (ignoring case/spaces), medication ones included', () => {
+  const rows = [
+    { id: 1, title: '1176635', type: 'medication', done: false, vet_done_at: null, needs_medication: true },
+    { id: 2, title: ' 1173 336 ', type: 'shelter', done: false, vet_done_at: null },
+    { id: 3, title: '9999', type: 'shelter', done: false, vet_done_at: null },
+  ];
+  assert.deepEqual(flagsClosedByNote(rows, '1176635').map((r) => r.id), [1]);
+  assert.deepEqual(flagsClosedByNote(rows, '1173336').map((r) => r.id), [2]);
+});
+test('note sent: leaves alone cases assigned to the nurses, done ones and routine list entries', () => {
+  const rows = [
+    { id: 1, title: 'A1', type: 'medication', done: false, vet_done_at: '2026-11-03T01:00:00Z', needs_medication: true },
+    { id: 2, title: 'A1', type: 'shelter', done: true, vet_done_at: null },
+    { id: 3, title: 'A1', type: 'check_recheck', done: false, vet_done_at: null },
+  ];
+  assert.deepEqual(flagsClosedByNote(rows, 'a1'), []);
+  assert.deepEqual(flagsClosedByNote(null, 'a1'), []);
+});

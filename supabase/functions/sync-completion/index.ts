@@ -175,6 +175,13 @@ function validateFlagDone(c) {
   if (!plan) return { error: 'A quick plan is required.' };
   return { id: flagId(title), plan: plan };
 }
+// A vet's note / medication chart sent to the Admission AA (2026-11-03) finishes that animal's open dashboard request(s),
+// unless the vet already assigned it to the nurses (vet_done_at set = waiting for the nurse's label: the nurse closes that one).
+// Routine list entries (check_recheck) are never touched. Pure, so tests/flag-edge-validate.test.mjs can run it.
+function flagsClosedByNote(rows, animalId) {
+  const want = flagId(animalId);
+  return (rows || []).filter((r) => r && !r.done && !r.vet_done_at && r.type !== 'check_recheck' && flagId(r.title) === want);
+}
 // flag-validate-end
 // conditions-of-start
 // The sign groups of a flagged row as stored: `conditions` if a non-empty array, else the old single `condition`, else none. Raw keys; the tools fold legacy keys into groups.
@@ -227,6 +234,24 @@ function behaviourResendHistory(history, by, nowISO) {
 }
 // behaviour-validate-end
 
+// Best effort: the note is already saved, so a failure here must never turn a successful send into "not sent".
+async function closeFlagsForNote(supabase, animalId, sentBy) {
+  try {
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const { data, error } = await supabase.from('tasks')
+      .select('id,title,type,done,vet_done_at,needs_medication')
+      .eq('done', false).neq('type', 'check_recheck').is('vet_done_at', null).gte('created_at', since).limit(1000);
+    if (error) { console.warn('close flags', error.message); return; }
+    const hits = flagsClosedByNote(data ?? [], animalId);
+    if (!hits.length) return;
+    const now = new Date().toISOString();
+    const base = { done: true, completed_by_role: 'vet_nurse', completed_at: now, vet_done_at: now };
+    const plain = hits.filter((r) => !r.needs_medication).map((r) => r.id);
+    const meds = hits.filter((r) => r.needs_medication).map((r) => r.id);   // med_done_* so the medication hold does not turn it back into a nurse label card
+    if (plain.length) await supabase.from('tasks').update(base).in('id', plain).eq('done', false);
+    if (meds.length) await supabase.from('tasks').update(Object.assign({}, base, { med_done_at: now, med_done_by: sentBy || null })).in('id', meds).eq('done', false);
+  } catch (e) { console.warn('close flags', e); }
+}
 // Completed Admission AA cards are kept 7 days (so a note the AA missed can be put back), then removed. Best effort.
 // status-match-start
 // (2026-10-30) The offline tools and the dashboard spell the same animal/pen differently (case, spaces, "CR1-30" vs
@@ -428,13 +453,14 @@ Deno.serve(async (req) => {
     };
     let u = await updateCard();
     if (u.error) return new Response(JSON.stringify({ error: u.error.message }), { status: 500, headers: CORS_HEADERS });
-    if (u.n > 0) return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
+    if (u.n > 0) { await closeFlagsForNote(supabase, v.row.animal_ids[0], v.row.sent_by); return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS }); }
     const ins = await supabase.from('aa_items').insert(Object.assign({}, v.row, { source_key: key }));
     if (ins.error && ins.error.code === '23505') {            // someone else inserted first: update theirs instead
       u = await updateCard();
-      if (!u.error && u.n > 0) return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS });
+      if (!u.error && u.n > 0) { await closeFlagsForNote(supabase, v.row.animal_ids[0], v.row.sent_by); return new Response(JSON.stringify({ ok: true, updated: true }), { status: 200, headers: CORS_HEADERS }); }
     }
     if (ins.error) return new Response(JSON.stringify({ error: ins.error.message }), { status: 500, headers: CORS_HEADERS });
+    await closeFlagsForNote(supabase, v.row.animal_ids[0], v.row.sent_by);
     return new Response(JSON.stringify({ ok: true, updated: false }), { status: 200, headers: CORS_HEADERS });
   }
 
