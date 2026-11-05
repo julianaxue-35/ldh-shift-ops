@@ -24,7 +24,9 @@
 <script src="lib/animal-history-view.js?v=20261101b"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js?v=20261102a"></script>
-<script src="lib/memo-extras.js"></script>
+<script src="lib/memo-extras.js?v=20261105a"></script>
+<script src="vendor/jszip.min.js"></script>
+<script src="lib/minutes-docx.js"></script>
 <script src="lib/behaviour-feedback.js"></script>
 <style>
   :root {
@@ -288,8 +290,14 @@
     </section>
 
     <section class="card" id="completed-panel">
-      <h2>Completed (last 24 h)</h2>
-      <div id="completed-list"></div>
+      <details id="completed-details">
+        <summary style="cursor:pointer; font-weight:600;"><span id="completed-title">Completed (last 24 h)</span></summary>
+        <div style="display:flex; gap:8px; align-items:center; margin:10px 0;">
+          <input id="completed-search" placeholder="Search an animal ID for its history" autocomplete="off" style="margin:0; flex:1;">
+          <button type="button" class="secondary" id="completed-search-all" style="padding:6px 12px; font-size:0.75rem; white-space:nowrap;">Search all history</button>
+        </div>
+        <div id="completed-list"></div>
+      </details>
     </section>
 
     <section class="card" id="memo-board">
@@ -690,21 +698,36 @@
     renderCases();
   });
 
-  function completedRowHtml(t) {
+  function completedWho(t) {
+    if (t.needs_medication && t.med_done_by) return 'meds by ' + t.med_done_by;
+    return 'done by ' + (t.claimed_by || (t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff'));
+  }
+  function completedRowHtml(t, hist) {
     return `<div class="completed-row">
-      <span>${esc(t.title)} — ${t.needs_medication && t.med_done_by ? 'meds by ' + esc(t.med_done_by) : 'done by ' + (t.completed_by_role === 'vet_nurse' ? 'Vet/Nurse' : 'Shelter Staff')}</span>
+      <span>${esc(t.title)} — ${esc(completedWho(t))}</span>
       <span style="display:flex; align-items:center; gap:8px;">
-        ${t.note ? `<span class="ameta" style="font-size:0.75rem; max-width:340px;">${esc(t.note)}</span>` : ''}
-        <span class="time">${esc(fmtTime(t.completed_at || t.created_at))}</span>
+        <span class="time">${esc(hist ? new Date(t.completed_at || t.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' ' : '')}${esc(fmtTime(t.completed_at || t.created_at))}</span>
         <button type="button" class="secondary undo-done" data-id="${esc(t.id)}" style="padding:4px 10px; font-size:0.7rem;">Undo</button>
       </span>
     </div>`;
   }
+  let completedHistory = null; // rows from "Search all history"; null = show the last 24 h
   function renderCompleted() {
-    document.getElementById('completed-list').innerHTML = CASES.completed.length
-      ? CASES.completed.map(completedRowHtml).join('')
-      : '<p class="empty-state">Nothing completed in the last 24 hours.</p>';
+    const q = document.getElementById('completed-search').value.trim().toLowerCase();
+    document.getElementById('completed-title').textContent = 'Completed (last 24 h): ' + CASES.completed.length;
+    const rows = completedHistory || (q ? CASES.completed.filter(t => String(t.title || '').toLowerCase().includes(q)) : CASES.completed);
+    document.getElementById('completed-list').innerHTML = rows.length
+      ? rows.map(t => completedRowHtml(t, !!completedHistory)).join('')
+      : '<p class="empty-state">' + (completedHistory ? 'No completed history for that ID.' : q ? 'No match in the last 24 hours. Try Search all history.' : 'Nothing completed in the last 24 hours.') + '</p>';
   }
+  document.getElementById('completed-search').addEventListener('input', () => { completedHistory = null; renderCompleted(); });
+  document.getElementById('completed-search-all').addEventListener('click', async () => {
+    const q = document.getElementById('completed-search').value.trim();
+    if (!q) { alert('Type an animal ID first.'); return; }
+    const { data, error } = await sb.from('tasks').select('*').eq('done', true).ilike('title', '%' + q.replace(/[%_,()]/g, '') + '%').order('completed_at', { ascending: false }).limit(30);
+    if (error) { alert('Could not search: ' + error.message); return; }
+    completedHistory = data || []; renderCompleted();
+  });
 
   /* ---------- DONE panel ---------- */
   function doneModalHtml(t) {
@@ -882,8 +905,14 @@
   // Next clinic meeting date + "Tick all off" (lib/memo-extras.js)
   let memoExtrasUi = null;
   function memoExtras() {
-    if (!memoExtrasUi) memoExtrasUi = MemoExtras.mount({ sb, el: document.getElementById('memo-extras'), getOpenCount: () => LDHLogic.splitMemos(MEMOS).active.length, reload: () => loadAll() });
+    if (!memoExtrasUi) memoExtrasUi = MemoExtras.mount({ sb, el: document.getElementById('memo-extras'), getOpenCount: () => LDHLogic.splitMemos(MEMOS).active.length, reload: () => loadAll(), onDownload: downloadMinutes });
     return memoExtrasUi;
+  }
+  async function downloadMinutes(date) {
+    const blob = await MinutesDocx.build(JSZip, { memos: LDHLogic.splitMemos(MEMOS).active.slice().reverse(), meetingDate: date || null });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'Vet-meeting-minutes-' + LDHLogic.localISO(new Date()) + '.docx';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
   function renderMemos() {
     const { active, completed } = LDHLogic.splitMemos(MEMOS);

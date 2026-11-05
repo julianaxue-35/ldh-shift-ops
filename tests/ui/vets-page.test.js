@@ -120,7 +120,7 @@ const H = 3600 * 1000;
     const doneNm = tasks.find(x => x.title === 'DONE-NM');
     t.ok(doneNm.done === true && doneNm.completed_by_role === 'vet_nurse' && !!doneNm.completed_at, 'non-medication DONE completes the case as vet_nurse');
     t.ok(doneNm.note === 'Eating well, bright. Recheck in 3 days.' && doneNm.plan === 'Eating well, bright. Recheck in 3 days.', 'the quick note is saved on the case (staff Plan column and the Shelter board): ' + JSON.stringify([doneNm.note, doneNm.plan]));
-    t.ok((await a.page.textContent('#completed-list')).includes('Eating well, bright'), 'and shows on the completed row');
+    t.ok(!(await a.page.textContent('#completed-list')).includes('Eating well, bright'), 'the completed row stays minimal (no note); the note lives in the Plan column');
     t.ok((await a.page.textContent('#completed-list')).includes('DONE-NM'), 'completed case shows in the Completed (last 24h) group');
 
     /* ---------- DONE (medication): label required, then waiting-on-medication ---------- */
@@ -345,6 +345,7 @@ const H = 3600 * 1000;
   try {
     t.ok((await f.page.textContent('#completed-list')).includes('UNDO-MED'), 'the completed medication case starts in the Completed list');
 
+    await f.page.evaluate(() => { document.getElementById('completed-details').open = true; });
     await f.page.locator('.completed-row', { hasText: 'UNDO-MED' }).locator('.undo-done').click();
     await f.page.waitForTimeout(300);
     t.ok(await f.page.locator('.oc-modal-overlay').count() === 0, 'undo runs with no passcode prompt');
