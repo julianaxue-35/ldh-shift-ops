@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shelter Board</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101d"></script>
+<script src="lib/ldh-logic.js?v=20261106a"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <style>
   /* Same tokens, fonts and sizes as the main dashboard (index.html). */
@@ -219,8 +219,8 @@
     const since = new Date(Date.now() - LDHLogic_HISTORY_DAYS * 86400000).toISOString();
     const [tasksRes, lcRes, histRes, behRes] = await Promise.all([
       LDHLogic.loadRecentTasks(sb),
-      sb.from('locations').select('*').order('sort', { ascending: true }),
-      sb.from('flag_history').select('*').gte('flagged_at', since),
+      LDHLogic.slowCache('loc', 30 * 60000, () => sb.from('locations').select('*').order('sort', { ascending: true })),
+      LDHLogic.slowCache('hist', 10 * 60000, () => sb.from('flag_history').select('*').gte('flagged_at', since)),
       sb.from('behaviour_tasks').select('id,created_at,kind,animal_id,location,lane,due_window,reason,courthold,flagged_by,status,done_at,done_note,done_by')
     ]);
     BEHAVIOUR = behRes.error ? [] : (behRes.data || []);
