@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Nurses</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101d"></script>
+<script src="lib/ldh-logic.js?v=20261106a"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js?v=20261102a"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
@@ -1495,7 +1495,7 @@
   async function loadNurseCounts() {
     try {
       const since = LDHLogic.localISO(LDHLogic.statsSince(Date.now()));
-      const { data, error } = await sb.rpc('nurse_daily_counts', { p_since: since });
+      const { data, error } = await LDHLogic.slowCache('ncounts', 10 * 60000, () => sb.rpc('nurse_daily_counts', { p_since: since }));
       NURSE_COUNTS = error ? null : (data || []).map(r => ({ day: String(r.day).slice(0, 10), role: r.role, n: Number(r.n) }));
     } catch (e) { NURSE_COUNTS = null; }
   }
@@ -1542,10 +1542,10 @@
   async function loadAll() {
     const [tasksRes, nrRes, ntRes, ndRes, ngRes, memosRes] = await Promise.all([
       LDHLogic.loadRecentTasks(sb),
-      sb.from('nurse_requests').select('*').order('created_at', { ascending: true }),
-      sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
+      LDHLogic.recentNurseRequests(sb),
+      LDHLogic.recentTreatments(sb),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
-      sb.from('noga_requests').select('*').order('created_at', { ascending: false }),
+      LDHLogic.recentNoga(sb),
       LDHLogic.recentMemos(sb),
     ]);
     TASKS = tasksRes.data || []; NURSE_REQUESTS = nrRes.data || []; NURSE_TREATMENTS = ntRes.data || [];

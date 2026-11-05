@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Vets</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261101d"></script>
+<script src="lib/ldh-logic.js?v=20261106a"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js?v=20261102a"></script>
@@ -478,10 +478,10 @@
     const [tasksRes, memosRes, ntRes, ndRes, rosterRes, ngRes] = await Promise.all([
       LDHLogic.loadRecentTasks(sb),
       LDHLogic.recentMemos(sb),
-      sb.from('nurse_treatments').select('*').order('created_at', { ascending: true }),
+      LDHLogic.recentTreatments(sb),
       sb.from('nurse_treatment_doses').select('*').gte('due_date', LDHLogic.addDaysISO(LDHLogic.localISO(new Date()), -31)).order('due_date', { ascending: true }),
       sb.from('roster').select('*').eq('roster_date', todayDateStr()),
-      sb.from('noga_requests').select('*').order('created_at', { ascending: false }),
+      LDHLogic.recentNoga(sb),
     ]);
     NOGA_REQUESTS = ngRes.error ? [] : (ngRes.data || []);
     TASKS = tasksRes.data || [];
