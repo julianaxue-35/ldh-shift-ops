@@ -20,7 +20,9 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     t.ok(await a.page.isHidden('.aa-card[data-id="n1"] .aa-notes'), 'notes are collapsed until View is pressed');
     await a.page.click('.aa-card[data-id="n1"] .aa-view');
     t.ok(/Exam normal\.\s*Weight 12 kg\./.test(await a.page.textContent('.aa-card[data-id="n1"] .aa-notes')), 'View shows the note text');
-    t.ok(await a.page.locator('.aa-card[data-id="n2"] .aa-docx').count() === 0, 'no Download Word button when the tool sent no Word file');
+    // 2026-11-07 egress: the list no longer downloads attachments, so the button is always there; a card with no file says so when pressed.
+    { let msg = ''; a.page.once('dialog', d => { msg = d.message(); }); await a.page.click('.aa-card[data-id="n2"] .aa-docx'); await a.page.waitForTimeout(300);
+      t.ok(/No Word file is attached/.test(msg), 'a card with no Word file says so when Download Word is pressed'); }
 
     const dl = a.page.waitForEvent('download');
     await a.page.click('.aa-card[data-id="n1"] .aa-docx');
@@ -41,7 +43,8 @@ const DOCX = Buffer.from('PK-fake-docx-bytes').toString('base64');
     const m1 = await a.page.textContent('.aa-card[data-id="m1"]');
     t.ok(/Drug A 1 tablet BID x 5 days/.test(m1) && /Drug B 0.5 mL SID x 3 days/.test(m1), 'medication chart lines are listed on the card');
 
-    t.ok(await a.page.locator('.aa-card[data-id="m2"] .aa-xlsx').count() === 0, 'no Download Excel button when no Excel was sent');
+    { let msg = ''; a.page.once('dialog', d => { msg = d.message(); }); await a.page.click('.aa-card[data-id="m2"] .aa-xlsx'); await a.page.waitForTimeout(300);
+      t.ok(/No Excel file is attached/.test(msg), 'a card with no Excel chart says so when Download Excel is pressed'); }
     const dlx = a.page.waitForEvent('download');
     await a.page.click('.aa-card[data-id="m1"] .aa-xlsx');
     const dx = await dlx;

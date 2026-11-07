@@ -273,10 +273,10 @@
       return `<div class="aa-extra">
           <button type="button" class="secondary aa-view" data-id="${esc(it.id)}">View notes</button>
           <button type="button" class="secondary aa-copy" data-id="${esc(it.id)}">Copy</button>
-          ${p.docx_b64 ? `<button type="button" class="secondary aa-docx" data-id="${esc(it.id)}">Download Word</button>` : ''}
+          <button type="button" class="secondary aa-docx" data-id="${esc(it.id)}">Download Word</button>
         </div><pre class="aa-notes" data-id="${esc(it.id)}">${esc(p.text || '')}</pre>`;
     }
-    if (it.kind === 'med_chart') return `<ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul>${p.xlsx_b64 ? `<div class="aa-extra"><button type="button" class="secondary aa-xlsx" data-id="${esc(it.id)}">Download Excel chart</button></div>` : ''}`;
+    if (it.kind === 'med_chart') return `<ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul><div class="aa-extra"><button type="button" class="secondary aa-xlsx" data-id="${esc(it.id)}">Download Excel chart</button></div>`;
     return '';
   }
   function cardHtml(it, now) {
@@ -327,9 +327,14 @@
     try { await navigator.clipboard.writeText(text); }
     catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); } catch (e2) { /* nothing more to try */ } ta.remove(); }
   }
-  function downloadFile(it, field, mime, suffix, what) {
+  async function downloadFile(it, field, mime, suffix, what) {
     let bin;
-    try { bin = atob((it.payload || {})[field] || ''); }
+    try {
+      const r = await sb.from('aa_items').select('f:payload->' + field).eq('id', it.id);   // fetched only now, for this one card
+      const b64 = r && !r.error && r.data && r.data[0] && r.data[0].f;
+      if (!b64) { alert('No ' + what + ' file is attached to this card.'); return; }
+      bin = atob(b64);
+    }
     catch (e) { alert('That ' + what + ' file could not be opened.'); return; }
     const bytes = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -515,10 +520,21 @@
     }
   }
 
+  const AA_PAYLOAD_KEYS = ['result', 'chip_number', 'implanter', 'uv_result', 'vaccine', 'date', 'note', 'lines', 'text', 'location', 'priority', 'due_mins'];
+  const AA_LIST_COLS = ['id', 'kind', 'animal_ids', 'sent_by', 'sent_at', 'source_key', 'updated_at', 'completed_at', 'done_ids', 'completed_by']
+    .concat(AA_PAYLOAD_KEYS.map(k => 'p_' + k + ':payload->' + k)).join(',');
   async function loadAll() {
     // who is on today (initials from the Nurses page); if that table is not there yet the strip just says "not set yet"
     sb.from('nurse_on_duty').select('*').eq('day', new Date().toLocaleDateString('en-CA')).then(r => { ON_DUTY = (r && !r.error && r.data) || []; render(); }, () => {});
-    const { data, error } = await sb.from('aa_items').select('*').order('sent_at', { ascending: true });
+    // 2026-11-07 egress: the list NEVER downloads the Excel/Word attachments (xlsx_b64/docx_b64, up to ~1 MB each, ~2 MB for the whole table
+    // on every reload); they are fetched one at a time when a button is clicked. Payload keys are rebuilt from the `p_*` aliases below.
+    const { data: rawRows, error } = await sb.from('aa_items').select(AA_LIST_COLS).order('sent_at', { ascending: true });
+    const data = rawRows && rawRows.map(r => {
+      const payload = {};
+      Object.keys(r).forEach(k => { if (k.indexOf('p_') === 0) { if (r[k] !== null && r[k] !== undefined) payload[k.slice(2)] = r[k]; delete r[k]; } });
+      r.payload = payload;
+      return r;
+    });
     const warn = document.getElementById('aa-load-error');
     if (error) {                                  // keep what is on screen; never show "Nothing waiting" for a failed load
       warn.style.display = 'block';
