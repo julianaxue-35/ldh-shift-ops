@@ -9,6 +9,7 @@ const dayKey = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(
   const n = await open({}, 'nurses.html');
   try {
     await n.page.evaluate(({ a, b, c }) => {
+      LDHLogic.clearSlowCache();
       window.__nurseCounts = [
         { day: a, role: 'welfare', n: 12 }, { day: b, role: 'welfare', n: 8 }, { day: c, role: 'welfare', n: 10 },
         { day: a, role: 'processing', n: 4 }

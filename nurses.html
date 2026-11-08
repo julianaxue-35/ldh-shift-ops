@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Nurses</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261106a"></script>
+<script src="lib/ldh-logic.js?v=20261108a"></script>
 <script src="lib/ops-core.js?v=20261030d"></script>
 <script src="lib/send-card.js?v=20261102a"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
@@ -1495,8 +1495,15 @@
   async function loadNurseCounts() {
     try {
       const since = LDHLogic.localISO(LDHLogic.statsSince(Date.now()));
-      const { data, error } = await LDHLogic.slowCache('ncounts', 10 * 60000, () => sb.rpc('nurse_daily_counts', { p_since: since }));
-      NURSE_COUNTS = error ? null : (data || []).map(r => ({ day: String(r.day).slice(0, 10), role: r.role, n: Number(r.n) }));
+      const todayKey = LDHLogic.localISO(new Date());
+      // The long history (averages) is cached 10 min; "today" is read fresh every time so the ring ticks up as soon as a task is done.
+      const [hist, fresh] = await Promise.all([
+        LDHLogic.slowCache('ncounts', 10 * 60000, () => sb.rpc('nurse_daily_counts', { p_since: since })),
+        sb.rpc('nurse_daily_counts', { p_since: todayKey })
+      ]);
+      const norm = r => ({ day: String(r.day).slice(0, 10), role: r.role, n: Number(r.n) });
+      if (hist.error || fresh.error) NURSE_COUNTS = null;
+      else NURSE_COUNTS = (hist.data || []).map(norm).filter(r => r.day < todayKey).concat((fresh.data || []).map(norm).filter(r => r.day >= todayKey));
     } catch (e) { NURSE_COUNTS = null; }
   }
   function ringSvg(today, typical) {
