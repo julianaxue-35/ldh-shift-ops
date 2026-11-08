@@ -376,11 +376,16 @@
       };
     });
   }
+  // A long ?query makes the server answer "URI Too Long" (several cases at once). Past ~1500 characters the cases go after the #,
+  // which the server never receives; Sick & Injured reads either form.
+  function handOffUrl(base, items) {
+    const q = new URLSearchParams({ items: JSON.stringify(items) }).toString();
+    return q.length <= 1500 ? `${base}?${q}` : `${base}#${q}`;
+  }
   function pickUpUrl(t) {
     const base = SHIFT_TOOL_URLS[t.shift];
     if (!base) return null;
-    const params = new URLSearchParams({ items: JSON.stringify(handOffItems([t])) });
-    return `${base}?${params.toString()}`;
+    return handOffUrl(base, handOffItems([t]));
   }
   // Batch hand-off: one URL carrying every selected case, sorted by
   // location so a vet can walk the shelter once (the offline tool already
@@ -390,8 +395,7 @@
     const base = SHIFT_TOOL_URLS[tasks[0].shift];
     if (!base) return null;
     const sorted = [...tasks].sort((a, b) => (a.location || '').localeCompare(b.location || ''));
-    const params = new URLSearchParams({ items: JSON.stringify(handOffItems(sorted)) });
-    return `${base}?${params.toString()}`;
+    return handOffUrl(base, handOffItems(sorted));
   }
 
   function fmtFlagged(iso) {
