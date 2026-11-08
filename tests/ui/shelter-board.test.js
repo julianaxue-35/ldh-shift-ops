@@ -120,7 +120,7 @@ const H = 3600 * 1000;
       t.ok(one[0].urgency === 'red_flag' && one[0].red_flags.includes('bleeding_wound') && one[0].extra_reasons.length === 2, 'an emergency sign added later raises the case to Emergency');
       t.ok((await idx.page.evaluate(() => window.__db.tasks.filter(r => r.title === '9990050').length)) === 1, 'still just one case');
       // the earlier flag shows on the main Cases table too
-      await idx.page.evaluate(() => loadAll());
+      await idx.page.evaluate(() => { LDHLogic.clearSlowCache(); return loadAll(); });
       t.ok((await idx.page.textContent('#cases-open-tbody')).includes('Flagged before 1× — '), 'the Cases table shows the "Flagged before" line');
     } finally { await idx.browser.close(); }
   } finally { await b.browser.close(); }

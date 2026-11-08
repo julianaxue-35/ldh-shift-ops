@@ -59,7 +59,7 @@ const todayISO = LDHLogic.localISO(new Date());
       { location: 'Cat Room 1', species: 'kitten', animal_count: 3, done_count: 1, arrived_at: ago(30 * 60 * 1000) }
     ],
     nurse_treatments: [
-      { id: 'trt1', animal_id: 'DOG-9', location: 'Pound 3', treatment: 'Metronidazole', times_per_day: 2, stopped: false }
+      { id: 'trt1', animal_id: 'DOG-9', location: 'Pound 3', treatment: 'Metronidazole', times_per_day: 2, stopped: false, start_date: todayISO }
     ],
     nurse_treatment_doses: [
       { id: 'dose1', treatment_id: 'trt1', slot_no: 1, due_date: todayISO, done_at: null, done_by: null }
