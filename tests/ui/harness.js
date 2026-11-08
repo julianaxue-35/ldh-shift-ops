@@ -50,9 +50,9 @@ const STUB = `
   }
   const listeners = [];
   function table(name) {
-    let op = null, payload = null, filters = [], orders = [], limitN = null, rangeTo = null, rangeFrom = 0, asc = true, single = false, conflictCols = ['id'];
+    let op = null, payload = null, filters = [], orders = [], limitN = null, rangeTo = null, rangeFrom = 0, asc = true, single = false, conflictCols = ['id'], selCols = null;
     const b = {
-      select(cols) { if (!op) op = 'select'; if (name === 'flag_history') (window.__fhSelects = window.__fhSelects || []).push(String(cols)); return b; },
+      select(cols) { if (!op) op = 'select'; selCols = String(cols); if (name === 'flag_history') (window.__fhSelects = window.__fhSelects || []).push(String(cols)); return b; },
       insert(rows) { op = 'insert'; payload = Array.isArray(rows) ? rows : [rows]; return b; },
       update(v) { op = 'update'; payload = v; return b; },
       upsert(rows, upsertOpts) { op = 'upsert'; payload = Array.isArray(rows) ? rows : [rows]; conflictCols = (upsertOpts && upsertOpts.onConflict ? upsertOpts.onConflict : 'id').split(',').map(c => c.trim()); return b; },
@@ -113,7 +113,12 @@ const STUB = `
           else if (op === 'delete') { data = match(); data.forEach(r => rows.splice(rows.indexOf(r), 1)); }
           else { data = match(); if (orders.length) data = data.slice().sort((x, y) => { for (const { c, asc } of orders) { if (x[c] !== y[c]) return (x[c] > y[c] ? 1 : -1) * (asc ? 1 : -1); } return 0; }); if (limitN != null) data = data.slice(0, limitN); if (rangeTo != null) data = data.slice(rangeFrom, rangeTo + 1); }
           if (op !== 'select') listeners.filter(l => l.table === name).forEach(l => setTimeout(l.cb, 0));
-          const out = JSON.parse(JSON.stringify(data));
+          let out = JSON.parse(JSON.stringify(data));
+          // Mirrors PostgREST JSON-path columns ("alias:payload->key"): the row carries only the named columns, so a test proves the page never relies on the heavy ones.
+          if (op === 'select' && selCols && selCols.indexOf(':payload->') > -1) {
+            const parts = selCols.split(',').map(x => x.trim()).filter(Boolean);
+            out = out.map(r => { const o = {}; parts.forEach(p => { const m = /^([A-Za-z0-9_]+):payload->([A-Za-z0-9_]+)$/.exec(p); if (m) o[m[1]] = (r.payload && r.payload[m[2]] !== undefined) ? r.payload[m[2]] : null; else if (p !== '*') o[p] = r[p]; }); return o; });
+          }
           res({ data: single ? out[0] : out, error: null });
         } catch (e) { rej ? rej(e) : res({ data: null, error: { message: e.message } }); }
       }
