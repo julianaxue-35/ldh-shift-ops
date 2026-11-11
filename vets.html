@@ -319,6 +319,7 @@
       <h2>FAQ — vets</h2>
       <p class="subtle">Quick answers for picking up cases, handing work to the nurses and handling results.</p>
       <h3 class="faq-group">Cases</h3>
+      <details><summary>A flag has a Photo button</summary><div><p>Staff can attach one phone photo when they flag an animal. Press <b>Photo</b> on the case to see it full screen; tap to close. When you mark the case <b>DONE</b> the photo is deleted for good (the case itself is kept for the 3-month review), so put anything you need to keep in your note.</p></div></details>
       <details><summary>How do I pick up a case?</summary><div><p>In <b>Cases</b>, press <b>Pick up →</b> on a card. To take several, tick their boxes and press <b>Pick up N selected, sorted by location</b>. Type your initials once in the box at the top left at the start of the day; picking up uses them (no prompt) and they show on the card (&ldquo;Picked up 10:32 by AB&rdquo;), and opens the shift tool for that animal. Once a case is picked up it leaves the pick-up list for the other vets. If another vet got there first you'll be told it was skipped.</p></div></details>
       <details><summary>I picked a case up but got called away — how do I put it back?</summary><div><p>Press <b>Put back</b> on the card. Only the vet who picked it up can put it back. The case returns to its tier column for any vet to pick up. No reason is needed. Its time target keeps running from when it was first flagged, and the card shows "Put back" with the time.</p></div></details>
       <details><summary>How do I finish a case?</summary><div><p>Press <b>DONE</b> once you have seen the animal. For a medication case the DONE panel asks for the medication details, and the case then waits for the nurses to make the label.</p></div></details>
@@ -548,7 +549,7 @@
         <div style="display:flex; align-items:flex-start; gap:8px; flex:1;">
           ${canPickUp ? `<input type="checkbox" class="pickup-check" data-id="${esc(t.id)}" ${selectedPickup.has(t.id) ? 'checked' : ''} style="width:18px; height:18px; margin:3px 0 0; flex:none;">` : ''}
           <div>
-            <div class="aname">${esc(t.title)}${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''} ${statusChipHtml(t)}</div>
+            <div class="aname">${esc(t.title)}${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''} ${statusChipHtml(t)}${t.photo_path && !t.done ? ` <button type="button" class="secondary photo-btn" data-id="${esc(t.id)}" style="padding:2px 10px; font-size:0.78rem;">&#128247; Photo</button>` : ''}</div>
             <div class="ameta">${metaBits.join(' · ')}</div>
           </div>
         </div>
@@ -828,6 +829,13 @@
       return;
     }
 
+    const photoBtn = e.target.closest('.photo-btn');
+    if (photoBtn) {
+      const t = TASKS.find(x => x.id === photoBtn.dataset.id);
+      if (t && t.photo_path) OpsCore.showFlagPhoto(sb, t.photo_path, t.title);
+      return;
+    }
+
     const doneBtn = e.target.closest('.done-btn');
     if (doneBtn) {
       const t = TASKS.find(x => x.id === doneBtn.dataset.id);
@@ -855,6 +863,11 @@
     const cancelBtn = e.target.closest('.done-cancel');
     if (cancelBtn) { cancelBtn.closest('.done-modal-overlay').remove(); return; }
 
+    // a finished case keeps no photo (the task row stays for the 3-month review)
+    function dropPhoto(t) {
+      if (!t || !t.photo_path) return;
+      OpsCore.removeFlagPhotos(sb, [t.photo_path]).then(() => sb.from('tasks').update({ photo_path: null }).eq('id', t.id)).catch(() => {});
+    }
     const confirmBtn = e.target.closest('.done-confirm');
     if (confirmBtn) {
       const overlay = confirmBtn.closest('.done-modal-overlay');
@@ -874,7 +887,7 @@
             completed_by_role: 'vet_nurse', completed_at: nowIso
           }, quickNote ? { note: quickNote } : {})).eq('id', id);
           if (error) { alert('Could not complete: ' + error.message); return; }
-          overlay.remove(); OpsCore.toast(); loadAll();
+          overlay.remove(); OpsCore.toast(); dropPhoto(t); loadAll();
           return;
         }
         const label = overlay.querySelector('.done-medlabel').value.trim();
@@ -891,6 +904,7 @@
         if (error) { alert('Could not complete: ' + error.message); return; }
       }
       overlay.remove();
+      dropPhoto(t);
       loadAll();
       return;
     }
@@ -1103,6 +1117,7 @@
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'vets', onDone: showPlanBanner });
     SendCard.mount(document.getElementById('send-request'), { sb, role: 'vets', tabs: ['nurses', 'behaviour'], getInitials: storedVetInit, initialsWhere: 'at the top left', focusInitials: focusVetInit, saveInitials: rememberVetInit, onSent: () => loadAll() });
     await loadAll();
+    OpsCore.sweepDonePhotos(sb);   // finished cases keep no photo, whichever tool finished them
     OpsCore.subscribe(['tasks', 'memos', 'clinic_meeting', 'nurse_treatments', 'nurse_treatment_doses', 'noga_requests', 'behaviour_tasks'], loadAll);
     document.getElementById('signout-link').addEventListener('click', async () => {
       await sb.auth.signOut();

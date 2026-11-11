@@ -9,6 +9,7 @@ const PASSCODES = { nurse: 'nurse', vet: 'vet2026', aa: 'aa-test', behaviour: 'b
 const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
+  window.__storage = window.__storage || {};
   const db = window.__db = { tasks: [], memos: [], clinic_meeting: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
@@ -154,6 +155,11 @@ const STUB = `
       }
     },
     from: table,
+    storage: { from: bucket => ({
+      upload: async (path, blob, opts) => { if (window.__storageFail) return { data: null, error: { message: 'storage down' } }; window.__storage[bucket + '/' + path] = { size: blob && blob.size, type: opts && opts.contentType }; return { data: { path }, error: null }; },
+      remove: async (paths) => { (paths || []).forEach(p => { delete window.__storage[bucket + '/' + p]; }); return { data: [], error: null }; },
+      createSignedUrl: async (path) => window.__storage[bucket + '/' + path] ? { data: { signedUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==' }, error: null } : { data: null, error: { message: 'Object not found' } }
+    }) },
     rpc: async (fn, args) => {
       if (fn === 'check_passcode') {
         const expected = PASSCODES[args && args.p_role];
