@@ -20,10 +20,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Vets</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261108a"></script>
+<script src="lib/ldh-logic.js?v=20261111a"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
-<script src="lib/send-card.js?v=20261102a"></script>
+<script src="lib/send-card.js?v=20261111a"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="lib/minutes-docx.js"></script>
@@ -1047,7 +1047,7 @@
           <h3 class="done-modal-title">Transfer to nurse — ${esc(t.title)}</h3>
           <p style="font-size:0.85rem; margin:0 0 10px;">The Welfare nurse gets this under Miscellaneous tasks (microchip, UV and treatment checks go to the Processing nurse), and the case leaves the vet board.</p>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the nurse</label>
-          <select class="transfer-task">${Object.keys(LDHLogic.MISC_TASK_LABELS).filter(k => k !== 'med_label' && k !== 'treatment').map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('')}</select>
+          <select class="transfer-task">${Object.keys(LDHLogic.MISC_TASK_LABELS).filter(k => k !== 'med_label' && k !== 'med_chart' && k !== 'treatment').map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('')}</select>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">${t.needs_medication ? 'Medication label, or how many tablets / mL to dispense (required)' : 'Note for the nurse (optional)'}</label>
           <textarea class="transfer-note" rows="3" placeholder="${esc(t.problem || 'e.g. bloods before surgery')}"></textarea>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Your initials (the nurse sees them)</label>

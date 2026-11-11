@@ -10,7 +10,7 @@ const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
   window.__storage = window.__storage || {};
-  const db = window.__db = { tasks: [], memos: [], clinic_meeting: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
+  const db = window.__db = { tasks: [], memos: [], clinic_meeting: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], nurse_chart_files: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
