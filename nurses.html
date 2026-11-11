@@ -20,9 +20,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Nurses</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261108a"></script>
+<script src="lib/ldh-logic.js?v=20261111a"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
-<script src="lib/send-card.js?v=20261102a"></script>
+<script src="lib/send-card.js?v=20261111a"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
 <script src="lib/behaviour-feedback.js"></script>
 <script src="vendor/jszip.min.js"></script>
@@ -399,6 +399,7 @@
       <h2>FAQ — nurses</h2>
       <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
       <h3 class="faq-group">Working your board</h3>
+      <details><summary>A vet sent me a medication chart to print</summary><div><p>It appears under <b>Medication labels to make</b> as <b>Medication chart (Excel) to print</b>, with the animal and room. Press <b>Download chart to print</b>, print it, then press <b>Done</b>. The file is removed once the task is finished. Vets use this when the Admission AA is not in, for example at the weekend.</p></div></details>
       <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
       <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the box at the top of your column (Welfare or Processing) once for the day — they are put on everything you pick up or tick off, and are cleared the next day. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
       <details><summary>How do I pick up, share or finish a nurse request?</summary><div><p>On a request, <b>Pick up</b> puts your initials on it (press <b>Release</b> to hand it back to the pool). Use <b>+1</b> as each animal is done, or <b>All done</b>. The coloured chip shows time left against the "needed within" time.</p></div></details>
@@ -480,7 +481,7 @@
 
   /* ---- category badges (2026-10-27) ---- */
   // the category badge colour for a task or request
-  const MISC_CAT = { med_label: ['Medication', 'cat-med'], dispense: ['Medication', 'cat-med'], treatment: ['Treatment', 'cat-treat'], ivft: ['Treatment', 'cat-treat'], tail_bandage: ['Treatment', 'cat-treat'],
+  const MISC_CAT = { med_label: ['Medication', 'cat-med'], med_chart: ['Medication', 'cat-med'], dispense: ['Medication', 'cat-med'], treatment: ['Treatment', 'cat-treat'], ivft: ['Treatment', 'cat-treat'], tail_bandage: ['Treatment', 'cat-treat'],
     blood: ['Test', 'cat-test'], ear_swab: ['Test', 'cat-test'], fiv_test: ['Test', 'cat-test'], urine_collection: ['Test', 'cat-test'], triple_test: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'] };
   const REQ_CAT = { vaccination: ['Vaccination', 'cat-vac'], fiv: ['Test', 'cat-test'], blood: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'], microchip_uv: ['Microchip / UV', 'cat-chip'] };
   const catOf = (map, key) => map[key] || ['Task', 'cat-other'];
@@ -836,7 +837,7 @@
   const NOGA_TASK_LABELS = LDHLogic.MISC_TASK_LABELS;
   // Microchip and UV checks belong to the Processing nurse; every other miscellaneous task is the Welfare nurse's.
   const PROCESSING_MISC_KINDS = ['microchip', 'uv', 'treatment'];
-  const MED_TASKS = ['med_label', 'dispense'];   // medication the vets send over: shown under Medication labels to make
+  const MED_TASKS = ['med_label', 'dispense', 'med_chart'];   // medication the vets send over: shown under Medication labels to make
   const AA_PREFILL_KIND = { fiv_test: 'fiv', microchip: 'microchip', uv: 'uv' };   // misc task -> Send-to-AA type
   // When the task was handed to the nurses: a time today ("09:40"), or the day and time if it is older ("Sun 09:40")
   function assignedAt(iso) {
@@ -848,8 +849,9 @@
     const cat = catOf(MISC_CAT, r.task), taskLabel = NOGA_TASK_LABELS[r.task] || r.task;
     const doneBadge = r.done ? `<span class="nt-done-badge${r.returned_at ? ' back' : ''}">${r.returned_at ? '\u21A9 sent back to vet' : '\u2713 done'}${r.done_by ? ' by ' + esc(r.done_by) : ''}</span>` : '';
     const isMed = MED_TASKS.includes(r.task), note = r.note && !isMed ? r.note : '';
-    const block = isMed && r.note ? `<div class="nt-block mono"><span class="bl">${r.task === 'dispense' ? 'Medication to dispense' : 'Medication label'}</span><span class="med-label-text" style="display:block">${esc(r.note)}</span></div>` : (note ? `<div class="nt-block"><span class="bl">Note</span>${esc(note)}</div>` : '');
+    const block = isMed && r.note ? `<div class="nt-block mono"><span class="bl">${r.task === 'dispense' ? 'Medication to dispense' : r.task === 'med_chart' ? 'Medication chart (Excel) to print' : 'Medication label'}</span><span class="med-label-text" style="display:block">${esc(r.note)}</span></div>` : (note ? `<div class="nt-block"><span class="bl">Note</span>${esc(note)}</div>` : '');
     const actions = r.done ? `<button class="secondary noga-putback" data-id="${esc(r.id)}">Put back</button>`
+      : r.task === 'med_chart' ? `<button class="secondary noga-chart-dl" data-id="${esc(r.id)}">Download chart to print</button><button class="go noga-done" data-id="${esc(r.id)}">Done</button>`
       : isMed ? `<button class="secondary noga-copy" data-id="${esc(r.id)}">Copy</button><button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="go noga-done" data-id="${esc(r.id)}">Done</button>`
       : `${AA_PREFILL_KIND[r.task] ? `<button class="secondary aa-prefill" data-kind="${esc(AA_PREFILL_KIND[r.task])}" data-ids="${esc(r.animal_id)}" data-src="misc" data-rid="${esc(r.id)}">Send to AA</button>` : ''}${r.task === 'microchip' && isProcessingMisc(r) && r.animal_id ? `<button class="secondary bh-send" data-src="misc" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}<button class="secondary noga-back" data-id="${esc(r.id)}">Send back to vet</button><button class="go noga-done" data-id="${esc(r.id)}">Done</button>`;
     return `
@@ -888,7 +890,27 @@
     renderMedLabels();
   }
   function isProcessingMisc(r) { return PROCESSING_MISC_KINDS.includes(r.task); }
+  // The Excel is not part of the list (it would be downloaded on every reload); it is fetched here, for this one chart.
+  async function downloadNurseChart(btn) {
+    const r = NOGA_REQUESTS.find(x => x.id === btn.dataset.id); if (!r) return;
+    let bin, name = (r.animal_id || 'animal') + '_medication_chart.xlsx';
+    try {
+      const f = await sb.from('nurse_chart_files').select('filename, xlsx_b64').eq('request_id', r.id).limit(1);
+      const row = f && !f.error && f.data && f.data[0];
+      if (!row || !row.xlsx_b64) { alert('No chart file is attached to this task. Ask the vet to send it again.'); return; }
+      bin = atob(row.xlsx_b64); name = row.filename || name;
+    } catch (err) { alert('That chart could not be opened.'); return; }
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
   async function miscDoneClick(e) {
+    const chartDl = e.target.closest('.noga-chart-dl');
+    if (chartDl) { downloadNurseChart(chartDl); return; }
     const back = e.target.closest('.noga-back');
     if (back) { const r = NOGA_REQUESTS.find(x => x.id === back.dataset.id); if (r) openBackModal({ src: 'misc', row: r }); return; }
     const cp = e.target.closest('.noga-copy');
