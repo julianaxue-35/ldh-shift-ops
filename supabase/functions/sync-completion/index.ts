@@ -143,6 +143,23 @@ function validateNurseLabel(n) {
   }
   return { id, location, sentBy, labels };
 }
+// (2026-11-11) { nurse_chart: { animal_id, location, sent_by, key, lines: [text], xlsx_b64 } } — a vet sends a medication chart to the nurses to print.
+function validateNurseChart(n) {
+  if (!n || typeof n !== 'object') return { error: 'Bad request.' };
+  const id = typeof n.animal_id === 'string' ? n.animal_id.trim() : '';
+  if (!id || id.length > 40) return { error: 'An animal ID (up to 40 characters) is required.' };
+  const location = typeof n.location === 'string' ? n.location.trim().slice(0, 80) : '';
+  if (!location) return { error: 'A location is required.' };
+  const sentBy = typeof n.sent_by === 'string' ? n.sent_by.trim().toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4) : '';
+  const key = typeof n.key === 'string' ? n.key.trim().slice(0, 120) : '';
+  if (!key) return { error: 'A chart key is required.' };
+  if (!Array.isArray(n.lines) || !n.lines.length || n.lines.length > 10) return { error: 'Send between 1 and 10 medication lines.' };
+  const lines = n.lines.map((l) => (typeof l === 'string' ? l.trim().slice(0, 300) : '')).filter(Boolean);
+  if (!lines.length) return { error: 'Send between 1 and 10 medication lines.' };
+  const b64 = typeof n.xlsx_b64 === 'string' ? n.xlsx_b64.trim() : '';
+  if (!b64 || b64.length > 3000000 || /[^A-Za-z0-9+/=]/.test(b64)) return { error: 'The chart file is missing or too large.' };
+  return { id, location, sentBy, key: 'chart|' + key, note: lines.join('\n').slice(0, 1000), b64 };
+}
 function validateAaCheck(c) {
   if (!c || typeof c !== 'object' || !Array.isArray(c.items)) return { error: 'Bad request.' };
   if (!c.items.length || c.items.length > 100) return { error: 'Send between 1 and 100 items.' };
@@ -416,6 +433,27 @@ Deno.serve(async (req) => {
       if (res.error) return new Response(JSON.stringify({ error: res.error.message }), { status: 500, headers: CORS_HEADERS });
     }
     return new Response(JSON.stringify({ ok: true, count: v.labels.length }), { status: 200, headers: CORS_HEADERS });
+  }
+  // Shape 10 (2026-11-11): { nurse_chart: { animal_id, location, sent_by, key, lines, xlsx_b64 } } — a medication chart for the nurses to
+  // print. One open task per chart key: sending again UPDATES the open task and replaces its file; a finished one is not reopened.
+  if (body.nurse_chart && typeof body.nurse_chart === 'object') {
+    const v = validateNurseChart(body.nurse_chart);
+    if (v.error) return new Response(JSON.stringify({ error: v.error }), { status: 400, headers: CORS_HEADERS });
+    const row = { animal_id: v.id, location: v.location, task: 'med_chart', note: v.note, added_by: v.sentBy || null };
+    const { data: open, error: e1 } = await supabase.from('noga_requests').select('id').eq('source_key', v.key).eq('done', false).limit(1);
+    if (e1) return new Response(JSON.stringify({ error: e1.message }), { status: 500, headers: CORS_HEADERS });
+    let rid = open && open.length ? open[0].id : null;
+    if (rid) {
+      const u = await supabase.from('noga_requests').update(row).eq('id', rid);
+      if (u.error) return new Response(JSON.stringify({ error: u.error.message }), { status: 500, headers: CORS_HEADERS });
+    } else {
+      const ins = await supabase.from('noga_requests').insert(Object.assign({}, row, { source_key: v.key })).select('id').single();
+      if (ins.error) return new Response(JSON.stringify({ error: ins.error.message }), { status: 500, headers: CORS_HEADERS });
+      rid = ins.data.id;
+    }
+    const f = await supabase.from('nurse_chart_files').upsert({ request_id: rid, filename: v.id.replace(/[^A-Za-z0-9._-]+/g, '_') + '_medication_chart.xlsx', xlsx_b64: v.b64 });
+    if (f.error) return new Response(JSON.stringify({ error: f.error.message }), { status: 500, headers: CORS_HEADERS });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: CORS_HEADERS });
   }
   // Shape 8 (2026-10-19): { aa_check: { items: [{kind, animal_id}] } } — read-back for the shift tools: which of the
   // cards they sent are still waiting? Replies {ok:true, pending:["kind|ANIMAL", ...]}; a card that is gone was ticked.
