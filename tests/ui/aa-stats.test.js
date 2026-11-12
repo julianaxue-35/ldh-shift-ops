@@ -41,6 +41,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     await a.page.waitForFunction(() => window.__db.aa_done_log.some(r => r.item_id === 'v1'));
     t.ok((await a.db()).aa_done_log.find(r => r.item_id === 'v1').animals === 2, 'the card is counted as 2 animals');
 
+    await a.page.click('#aa-done-details > summary');
     await a.page.click('#aa-completed .aa-putback[data-id="p1"]');
     await a.page.waitForFunction(() => !window.__db.aa_done_log.some(r => r.item_id === 'p1'));
     t.ok(true, 'putting a card back removes its count');

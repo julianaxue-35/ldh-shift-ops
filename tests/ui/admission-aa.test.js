@@ -71,7 +71,10 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     vrow = (await a.db()).aa_items.find(r => r.id === 'vacc');
     t.ok(vrow.completed_at && vrow.done_ids.join() === 'A1,A2,A3', 'when the last animal is ticked the card completes');
 
-    /* Completed list: newest first, each can be put back */
+    /* Completed list: collapsible (starts closed), newest first, each can be put back */
+    t.ok(await a.page.locator('#aa-done-details[open]').count() === 0, 'the Completed list starts collapsed');
+    await a.page.click('#aa-done-details > summary');
+    t.ok(await a.page.locator('#aa-done-details[open]').count() === 1, 'it opens when the heading is pressed');
     const doneOrder = await a.page.$$eval('#aa-completed .aa-done-row', els => els.map(e => e.dataset.id));
     t.ok(doneOrder.join() === 'vacc,late', 'completed list is newest first: ' + doneOrder.join());
     await a.page.click('#aa-completed .aa-putback[data-id="vacc"][data-animal="A2"]');
@@ -105,6 +108,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     { id: 'o3', kind: 'processing_note', animal_ids: ['Z3'], payload: { text: 'Note for Z3' }, sent_by: 'YN', sent_at: ago(60 * H), completed_at: ago(50 * H), done_ids: ['Z3'] }] }, 'admission-aa.html');
   try {
     await old.page.waitForTimeout(400);
+    await old.page.click('#aa-done-details > summary');
     const comp = await old.page.textContent('#aa-completed');
     t.ok(/Z2/.test(comp) && /Z3/.test(comp) && !/Z1/.test(comp), 'a card completed 2 days ago is still listed; one completed 8 days ago is not');
     t.ok(!(await old.db()).aa_items.some(r => r.id === 'o1') && (await old.db()).aa_items.some(r => r.id === 'o2') && (await old.db()).aa_items.some(r => r.id === 'o3'), 'the 8-day-old one is deleted from the database, the others stay');

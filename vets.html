@@ -125,6 +125,8 @@
   }
   .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
 
+  .pair-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+  .pair-row > .card { margin-bottom: 0; min-width: 0; }
   .urgency-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
   .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
   .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
@@ -171,6 +173,7 @@
 
   @media (max-width: 1000px) {
     .urgency-board { grid-template-columns: 1fr; }
+    .pair-row { grid-template-columns: 1fr; }
     .kpi-row { grid-template-columns: repeat(2, 1fr); }
   }
   @media (max-width: 800px) {
@@ -232,7 +235,6 @@
     </section>
 
     <section class="card" id="send-request"></section>
-    <section class="card" id="behaviour-plans" style="display:none;"></section>
 
     <p class="subtle" id="kpi-date" style="margin:-8px 0 0;"></p>
     <div class="kpi-row">
@@ -245,18 +247,6 @@
       </section>
       <div id="shift-progress-row" style="display:contents;"></div>
     </div>
-
-    <section class="card" id="nurse-treatments">
-      <h2>Treatment courses in progress</h2>
-      <p class="subtle">Ask the nurses for a new course from <b>Send a request</b> above (Nurses, then Treatment course).</p>
-      <div id="nt-courses" style="margin-top:18px;"></div>
-    </section>
-
-    <section class="card" id="nurse-misc">
-      <h2>Nurse tasks requested</h2>
-      <p class="subtle">Tasks you asked the nurses for show here. They appear on the Nurses page under the Welfare nurse's Miscellaneous tasks; microchip and UV checks go to the Processing nurse. Ask for a new one from <b>Send a request</b> above.</p>
-      <div id="misc-list"></div>
-    </section>
 
     <section class="card" id="animal-history" style="display:none;">
       <h2>Animal history — last 3 months</h2>
@@ -289,7 +279,29 @@
       </div>
     </section>
 
-    <section class="card" id="completed-panel">
+    <div class="pair-row">
+    <section class="card" id="nurse-treatments">
+      <h2>Treatment courses in progress</h2>
+      <p class="subtle">Ask the nurses for a new course from <b>Send a request</b> above (Nurses, then Treatment course).</p>
+      <div id="nt-courses" style="margin-top:18px;"></div>
+    </section>
+
+    <section class="card" id="nurse-misc">
+      <h2>Nurse tasks requested</h2>
+      <p class="subtle">Tasks you asked the nurses for show here. They appear on the Nurses page under the Welfare nurse's Miscellaneous tasks; microchip and UV checks go to the Processing nurse. Ask for a new one from <b>Send a request</b> above.</p>
+      <div id="misc-list"></div>
+    </section>
+
+    </div>
+
+    <div class="pair-row">
+    <section class="card" id="behaviour-plans" style="display:none;"></section>
+    <section class="card" id="behaviour-done" style="display:none;"></section>
+
+    </div>
+
+
+    <section class="card" id="completed-panel" style="margin-bottom:16px;">
       <details id="completed-details">
         <summary style="cursor:pointer; font-weight:600;"><span id="completed-title">Completed (last 24 h)</span></summary>
         <div style="display:flex; gap:8px; align-items:center; margin:10px 0;">
@@ -1114,7 +1126,7 @@
     sb = client;
     document.getElementById('app-root').style.display = 'grid';
     // One request card, the same on every page: the vets ask the nurses (a treatment course or a one-animal task) or the behaviour team.
-    BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'vets', onDone: showPlanBanner });
+    BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'vets', doneEl: document.getElementById('behaviour-done'), onDone: showPlanBanner });
     SendCard.mount(document.getElementById('send-request'), { sb, role: 'vets', tabs: ['nurses', 'behaviour'], getInitials: storedVetInit, initialsWhere: 'at the top left', focusInitials: focusVetInit, saveInitials: rememberVetInit, onSent: () => loadAll() });
     await loadAll();
     OpsCore.sweepDonePhotos(sb);   // finished cases keep no photo, whichever tool finished them
