@@ -314,14 +314,16 @@
         </div></div>`).join('');
     return rows || '<p class="col-empty">' + (DONE_Q ? 'No completed card matches that ID.' : 'Nothing completed yet.') + '</p>';
   }
+  let DONE_OPEN = false;   // the Completed list starts collapsed; remembered across the page's re-renders
   function completedHtml() {
-    return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        <h2 style="margin:0;">Completed <span class="box-count">${DONE.length}</span></h2>
+    return `<details id="aa-done-details"${DONE_OPEN ? ' open' : ''}>
+      <summary style="cursor:pointer;"><h2 style="margin:0; display:inline;">Completed <span class="box-count">${DONE.length}</span></h2></summary>
+      <div style="display:flex; justify-content:flex-end; margin-top:8px;">
         ${DONE.length ? '<button type="button" class="secondary" id="aa-empty-done">Empty list</button>' : ''}
       </div>
       <p class="subtle" style="margin:6px 0 0;">Newest first. Ticked by mistake, or the note was not entered? Put it back. Completed cards are kept for 7 days, then removed.</p>
       ${DONE.length ? `<input id="aa-done-search" placeholder="Find an animal ID in the completed list" value="${esc(DONE_Q)}" style="margin:8px 0 0; max-width:340px;">` : ''}
-      <div id="aa-done-rows">${doneRowsHtml()}</div>`;
+      <div id="aa-done-rows">${doneRowsHtml()}</div></details>`;
   }
   async function copyText(text) {
     try { await navigator.clipboard.writeText(text); }
@@ -462,6 +464,7 @@
     if (!(await saveDone(it, it.animal_ids.filter(a => set.has(a))))) { cb.checked = !cb.checked; cb.disabled = false; }
     else if (set.size === it.animal_ids.length) doneThisSession++;
   });
+  document.getElementById('aa-completed').addEventListener('toggle', (e) => { if (e.target.id === 'aa-done-details') DONE_OPEN = e.target.open; }, true);
   document.getElementById('aa-completed').addEventListener('input', (e) => {
     if (!e.target.closest('#aa-done-search')) return;
     DONE_Q = e.target.value;

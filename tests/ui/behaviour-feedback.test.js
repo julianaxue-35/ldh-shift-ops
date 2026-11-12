@@ -21,7 +21,7 @@ async function finish(page, id) {
     const p = await open(s, pageName);
     try {
       await p.page.waitForSelector('#behaviour-plans .bf-row', { timeout: 5000 });
-      const txt = await p.page.textContent('#behaviour-plans');
+      const txt = await p.page.evaluate(() => ['behaviour-plans', 'behaviour-done'].map(i => (document.getElementById(i) || {}).textContent || '').join(' '));
       t.ok(txt.includes(mine) && /Behaviour team plans/.test(txt), L + 'shows the plan for what this team asked');
       t.ok(role === 'vets' ? /Plan: enrichment, handle with towel/.test(txt) && /done by XY/.test(txt) : /Nurse plan: quiet room/.test(txt) && /done by ZZ/.test(txt), L + 'with the Behaviour team\'s note and who decided');
       t.ok(others.every(x => !txt.includes(x)), L + 'and not the other teams\' tasks, older than 24 h, or tasks with no requester: ' + others.filter(x => txt.includes(x)));
@@ -30,7 +30,7 @@ async function finish(page, id) {
       await finish(p.page, role === 'vets' ? 'v-open' : 'n-open');
       await p.page.waitForFunction(() => getComputedStyle(document.getElementById('new-item-banner')).display !== 'none', { timeout: 4000 });
       t.ok(/BEHAVIOUR PLAN/.test(await p.page.textContent('#new-item-banner-text')), L + 'when Behaviour ticks one Done the page rings: ' + await p.page.textContent('#new-item-banner-text'));
-      await p.page.waitForFunction(() => /Just decided: foster with experience/.test(document.getElementById('behaviour-plans').textContent));
+      await p.page.waitForFunction(() => /Just decided: foster with experience/.test(['behaviour-plans', 'behaviour-done'].map(i => (document.getElementById(i) || {}).textContent || '').join(' ')));
       t.ok(await p.page.locator('#behaviour-plans .bf-open').count() === 0, L + 'and it moves from waiting to the plan list');
       // the other team's task finishing does not ring this page
       await p.page.click('#new-item-banner-dismiss');
