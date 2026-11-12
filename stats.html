@@ -380,13 +380,13 @@
     const st = ST.tot, b = LDHLogic.timeBuckets(st.period, Date.now());
     const dates = (k) => YEAR_ROWS.filter(r => r.completed_at && (k === 'total' ? Object.prototype.hasOwnProperty.call(SHIFT_LABELS, r.shift) : r.shift === k)).map(r => r.completed_at);
     const mk = (k, name, color, dash) => ({ name, color, dash, values: LDHLogic.bucketCounts(dates(k), b, st.running), raw: LDHLogic.bucketCounts(dates(k), b, false) });
-    const series = [mk('processing', 'Processing (examined)', C.blue), mk('sick_injured', 'Sick & Injured (attended)', C.orange), mk('surgery', 'Surgery', C.aqua), { ...mk('total', 'Total animals', C.ink), total: true }];
+    const series = [mk('processing', 'Processing (examined)', C.blue), mk('sick_injured', 'Sick & Injured (attended)', C.orange), mk('surgery', 'Surgery', C.aqua), { ...mk('total', 'Total checks', C.ink), total: true }];
     const inPeriod = (k) => LDHLogic.bucketCounts(dates(k), b, false).reduce((a, v) => a + v, 0);
     const avg = (k) => avgSub(LDHLogic.dailyAverage(dates(k), st.period, Date.now(), LDHLogic.WORKING_DAYS[k]));
     const allDates = dates('total');
     document.getElementById('period-totals-grid').innerHTML =
       `<div class="chart-controls">${seg('tot-period', PERIODS, st.period)}${seg('tot-run', [[0, b.unit === 'month' ? 'Per month' : 'Per day'], [1, 'Running total']], st.running ? 1 : 0)}</div>`
-      + `<div class="kpi-row">${kpi('Processing', inPeriod('processing'), C.blue, avg('processing') + ' <span class="subtle">(Mon–Fri)</span>')}${kpi('Sick & Injured', inPeriod('sick_injured'), C.orange, avg('sick_injured') + ' <span class="subtle">(7 days)</span>')}${kpi('Surgery', inPeriod('surgery'), C.aqua, avg('surgery') + ' <span class="subtle">(Mon–Fri, no public holidays)</span>')}${kpi('Total animals', inPeriod('total'), C.ink)}${FLAGGED_DATES ? kpi('Flagged by shelter staff', LDHLogic.bucketCounts(FLAGGED_DATES, b, false).reduce((a, v) => a + v, 0), C.violet, 'sent in on the staff form') : ''}</div>`
+      + `<div class="kpi-row">${kpi('Processing', inPeriod('processing'), C.blue, avg('processing') + ' <span class="subtle">(Mon–Fri)</span>')}${kpi('Sick & Injured', inPeriod('sick_injured'), C.orange, avg('sick_injured') + ' <span class="subtle">(7 days)</span>')}${kpi('Surgery', inPeriod('surgery'), C.aqua, avg('surgery') + ' <span class="subtle">(Mon–Fri, no public holidays)</span>')}${kpi('Total checks', inPeriod('total'), C.ink)}${FLAGGED_DATES ? kpi('Flagged by shelter staff', LDHLogic.bucketCounts(FLAGGED_DATES, b, false).reduce((a, v) => a + v, 0), C.violet, 'sent in on the staff form') : ''}</div>`
       + TrendChart.html({ labels: b.labels, series, mode: 'stacked', title: 'Animals completed, ' + PERIOD_NAME[st.period].toLowerCase(), unitLabel: (st.running ? 'Running total of animals' : 'Animals completed ' + (b.unit === 'month' ? 'per month' : 'per day')) + ' · ' + PERIOD_NAME[st.period].toLowerCase() });
   }
 

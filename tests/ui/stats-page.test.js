@@ -17,7 +17,7 @@ const D = 24 * 3600 * 1000;
     await stats.page.waitForSelector('#period-totals-grid .tc-svg');
     const tot = await stats.page.textContent('#period-totals-grid');
     t.ok(await stats.page.locator('#period-totals-grid .tc-svg').count() === 1 && /Week/.test(tot) && /Season/.test(tot) && !/Quarter/.test(tot) && /Year/.test(tot), 'the Totals chart has Week / Month / Season / Year buttons');
-    t.ok(await stats.page.locator('#period-totals-grid .kpi-row').count() === 1 && /Processing/.test(tot) && /Sick & Injured/.test(tot) && /Surgery/.test(tot) && /Total animals/.test(tot), 'the Totals tiles cover Processing, Sick & Injured, Surgery and the total');
+    t.ok(await stats.page.locator('#period-totals-grid .kpi-row').count() === 1 && /Processing/.test(tot) && /Sick & Injured/.test(tot) && /Surgery/.test(tot) && /Total checks/.test(tot), 'the Totals tiles cover Processing, Sick & Injured, Surgery and the total');
     t.ok(await stats.page.locator('#response-rate-section').count() === 1 && await stats.page.locator('#surveillance-section').count() === 1, 'response-rate and disease-export sections are on the stats page');
     t.ok((await stats.page.locator('#response-rate-chart svg').count()) >= 1, 'response-rate chart drawn');
     t.ok(await stats.page.locator('a[href="index.html"]').count() >= 1, 'link back to the dashboard');
