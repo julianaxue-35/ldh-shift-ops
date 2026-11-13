@@ -935,3 +935,17 @@ test('speciesOfLocation: cat / dog / rabbit by room, either when unknown', () =>
   for (const [loc, sp] of [['Cat Room 1', 'cat'], ['Cat Room 3', 'cat'], ['Pound 1', 'dog'], ['Pound 2 / Run 4', 'dog'], ['Rabbit Room', 'rabbit'], ['Rabbit Room / 1', 'rabbit'], ['Offsite', 'either']])
     assert.equal(L.speciesOfLocation(loc), sp, loc);
 });
+
+test('aaPairCharts: chart goes under the newest Processing/S&I note for the same ID; no note = orphan; Surgery notes never take a chart', () => {
+  const n = (id, kind, ids, ago) => ({ id, kind, animal_ids: ids, sent_at: new Date(NOW - ago).toISOString() });
+  const items = [
+    n('p1', 'processing_note', ['A1'], 3 * H), n('s1', 'si_note', ['a 1'], 1 * H), n('g1', 'surgery_note', ['B2'], H),
+    n('c1', 'med_chart', ['A1'], H), n('c2', 'med_chart', ['B2'], H), n('c3', 'med_chart', ['Z9'], H), n('c4', 'med_chart', ['L2'], H),
+    n('p2', 'processing_note', ['L1', 'L2'], H)
+  ];
+  const r = L.aaPairCharts(items);
+  assert.deepEqual(r.byNote.s1.map(c => c.id), ['c1']);          // newest note wins; spacing/case in the ID ignored
+  assert.deepEqual(r.byNote.p2.map(c => c.id), ['c4']);          // litter note carries the chart for one of its animals
+  assert.deepEqual(r.orphans.map(c => c.id).sort(), ['c2', 'c3']); // Surgery note does not take a chart
+  assert.deepEqual(L.aaPairCharts([]), { byNote: {}, orphans: [] });
+});
