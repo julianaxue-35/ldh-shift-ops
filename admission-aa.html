@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Admission AA</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261111a"></script>
+<script src="lib/ldh-logic.js?v=20261113a"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
 <style>
   :root {
@@ -169,6 +169,10 @@
   .aa-notes { white-space: pre-wrap; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 0.85rem; margin: 8px 0 0; display: none; }
   .aa-notes.open { display: block; }
   .aa-extra { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .aa-chart-under { margin: 10px 0 0; padding: 8px 10px; border: 1px dashed var(--border); border-radius: 8px; flex-basis: 100%; }
+  .aa-chart-under h4 { margin: 0 0 4px; font-size: 0.85rem; }
+  .aa-nonote { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: rgba(230,160,0,.18); border: 1px solid #c98a00; font-size: 0.85rem; }
+  .aa-ask { margin-top: 6px; padding: 6px 8px; border-radius: 6px; background: rgba(192,57,43,.1); border: 1px solid #c0392b; font-size: 0.85rem; }
   .aa-lines { margin: 6px 0 0; padding-left: 18px; font-size: 0.85rem; }
   .aa-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; align-items: start; }
   .aa-col { min-width: 0; background: var(--card-bg); border: 1px solid var(--border); border-top-width: 5px; border-radius: 14px; box-shadow: var(--shadow-card); padding: 18px 20px 14px; }
@@ -266,6 +270,8 @@
     try { const o = JSON.parse(localStorage.getItem(AA_INIT_KEY) || '{}'); if (o.day === new Date().toLocaleDateString('en-CA')) el.value = o.v || ''; } catch (e) { /* convenience only */ }
     el.addEventListener('input', () => { el.value = myInitials(); try { localStorage.setItem(AA_INIT_KEY, JSON.stringify({ day: new Date().toLocaleDateString('en-CA'), v: el.value })); } catch (e) { /* ignore */ } });
   })();
+  const openMismatch = new Set();        // chart ids where the AA pressed "Doesn't match" (a reminder only; nothing is saved or sent)
+  let PAIRED = { byNote: {}, orphans: [] };
   const openNotes = new Set();           // which note cards are expanded (ids only; survives re-renders)
   function extraHtml(it) {
     const p = it.payload || {};
@@ -279,6 +285,19 @@
     if (it.kind === 'med_chart') return `<ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul><div class="aa-extra"><button type="button" class="secondary aa-xlsx" data-id="${esc(it.id)}">Download Excel chart</button></div>`;
     return '';
   }
+  // Who to ask on the day: the sender initials on the note and on the chart.
+  function whoSent(it) { return it && it.sent_by ? esc(it.sent_by) : 'vet unknown'; }
+  function chartUnderHtml(c, note) {
+    const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const p = c.payload || {};
+    return `<div class="aa-chart-under" data-id="${esc(c.id)}">
+      <h4>Medication chart to print <span class="ameta">\u00b7 sent ${esc(hm(c.sent_at))} by ${whoSent(c)}</span></h4>
+      <ul class="aa-lines">${(p.lines || []).map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+      <div class="aa-extra"><button type="button" class="secondary aa-xlsx" data-id="${esc(c.id)}">Download Excel chart</button>
+        <button type="button" class="secondary aa-mismatch" data-id="${esc(c.id)}">Doesn't match the note</button>
+        <button type="button" class="aa-done" data-id="${esc(c.id)}">Done \u2713</button></div>
+      ${openMismatch.has(c.id) ? `<div class="aa-ask">\u26a0 Medication doesn't match the note? Ask <b>${whoSent(note)}</b> (sent the note at ${esc(hm(note.sent_at))})${c.sent_by && c.sent_by !== note.sent_by ? ' or <b>' + whoSent(c) + '</b> (sent the chart)' : ''} on the day.</div>` : ''}</div>`;
+  }
   function cardHtml(it, now) {
     const c = LDHLogic.aaCountdown(it, now);
     const hm = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -288,6 +307,8 @@
         <div class="aname">${esc(it.animal_ids.join(', '))} ${pri ? '<span class="aa-pri-tag">PRIORITY \u2014 do first</span> ' : ''}<span class="tag-med">${esc(LDHLogic.AA_KINDS[it.kind] || it.kind)}</span></div>
         <div class="ameta">${esc(LDHLogic.aaSummary(it))}${it.payload && it.payload.location ? ' · ' + esc(it.payload.location) : ''} · sent ${esc(hm(it.sent_at))}${it.sent_by ? ' by ' + esc(it.sent_by) : ''}${it.updated_at ? ' · <b class="aa-updated">updated ' + esc(hm(it.updated_at)) + '</b>' : ''}</div>
         ${extraHtml(it)}
+        ${it.kind === 'med_chart' ? `<div class="aa-nonote">\u26a0 No note was sent with this chart. The vet must confirm the medication. Ask <b>${whoSent(it)}</b>.</div>` : ''}
+        ${(PAIRED.byNote[it.id] || []).map(c => chartUnderHtml(c, it)).join('')}
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
         <span class="lvl lvl-${esc(c.level)}">${esc(c.label)}</span>
@@ -381,12 +402,14 @@
   function render() {
     const now = Date.now();
     const sorted = LDHLogic.aaSortItems(ITEMS, now);
+    PAIRED = LDHLogic.aaPairCharts(sorted);
+    const orphanIds = new Set(PAIRED.orphans.map(c => c.id));
     // Left half: vet notes. Right half, side by side: medication charts (to print) and nurse tasks.
     const COLS = [
       { key: 'processing', title: 'Processing notes', has: i => i.kind === 'processing_note', empty: 'No Processing notes waiting.' },
       { key: 'sick', title: 'Sick & Injured notes', has: i => i.kind === 'si_note', empty: 'No Sick & Injured notes waiting.' },
       { key: 'surgery', title: 'Surgery notes', has: i => i.kind === 'surgery_note', empty: 'No Surgery notes waiting.' },
-      { key: 'charts', title: 'Medication charts to print', has: i => i.kind === 'med_chart', empty: 'No charts waiting.' },
+      { key: 'charts', title: 'Medication charts to print', has: i => i.kind === 'med_chart' && orphanIds.has(i.id), empty: 'No charts waiting on their own. A chart that came with a note shows under that note.' },
       { key: 'tasks', title: 'Tasks from nurses', has: i => i.kind !== 'processing_note' && i.kind !== 'si_note' && i.kind !== 'surgery_note' && i.kind !== 'med_chart', empty: 'No tasks waiting.' }
     ];
     document.getElementById('aa-list').innerHTML = (sorted.length ? '' : '<p class="empty-state">Nothing waiting. New items from the nurses will appear here with a sound.</p>')
@@ -421,6 +444,8 @@
     if (copy) { const it = ITEMS.find(x => x.id === copy.dataset.id); if (it) copyText((it.payload || {}).text || ''); return; }
     const dx = e.target.closest('.aa-docx');
     if (dx) { const it = ITEMS.find(x => x.id === dx.dataset.id); if (it) downloadDocx(it); return; }
+    const mm = e.target.closest('.aa-mismatch');
+    if (mm) { const id = mm.dataset.id; if (openMismatch.has(id)) openMismatch.delete(id); else openMismatch.add(id); render(); return; }
     const xl = e.target.closest('.aa-xlsx');
     if (xl) { const it = ITEMS.find(x => x.id === xl.dataset.id); if (it) downloadXlsx(it); return; }
     const btn = e.target.closest('.aa-done'); if (!btn) return;
