@@ -22,7 +22,7 @@ async function db() {
     create function auth.jwt() returns jsonb language sql as $$ select coalesce(nullif(current_setting('app.jwt', true), ''), '{}')::jsonb $$;
     create role authenticated; create role anon; create role service_role;
     create publication supabase_realtime;` + SHIM);
-  const files = fs.readdirSync(MIG).filter(f => /^\d{4}_.*\.sql$/.test(f) && f <= '0045_login_lockout_and_failed_log.sql').sort();
+  const files = fs.readdirSync(MIG).filter(f => /^\d{4}_.*\.sql$/.test(f) && (f <= '0045_login_lockout_and_failed_log.sql' || f.startsWith('0050'))).sort();
   for (const f of files) { if (f.startsWith('0006') || f.startsWith('0007')) continue; await d.exec(load(f)); }
   return d;
 }
@@ -47,13 +47,15 @@ test('0045: three wrong role-passcode guesses lock that address, even for the ri
   assert.equal(await guess(d, 'vet2026'), true, 'a different address is not locked');
 });
 
-test('0045: the lock ends once the failures are 15 minutes old, and the log never holds the guessed code', async () => {
+test('0050: the lock ends once the failures are 1 minute old, passcode_locked() reports it, and the log never holds the guessed code', async () => {
   const d = await db();
   await hdr(d, '5.5.5.5');
   for (const c of ['aaa', 'bbb', 'ccc']) await guess(d, c);
   assert.equal(await guess(d, 'vet2026'), false);
-  await d.exec(`update public.auth_failed_log set at = now() - interval '16 minutes' where client = '5.5.5.5'`);
-  assert.equal(await guess(d, 'vet2026'), true, 'unlocked after 15 minutes');
+  assert.equal(await n(d, `select public.passcode_locked()::int n`), 1, 'locked address is reported');
+  await d.exec(`update public.auth_failed_log set at = now() - interval '2 minutes' where client = '5.5.5.5'`);
+  assert.equal(await n(d, `select public.passcode_locked()::int n`), 0, 'no longer reported once the failures are over a minute old');
+  assert.equal(await guess(d, 'vet2026'), true, 'unlocked after 1 minute');
   const cols = (await d.query(`select column_name from information_schema.columns where table_name = 'auth_failed_log'`)).rows.map(r => r.column_name);
   assert.ok(!cols.some(c => /code|guess|password/.test(c)), 'no column can hold the guess');
 });
