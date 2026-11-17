@@ -317,7 +317,7 @@ Deno.serve(async (req) => {
   }
 
   const providedSecret = req.headers.get('x-sync-secret');
-  // 2026-10-30: three wrong codes from one network address in 15 minutes lock that address (even for the right code) and every
+  // 2026-10-30: three wrong codes from one network address in a minute lock that address (even for the right code) and every
   // wrong guess is logged (when, which door, which address; never the guess). Needs migration 0045: if it has not been run the
   // calls below fail and the check carries on exactly as before, so syncing never breaks because of the lockout.
   const clientId = (req.headers.get('cf-connecting-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0] || 'unknown').trim() || 'unknown';
@@ -329,7 +329,7 @@ Deno.serve(async (req) => {
   } catch { /* lockout unavailable: carry on */ }
   if (recentFailures >= 3) {
     try { await guard.rpc('auth_record_failure', { p_source: 'sync_code', p_role: null, p_client: clientId, p_blocked: true }); } catch { /* log only */ }
-    return new Response(JSON.stringify({ error: 'Too many wrong attempts. Try again in 15 minutes.' }), { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': '900' } });
+    return new Response(JSON.stringify({ error: 'Too many wrong attempts. Try again in a minute.' }), { status: 429, headers: { ...CORS_HEADERS, 'Retry-After': '60' } });
   }
   if (!SYNC_SECRET || providedSecret !== SYNC_SECRET) {
     if (providedSecret) {   // a missing code is a tool that was never connected, not a guess
