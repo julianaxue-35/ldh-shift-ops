@@ -402,9 +402,23 @@
             <option value="other">Other (describe in the note)</option>
             <option value="admin">Admin / paperwork review (e.g. vet history)</option>
           </select></label>
-          <label><span>Animal ID <span class="req">*</span></span><input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)"></label>
+          <label><span>Animal ID <span class="req">*</span></span><input id="req-title" placeholder="Animal ID. Several: 1170123, 1170124, 1170130 or a litter 1170123 - 1170130"></label>
           <label>Location / Space<select id="req-location"></select></label>
           <label>Pen / Detail #<input id="req-pen" placeholder="Pen #"><input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="display:none;"></label>
+          <div id="req-nurse-extras" class="sr-wide" style="display:none; margin:0; padding:14px 16px; border:2px solid var(--border); border-radius:12px;">
+        <div style="font-size:1rem; font-weight:800; margin-bottom:4px;">Also needed for each animal (tick any)</div>
+        <div style="font-size:0.9rem; color:var(--muted); margin-bottom:10px;">Microchip, UV and Treatment check go straight to the Processing nurse and skip the vet board. A foster med plan always goes to the vets.</div>
+        <div class="req-x-grid">
+          <label class="req-x-opt"><input type="checkbox" id="req-x-microchip"> Microchip</label>
+          <label class="req-x-opt"><input type="checkbox" id="req-x-uv"> UV request</label>
+          <label class="req-x-opt"><input type="checkbox" id="req-x-treatment"> Treatment check / due</label>
+          <label class="req-x-opt req-x-medplan" id="req-x-medplan-wrap"><input type="checkbox" id="req-x-medplan"> Foster med plan added + meds dispensed <span class="req-x-tag">goes to vets</span></label>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:12px; font-size:0.95rem;">
+          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Species <select id="req-x-species" style="margin:0; width:auto; font-size:1rem;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select></label>
+          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
+        </div>
+      </div>
           <label class="sr-span2">Needed within<select id="req-urgency-pick" class="tier-routine">
             <option value="routine">Request check — within 24–48 h</option>
             <option value="urgent">Urgent — within 12–24 h</option>
@@ -429,20 +443,6 @@
       <div id="req-birthing-wrap" style="display:none; margin:10px 0 0; padding:10px 12px; border:2px solid var(--critical); border-radius:12px; background:rgba(208,59,59,0.06);">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--critical);">Urgent cat birthing check — what is wrong? (goes straight to the top of the vet board)</div>
         <select id="req-birthing-reason" style="margin:0;"></select>
-      </div>
-      <div id="req-nurse-extras" style="display:none; margin:12px 0 0; padding:14px 16px; border:2px solid var(--border); border-radius:12px;">
-        <div style="font-size:1rem; font-weight:800; margin-bottom:4px;">Also needed for this animal (tick any)</div>
-        <div style="font-size:0.9rem; color:var(--muted); margin-bottom:10px;">Microchip, UV and Treatment check go straight to the Processing nurse and skip the vet board. A foster med plan always goes to the vets.</div>
-        <div class="req-x-grid">
-          <label class="req-x-opt"><input type="checkbox" id="req-x-microchip"> Microchip</label>
-          <label class="req-x-opt"><input type="checkbox" id="req-x-uv"> UV request</label>
-          <label class="req-x-opt"><input type="checkbox" id="req-x-treatment"> Treatment check / due</label>
-          <label class="req-x-opt req-x-medplan" id="req-x-medplan-wrap"><input type="checkbox" id="req-x-medplan"> Foster med plan added + meds dispensed <span class="req-x-tag">goes to vets</span></label>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:12px; font-size:0.95rem;">
-          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Species <select id="req-x-species" style="margin:0; width:auto; font-size:1rem;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select></label>
-          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
-        </div>
       </div>
       <div id="req-redflags-wrap" class="triage">
         <details id="triage-drawer">
