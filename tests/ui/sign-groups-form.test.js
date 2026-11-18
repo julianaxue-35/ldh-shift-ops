@@ -15,7 +15,7 @@ const KEYS = 'respiratory,gi,wounds_pain_swelling,urinary,skin,msk,neuro,eyes,ea
   t.ok(await page.locator('fieldset#req-signs-wrap > legend').count() === 1 && /Signs you can see/.test(await page.textContent('fieldset#req-signs-wrap > legend')), 'sign list is a fieldset with a legend');
   t.ok(await page.locator('details#req-signs-dd').count() === 1 && !(await page.$eval('#req-signs-dd', d => d.open)), 'signs are a collapsed dropdown');
   t.ok(/Select signs/.test(await page.textContent('#req-signs-label')), 'dropdown shows placeholder when nothing ticked');
-  t.ok(/^Symptoms/.test((await page.textContent('#req-problem'.replace('#req-problem','label.sr-wide:has(#req-problem)'))).trim()) && !/clinical notes/i.test(await page.textContent('#req-signs-wrap ~ label.sr-wide')), 'notes box is labelled Symptoms, not clinical notes');
+  t.ok(/^Notes/.test((await page.textContent('#req-problem'.replace('#req-problem','label.sr-wide:has(#req-problem)'))).trim()) && !/clinical notes/i.test(await page.textContent('#req-signs-wrap ~ label.sr-wide')), 'notes box is labelled Notes (changed from Symptoms 2026-11-18), not clinical notes');
   const pos = () => page.$eval('#req-submit', b => getComputedStyle(b).position);
   const vp0 = page.viewportSize();
   await page.setViewportSize({ width: 390, height: 844 }); t.ok(await pos() !== 'sticky', 'phone: Send to vets does not float');

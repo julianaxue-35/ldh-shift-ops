@@ -16,6 +16,12 @@ const t = require('./check')('flag-nurse-extras-position');
     const r = (await db()).nurse_requests;
     t.ok(r.length === 3 && r.every(x => x.kind === 'microchip_uv'), 'three animals entered at once give three microchip + UV requests: ' + r.map(x => x.animal_id).join(','));
     t.ok(errors.length === 0, 'no page errors: ' + errors.join('; '));
+    // IDs written in the Notes box can become their own requests too
+    await page.fill('#req-title', '1170200'); await page.fill('#req-problem', 'same litter as 1170201 and 1170202, mum 1170200');
+    await page.click('#req-submit'); await page.waitForTimeout(500);
+    const r2 = (await db()).tasks.filter(x => /^11702/.test(x.title)).map(x => x.title).sort().join(',');
+    t.ok(r2 === '1170200,1170201,1170202', 'IDs in the notes are counted as separate animals, the one in the ID box not doubled: ' + r2);
+    t.ok(!(await page.textContent('#send-request, body')).includes('Symptoms<'), 'the box is called Notes');
   } finally { await browser.close(); }
   t.done();
 })();
