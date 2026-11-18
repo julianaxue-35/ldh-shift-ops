@@ -63,5 +63,19 @@ const t = require('./check')('rescue-group');
     t.ok(d.tasks[0].done === true, 'and the vet case is closed');
     t.ok(v.errors.length === 0, 'no page errors: ' + v.errors.join('; '));
   } finally { await v.browser.close(); }
+  // 5) only Microchip / UV / Treatment check / Other (free text) are offered per animal
+  const o = await open();
+  try {
+    await o.page.selectOption('#req-type', 'rescue'); await o.page.fill('#req-title', '1170701, 1170702');
+    t.ok(await o.page.locator('.grp-row').first().locator('input[data-k]').count() === 4 && await o.page.locator('details', { hasText: 'More requests' }).count() === 0, 'four ticks per animal and no "more requests" list');
+    await o.page.check('.grp-row[data-gid="1170701"] [data-k="treatment"]');
+    await o.page.check('.grp-row[data-gid="1170702"] [data-k="other"]');
+    await o.page.click('#req-submit'); await o.page.waitForTimeout(300);
+    t.ok((await o.db()).noga_requests.length === 0, '"Other" with no text is refused');
+    await o.page.fill('.grp-row[data-gid="1170702"] [data-g="otherText"]', 'check the ears and weigh'); await o.page.click('#req-submit'); await o.page.waitForTimeout(500);
+    const nq = (await o.db()).noga_requests;
+    t.ok(nq.length === 2 && nq.some(r => r.animal_id === '1170701' && r.task === 'treatment') && nq.some(r => r.animal_id === '1170702' && r.task === 'other' && r.note === 'check the ears and weigh'), 'treatment check and the free-text request become that animal\'s nurse tasks');
+    t.ok(o.errors.length === 0, 'no page errors: ' + o.errors.join('; '));
+  } finally { await o.browser.close(); }
   t.done();
 })();

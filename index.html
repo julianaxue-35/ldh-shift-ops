@@ -711,9 +711,8 @@
     return ids.map(id => ({ id, notes: false })).concat(fromNotes.map(id => ({ id, notes: true })));
   }
   // the same requests the dashboard already offers for one animal: microchip and UV (a nurse request that lists the animals), then the nurse tasks
-  const GROUP_MAIN = ['microchip', 'uv', 'treatment'];
-  const GROUP_MORE = Object.keys(LDHLogic.MISC_TASK_LABELS).filter(k => !['dispense', 'med_label', 'med_chart', 'microchip', 'uv', 'treatment', 'other'].includes(k));
-  const GROUP_LABEL = k => k === 'uv' ? 'UV' : LDHLogic.MISC_TASK_LABELS[k] || k;
+  const GROUP_MAIN = ['microchip', 'uv', 'treatment', 'other'];   // microchip + UV go to the Processing nurse as one card; treatment check and a free-text 'other' are that animal's own nurse task
+  const GROUP_LABEL = k => k === 'uv' ? 'UV' : k === 'other' ? 'Other' : LDHLogic.MISC_TASK_LABELS[k] || k;
   function renderGroup() {
     const cands = groupCandidates(), on = cands.length > 1;
     const box = document.getElementById('req-group');
@@ -730,13 +729,12 @@
         <select data-g="room" style="margin:0; width:auto;" aria-label="Space for ${esc(c.id)}">${spaces.replace('<option>' + esc(g.room) + '</option>', '<option selected>' + esc(g.room) + '</option>')}</select>
         <input data-g="pen" value="${esc(g.pen)}" placeholder="Pen # / detail" maxlength="40" style="margin:0; width:130px;" aria-label="Pen for ${esc(c.id)}">
         ${GROUP_MAIN.map(k => `<label class="req-x-opt" style="padding:6px 10px; font-size:0.95rem;"><input type="checkbox" data-k="${k}" ${g.k[k] ? 'checked' : ''}> ${esc(GROUP_LABEL(k))}</label>`).join('')}
-        <details style="flex-basis:100%;" ${GROUP_MORE.some(k => g.k[k]) ? 'open' : ''}><summary style="cursor:pointer; font-size:0.85rem; font-weight:700;">More requests for this animal</summary>
-          <div style="display:flex; flex-wrap:wrap; gap:6px 10px; margin-top:6px;">${GROUP_MORE.map(k => `<label class="req-x-opt" style="padding:6px 10px; font-size:0.9rem;"><input type="checkbox" data-k="${k}" ${g.k[k] ? 'checked' : ''}> ${esc(GROUP_LABEL(k))}</label>`).join('')}</div></details></div>`; }).join('');
+        <input data-g="otherText" value="${esc(g.otherText || '')}" placeholder="What else is needed for this animal?" maxlength="200" aria-label="Other request for ${esc(c.id)}" style="margin:0; flex:1 1 100%; ${g.k.other ? '' : 'display:none;'}"></div>`; }).join('');
   }
   document.getElementById('req-group-rows').addEventListener('input', (e) => {
     const row = e.target.closest('.grp-row'), f = e.target.dataset && (e.target.dataset.g || e.target.dataset.k); if (!row || !f) return;
     const g = GROUP.get(row.dataset.gid); if (!g) return;
-    if (e.target.dataset.k) g.k[e.target.dataset.k] = e.target.checked; else if (f === 'include') g.include = e.target.checked; else g[f] = e.target.value;
+    if (e.target.dataset.k) { g.k[e.target.dataset.k] = e.target.checked; if (e.target.dataset.k === 'other') { const ot = row.querySelector('[data-g="otherText"]'); ot.style.display = e.target.checked ? '' : 'none'; if (e.target.checked) ot.focus(); } } else if (f === 'include') g.include = e.target.checked; else g[f] = e.target.value;
     if (f === 'include') document.getElementById('req-group-n').textContent = Array.from(GROUP.entries()).filter(([id, v]) => v.include && groupCandidates().some(c => c.id === id)).length;
   });
   ['req-title', 'req-problem'].forEach(id => document.getElementById(id).addEventListener('input', renderGroup));
@@ -749,7 +747,7 @@
     const place = (room, pen) => LDHLogic.OFFSITE_NAMES.includes(room) ? (pen ? room + ' — ' + pen : room) : (pen ? room + ' / ' + pen : room);
     return cands.map(c => { const g = GROUP.get(c.id);
       const loc = g.room ? place(g.room, g.pen.trim()) : (g.pen.trim() ? place(room0, g.pen.trim()) : place(room0, LDHLogic.OFFSITE_NAMES.includes(room0) ? det0 : pen0));
-      return { id: c.id, location: loc, kinds: GROUP_MAIN.concat(GROUP_MORE).filter(k => g.k[k]) }; });
+      return Object.assign({ id: c.id, location: loc, kinds: GROUP_MAIN.filter(k => g.k[k]) }, g.k.other ? { other: (g.otherText || '').trim() } : {}); });
   }
 
   document.getElementById('req-submit').addEventListener('click', async () => {
@@ -886,11 +884,13 @@
       const spc = document.getElementById('req-x-species').value, animals = gRows.map(a => Object.assign({}, a, { species: spc })), GK = LDHLogic.MISC_TASK_LABELS;
       const needsVetG = allFlags().length > 0 || signs.length > 0 || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine' || animals.every(a => !a.kinds.length);
       if (PHOTO_BLOB) { alert('A photo can only go with one animal. Remove the photo, or flag the animals one at a time.'); return false; }
+      const noText = animals.find(a => a.kinds.includes('other') && !a.other);
+      if (noText) { alert('Say what else is needed for ' + noText.id + ' (or untick Other).'); return false; }
       if (!needsVetG && animals.some(a => !a.kinds.length)) { alert('Tick what each animal needs (or untick the animals that are not needed).'); return false; }
       const locs = Array.from(new Set(animals.map(a => a.location))), groupLoc = locs.length === 1 ? locs[0] : 'Various';
       const missing = (m) => /animals|group_animals|schema cache/i.test(m || '') ? 'the database needs migration 0051 (rescue groups) run first.' : m;
       if (needsVetG) {
-        const list = animals.map(a => a.id + ' (' + a.location + (a.kinds.length ? '; ' + a.kinds.map(k => GK[k] || k).join(' + ') : '') + ')').join(', ');
+        const list = animals.map(a => a.id + ' (' + a.location + (a.kinds.length ? '; ' + a.kinds.map(k => k === 'other' ? 'other: ' + a.other : GK[k] || k).join(' + ') : '') + ')').join(', ');
         const row = Object.assign({}, baseRow, { title: animals[0].id, location: groupLoc, location_detail: null, sm_number: null, group_animals: animals,
           problem: ['Rescue group of ' + animals.length + ' animals: ' + list, baseRow.problem].filter(Boolean).join(' — ') });
         const { error } = await sb.from('tasks').insert(row);
@@ -910,8 +910,8 @@
       // every other request an animal needs (treatment check, bloods, FIV test...) is that animal's own nurse task, as on the single-animal form.
       // When the group went to the vets only the treatment check goes straight to the nurses (the usual rule); the rest wait for the vet's Transfer.
       for (const a of animals) for (const k of a.kinds.filter(x => x !== 'microchip' && x !== 'uv' && (!needsVetG || x === 'treatment'))) {
-        const { error: trErr } = await sb.from('noga_requests').insert({ animal_id: a.id, location: a.location, location_detail: null, task: k, note: TYPE_LABELS[reqType], added_by: 'Shelter Staff' });
-        if (trErr) alert('The ' + GK[k] + ' for ' + a.id + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
+        const { error: trErr } = await sb.from('noga_requests').insert({ animal_id: a.id, location: a.location, location_detail: null, task: k, note: k === 'other' ? a.other : TYPE_LABELS[reqType], added_by: 'Shelter Staff' });
+        if (trErr) alert('The ' + (GK[k] || k) + ' for ' + a.id + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
       }
       return true;
     }

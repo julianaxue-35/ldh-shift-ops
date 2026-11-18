@@ -1122,7 +1122,7 @@
       t.group_animals.forEach(a => { const mu = (a.kinds || []).filter(x => x === 'microchip' || x === 'uv'); if (!mu.length) return; const k = mu.length === 2 ? 'microchip_uv' : mu[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
       // the other asks (bloods, FIV test, ...) become that animal's own nurse task; a treatment check was already sent when the group was flagged
       const others = [];
-      t.group_animals.forEach(a => (a.kinds || []).filter(x => x !== 'microchip' && x !== 'uv' && x !== 'treatment').forEach(k => others.push({ id: a.id, location: a.location, task: k })));
+      t.group_animals.forEach(a => (a.kinds || []).filter(x => x !== 'microchip' && x !== 'uv' && x !== 'treatment').forEach(k => others.push({ id: a.id, location: a.location, task: k, text: k === 'other' ? a.other : '' })));
       if (!by.size && !others.length) { ok.disabled = false; alert('No microchip or UV check was asked for on this group, so there is nothing to hand to the nurses as a bundle. Transfer the animals one at a time instead.'); return; }
       const typedG = overlay.querySelector('.transfer-note').value.trim();
       for (const [kind, list] of by) {
@@ -1134,7 +1134,7 @@
         if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
       }
       for (const o of others) {
-        const { error } = await sb.from('noga_requests').insert({ animal_id: o.id, location: o.location, location_detail: null, task: o.task, note: typedG || t.problem || null, added_by: who, source_task_id: t.id });
+        const { error } = await sb.from('noga_requests').insert({ animal_id: o.id, location: o.location, location_detail: null, task: o.task, note: o.text || typedG || t.problem || null, added_by: who, source_task_id: t.id });
         if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
       }
       const { error: cErr } = await sb.from('tasks').update({ done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString(), note: 'Rescue group transferred to nurse' }).eq('id', t.id);
