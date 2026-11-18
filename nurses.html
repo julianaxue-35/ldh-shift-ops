@@ -250,10 +250,14 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Welfare nurse initials (kept on this device today)</label>
-    <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="margin-bottom:12px;">
-    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Processing nurse initials (kept on this device today)</label>
-    <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="margin-bottom:12px;">
+    <div class="ini-box ini-side" data-ini>
+      <label for="initials-welfare"><span class="ini-long">Welfare nurse initials (kept on this device today)</span><span class="ini-short">Welfare:</span></label>
+      <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" aria-label="Welfare initials">
+    </div>
+    <div class="ini-box ini-side" data-ini>
+      <label for="initials-processing"><span class="ini-long">Processing nurse initials (kept on this device today)</span><span class="ini-short">Processing:</span></label>
+      <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" aria-label="Processing initials">
+    </div>
     <p class="hint">Welfare nurse: medication labels, treatments due and miscellaneous tasks. Processing nurse: vaccination, microchip and UV requests.</p>
     <p class="hint" style="margin-top:14px;">
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
@@ -267,7 +271,7 @@
       <span id="new-item-banner-text"></span>
       <button type="button" id="new-item-banner-dismiss" class="alert-banner-dismiss" aria-label="Dismiss">&times;</button>
     </div>
-    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
+    <div class="page-head"><div><h1>Nurses</h1><p>Welfare nurse on the left, Processing nurse on the right.</p></div><div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;"><span data-ini-slot style="display:contents;"></span><button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button><button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button></div></div>
 
     <section class="card" id="send-request"></section>
     <section class="card" id="behaviour-plans" style="display:none;"></section>

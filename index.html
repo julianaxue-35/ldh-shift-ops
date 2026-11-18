@@ -351,9 +351,9 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <div id="sr-who" title="Needed for Behaviour requests, optional for the others. Remembered on this device for the day.">
-      <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Your initials (kept on this device today)</label>
-      <input id="sr-initials" maxlength="4" placeholder="e.g. AB" aria-label="Your initials" autocomplete="off" style="margin-bottom:12px;"><span id="sr-who-state" hidden></span>
+    <div class="ini-box ini-side" data-ini id="sr-who" title="Needed for Behaviour requests, optional for the others. Remembered on this device for the day.">
+      <label for="sr-initials"><span class="ini-long">Your initials (kept on this device today)</span><span class="ini-short">Initials:</span></label>
+      <span id="sr-who-state" hidden></span><input id="sr-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" aria-label="Initials initials">
     </div>
     <p class="hint">
       This is the live dashboard — everything here is real and shared with
@@ -375,6 +375,7 @@
         <p>All open tasks across Processing, Sick &amp; Injured, and Surgery.</p>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span data-ini-slot style="display:contents;"></span>
         <input id="search-box" placeholder="Search animal ID...">
         <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
       </div>
