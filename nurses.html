@@ -250,6 +250,10 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Welfare nurse initials (kept on this device today)</label>
+    <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="margin-bottom:12px;">
+    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Processing nurse initials (kept on this device today)</label>
+    <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="margin-bottom:12px;">
     <p class="hint">Welfare nurse: medication labels, treatments due and miscellaneous tasks. Processing nurse: vaccination, microchip and UV requests.</p>
     <p class="hint" style="margin-top:14px;">
       <a href="https://julianaxue-35.github.io/ldh-tools/" style="color:var(--sidebar-text-muted);">← LDH Tools hub</a>
@@ -271,8 +275,6 @@
     <div class="nurse-cols">
     <div class="nurse-col" id="welfare-col">
     <h2 class="nurse-col-title welfare">Welfare nurse</h2>
-    <div class="col-initials" style="margin:0 0 12px;"><label for="initials-welfare" style="font-size:0.78rem; font-weight:700;">Welfare nurse initials for today</label>
-      <input id="initials-welfare" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
 
     <section class="card" id="med-labels-section">
       <h2>Medication labels to make</h2>
@@ -310,8 +312,6 @@
 
     <div class="nurse-col" id="processing-col">
     <h2 class="nurse-col-title processing">Processing nurse</h2>
-    <div class="col-initials" style="margin:0 0 12px;"><label for="initials-processing" style="font-size:0.78rem; font-weight:700;">Processing nurse initials for today</label>
-      <input id="initials-processing" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:120px;"> <span class="subtle" style="font-size:0.75rem;">put on every tick automatically</span></div>
     <section class="card" id="nurse-requests-section">
       <h2>Nurse requests</h2>
       <div id="bulk-bar-processing" class="bulk-float" style="display:none;">
@@ -403,7 +403,7 @@
       <details><summary>A vet sent me a medication chart to print</summary><div><p>It appears under <b>Medication labels to make</b> as <b>Medication chart (Excel) to print</b>, with the animal and room. Press <b>Download chart to print</b>, print it, then press <b>Done</b>. The file is removed once the task is finished. Vets use this when the Admission AA is not in, for example at the weekend.</p></div></details>
       <details><summary>I sent a request with the wrong location. Can I fix it?</summary><div><p>Yes. Press <b>Edit</b> (or <b>Edit location</b>) on the request. Change the space and pen, and for a nurse request the number of animals, the timing or the note; for a treatment the treatment name. Press <b>Save changes</b>. Anyone on the dashboard can do this, and the other pages update by themselves. A treatment's times a day and days cannot be changed this way: stop the course and send a new one.</p></div></details>
       <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
-      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the box at the top of your column (Welfare or Processing) once for the day — they are put on everything you pick up or tick off, and are cleared the next day. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
+      <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the box at the top left, under the menu (the Welfare nurse box or the Processing nurse box), once for the day — they are put on everything you pick up or tick off, and are cleared the next day. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
       <details><summary>How do I pick up, share or finish a nurse request?</summary><div><p>On a request, <b>Pick up</b> puts your initials on it (press <b>Release</b> to hand it back to the pool). Use <b>+1</b> as each animal is done, or <b>All done</b>. The coloured chip shows time left against the "needed within" time.</p></div></details>
       <details><summary>How do I do a medication label or a treatment dose?</summary><div><p>Medication labels: copy the label text, then mark it done (tick several and enter your initials once). Treatments due: tick each dose as you give it. Overdue doses are listed first.</p></div></details>
       <details><summary>What are miscellaneous tasks?</summary><div><p>Tasks a vet asked for or transferred from a case — bloods, ear swab, FIV test, flu cat needing IVFT and so on. Press <b>Done</b> when finished.</p></div></details>
@@ -1635,7 +1635,7 @@
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });
     SendCard.mount(document.getElementById('send-request'), { sb, role: 'nurses', tabs: ['vets', 'behaviour'], vetsFrom: 'nurse',
       getInitials: () => cleanInitials(document.getElementById('initials-welfare').value) || cleanInitials(document.getElementById('initials-processing').value),
-      initialsWhere: 'under Welfare nurse initials for today',
+      initialsWhere: 'at the top left (Welfare nurse initials)',
       focusInitials: () => { const i = document.getElementById('initials-welfare'); i.scrollIntoView({ block: 'center' }); i.focus(); i.style.outline = '3px solid #d9534f'; setTimeout(() => { i.style.outline = ''; }, 3000); },
       onSent: () => loadAll() });
     document.getElementById('app-root').style.display = 'grid';
