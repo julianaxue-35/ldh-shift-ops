@@ -176,7 +176,7 @@ const t = require('./check')('flag-form');
   t.ok((await page.inputValue('#req-title')) === '', 'the form is cleared after a litter');
   await page.selectOption('#req-type', 'rescue');
   await page.fill('#req-title', '1180001 - 1180002');
-  await page.check('.grp-row[data-gid="1180001"] [data-g="chip"]'); await page.check('.grp-row[data-gid="1180002"] [data-g="chip"]'); await page.check('#req-x-treatment');
+  await page.check('.grp-row[data-gid="1180001"] [data-k="microchip"]'); await page.check('.grp-row[data-gid="1180002"] [data-k="microchip"]'); await page.check('.grp-row[data-gid="1180001"] [data-k="treatment"]'); await page.check('.grp-row[data-gid="1180002"] [data-k="treatment"]');
   await page.fill('#req-problem', 'sneezing, check on the way');
   await page.click('#req-submit');
   await page.waitForTimeout(500);

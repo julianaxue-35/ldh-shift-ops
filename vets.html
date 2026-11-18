@@ -707,7 +707,7 @@
       alert(skipped.map(t => t.title).join(', ') + (skipped.length > 1 ? ' were' : ' was') + ' already picked up by someone else — skipped.');
     }
     if (claimed.length) {
-      const url = batchPickUpUrl(claimed);
+      const url = batchPickUpUrl(claimed.filter(t => !LDHLogic.isAdminRequest(t)));
       if (url) window.open(url, '_blank');
     }
     selectedPickup.clear();
@@ -775,9 +775,17 @@
             <textarea class="done-medlabel" rows="4" placeholder="Drug, dose, frequency..."></textarea>
             <p class="done-medlabel-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:-6px 0 8px;">Enter the real medication label (drug, dose, frequency) \u2014 not "done".</p>
             </div>
-          ` : `<p style="font-size:0.88rem; margin:0 0 12px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
+          ` : LDHLogic.isAdminRequest(t) ? '' : `<p style="font-size:0.88rem; margin:0 0 12px;">Mark <b>${esc(t.title)}</b> as done?</p>`}
+          ${LDHLogic.isAdminRequest(t) ? `
+          <p style="font-size:0.85rem; margin:0 0 10px;">Your reply goes back to the shelter staff page with your initials, and the request is marked done.</p>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin:0 0 6px;">Notes to share with the office</label>
+          <textarea class="done-note" rows="5" maxlength="1500" placeholder="e.g. Vet history reviewed: last vaccinated 12/10, no ongoing conditions, desexed." style="margin-bottom:10px;"></textarea>
+          <label style="font-size:0.78rem; font-weight:700; display:block; margin:0 0 6px;">Your initials</label>
+          <input class="done-admin-initials vet-init" maxlength="4" placeholder="e.g. JX" autocomplete="off" value="${esc(storedVetInit())}" style="margin-bottom:6px;">
+          <p class="done-admin-error" style="display:none; color:var(--critical); font-size:0.78rem; margin:0 0 10px;">Write the notes to share and enter your initials.</p>
+          <div style="margin-bottom:8px;"></div>` : `
           <label style="font-size:0.78rem; font-weight:700; display:block; margin:0 0 6px;">Quick note (optional)</label>
-          <textarea class="done-note" rows="2" placeholder="e.g. Eating well, bright. Recheck in 3 days." style="margin-bottom:14px;"></textarea>
+          <textarea class="done-note" rows="2" placeholder="e.g. Eating well, bright. Recheck in 3 days." style="margin-bottom:14px;"></textarea>`}
           <div class="oc-modal-actions">
             <button type="button" class="oc-modal-cancel done-cancel">Cancel</button>
             <button type="button" class="oc-modal-submit done-confirm">Confirm</button>
@@ -830,7 +838,7 @@
         loadAll();
         return;
       }
-      const url = pickUpUrl(t);
+      const url = LDHLogic.isAdminRequest(t) ? null : pickUpUrl(t);   // an admin / paperwork request is answered here, no tool to open
       if (url) window.open(url, '_blank');
       loadAll();
       return;
@@ -889,7 +897,13 @@
       const id = overlay.dataset.id;
       const t = TASKS.find(x => x.id === id);
       if (!t) { overlay.remove(); return; }
-      const quickNote = overlay.querySelector('.done-note').value.trim().slice(0, 500);
+      const isAdm = LDHLogic.isAdminRequest(t);
+      let quickNote = overlay.querySelector('.done-note').value.trim().slice(0, isAdm ? 1500 : 500);
+      if (isAdm) {   // the reply carries the vet's initials, so the office sees who answered
+        const whoA = vetInitFrom(overlay.querySelector('.done-admin-initials'));
+        if (!quickNote || !whoA) { overlay.querySelector('.done-admin-error').style.display = 'block'; return; }
+        quickNote = quickNote + ' \u2014 ' + whoA;
+      }
       if (t.needs_medication) {
         const chart = overlay.querySelector('.done-medchart').checked;
         if (overlay.querySelector('.done-self').checked) {
@@ -1105,8 +1119,11 @@
     ok.disabled = true;
     if (Array.isArray(t.group_animals) && t.group_animals.length) {   // rescue group -> nurse requests, one per kind of check
       const by = new Map();
-      t.group_animals.filter(a => a.kinds && a.kinds.length).forEach(a => { const k = a.kinds.length === 2 ? 'microchip_uv' : a.kinds[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
-      if (!by.size) { ok.disabled = false; alert('No microchip or UV check was asked for on this group, so there is nothing to hand to the nurses as a bundle. Transfer the animals one at a time instead.'); return; }
+      t.group_animals.forEach(a => { const mu = (a.kinds || []).filter(x => x === 'microchip' || x === 'uv'); if (!mu.length) return; const k = mu.length === 2 ? 'microchip_uv' : mu[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
+      // the other asks (bloods, FIV test, ...) become that animal's own nurse task; a treatment check was already sent when the group was flagged
+      const others = [];
+      t.group_animals.forEach(a => (a.kinds || []).filter(x => x !== 'microchip' && x !== 'uv' && x !== 'treatment').forEach(k => others.push({ id: a.id, location: a.location, task: k })));
+      if (!by.size && !others.length) { ok.disabled = false; alert('No microchip or UV check was asked for on this group, so there is nothing to hand to the nurses as a bundle. Transfer the animals one at a time instead.'); return; }
       const typedG = overlay.querySelector('.transfer-note').value.trim();
       for (const [kind, list] of by) {
         const ll = Array.from(new Set(list.map(a => a.location)));
@@ -1114,6 +1131,10 @@
           kind, due_window: '2h', location: ll.length === 1 ? ll[0] : 'Various', species: list[0].species === 'dog' ? 'dog' : 'cat', animal_count: list.length, animal_id: list.map(a => a.id).join(', '),
           arrived_at: new Date().toISOString(), created_by: 'Vet team (' + who + ')', note: typedG || 'Rescue group, from a vet case'
         }, list.length === 1 ? {} : { animals: list.map(a => ({ id: a.id, location: a.location, done: false })) }));
+        if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
+      }
+      for (const o of others) {
+        const { error } = await sb.from('noga_requests').insert({ animal_id: o.id, location: o.location, location_detail: null, task: o.task, note: typedG || t.problem || null, added_by: who, source_task_id: t.id });
         if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
       }
       const { error: cErr } = await sb.from('tasks').update({ done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString(), note: 'Rescue group transferred to nurse' }).eq('id', t.id);
