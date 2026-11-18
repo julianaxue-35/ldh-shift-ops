@@ -402,9 +402,23 @@
             <option value="other">Other (describe in the note)</option>
             <option value="admin">Admin / paperwork review (e.g. vet history)</option>
           </select></label>
-          <label><span>Animal ID <span class="req">*</span></span><input id="req-title" placeholder="Animal ID (a litter: 1170123 - 1170130)"></label>
+          <label><span>Animal ID <span class="req">*</span></span><input id="req-title" placeholder="Animal ID. Several: 1170123, 1170124, 1170130 or a litter 1170123 - 1170130"></label>
           <label>Location / Space<select id="req-location"></select></label>
           <label>Pen / Detail #<input id="req-pen" placeholder="Pen #"><input id="req-location-detail" placeholder="Detail (e.g. foster name)" style="display:none;"></label>
+          <div id="req-nurse-extras" class="sr-wide" style="display:none; margin:0; padding:14px 16px; border:2px solid var(--border); border-radius:12px;">
+        <div style="font-size:1rem; font-weight:800; margin-bottom:4px;">Also needed for each animal (tick any)</div>
+        <div style="font-size:0.9rem; color:var(--muted); margin-bottom:10px;">Microchip, UV and Treatment check go straight to the Processing nurse and skip the vet board. A foster med plan always goes to the vets.</div>
+        <div class="req-x-grid">
+          <label class="req-x-opt"><input type="checkbox" id="req-x-microchip"> Microchip</label>
+          <label class="req-x-opt"><input type="checkbox" id="req-x-uv"> UV request</label>
+          <label class="req-x-opt"><input type="checkbox" id="req-x-treatment"> Treatment check / due</label>
+          <label class="req-x-opt req-x-medplan" id="req-x-medplan-wrap"><input type="checkbox" id="req-x-medplan"> Foster med plan added + meds dispensed <span class="req-x-tag">goes to vets</span></label>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:12px; font-size:0.95rem;">
+          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Species <select id="req-x-species" style="margin:0; width:auto; font-size:1rem;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select></label>
+          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
+        </div>
+      </div>
           <label class="sr-span2">Needed within<select id="req-urgency-pick" class="tier-routine">
             <option value="routine">Request check — within 24–48 h</option>
             <option value="urgent">Urgent — within 12–24 h</option>
@@ -416,7 +430,7 @@
               <div id="req-signs"></div></details>
             <label class="req-chip req-birthing-chip"><input type="checkbox" id="req-birthing">🚨 Cat birthing — urgent check</label>
           </fieldset>
-          <label class="sr-wide">Symptoms<textarea id="req-problem" rows="3" placeholder="Describe the symptoms, e.g. limping on front-left leg, not eating for 2 days..."></textarea></label>
+          <label class="sr-wide">Notes<textarea id="req-problem" rows="3" placeholder="Notes, e.g. limping on front-left leg, not eating for 2 days. Other animal IDs written here can get their own request."></textarea></label>
           <div class="sr-wide" id="req-photo-wrap" style="margin:0;">
             <span style="display:block;font-size:0.85rem;font-weight:700;margin-bottom:6px;">Photo (optional)</span>
             <input type="file" id="req-photo" accept="image/*" style="display:none;">
@@ -429,20 +443,6 @@
       <div id="req-birthing-wrap" style="display:none; margin:10px 0 0; padding:10px 12px; border:2px solid var(--critical); border-radius:12px; background:rgba(208,59,59,0.06);">
         <div style="font-size:0.78rem; font-weight:700; margin-bottom:6px; color:var(--critical);">Urgent cat birthing check — what is wrong? (goes straight to the top of the vet board)</div>
         <select id="req-birthing-reason" style="margin:0;"></select>
-      </div>
-      <div id="req-nurse-extras" style="display:none; margin:12px 0 0; padding:14px 16px; border:2px solid var(--border); border-radius:12px;">
-        <div style="font-size:1rem; font-weight:800; margin-bottom:4px;">Also needed for this animal (tick any)</div>
-        <div style="font-size:0.9rem; color:var(--muted); margin-bottom:10px;">Microchip, UV and Treatment check go straight to the Processing nurse and skip the vet board. A foster med plan always goes to the vets.</div>
-        <div class="req-x-grid">
-          <label class="req-x-opt"><input type="checkbox" id="req-x-microchip"> Microchip</label>
-          <label class="req-x-opt"><input type="checkbox" id="req-x-uv"> UV request</label>
-          <label class="req-x-opt"><input type="checkbox" id="req-x-treatment"> Treatment check / due</label>
-          <label class="req-x-opt req-x-medplan" id="req-x-medplan-wrap"><input type="checkbox" id="req-x-medplan"> Foster med plan added + meds dispensed <span class="req-x-tag">goes to vets</span></label>
-        </div>
-        <div style="display:flex; flex-wrap:wrap; gap:10px 18px; align-items:center; margin-top:12px; font-size:0.95rem;">
-          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Species <select id="req-x-species" style="margin:0; width:auto; font-size:1rem;" aria-label="Species"><option value="cat">Cat</option><option value="dog">Dog</option></select></label>
-          <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
-        </div>
       </div>
       <div id="req-redflags-wrap" class="triage">
         <details id="triage-drawer">
@@ -583,7 +583,7 @@
       <h3 class="faq-group">Logging requests</h3>
       <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival (microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
       <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Tick the <b>signs you can see</b> (one or more groups; you are flagging signs, not diagnosing), and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
-      <details><summary>Can I add a photo to a flag?</summary><div><p>Yes. In <b>Send a request</b>, press <b>Take / add a photo</b> under Symptoms. On a phone this opens the camera. One photo per animal (not for a litter range). The vets see it with a <b>Photo</b> button on the case, and it is <b>deleted as soon as the case is finished</b>. The flag itself stays on record.</p></div></details>
+      <details><summary>Can I add a photo to a flag?</summary><div><p>Yes. In <b>Send a request</b>, press <b>Take / add a photo</b> under Notes. On a phone this opens the camera. One photo per animal (not for a litter range). The vets see it with a <b>Photo</b> button on the case, and it is <b>deleted as soon as the case is finished</b>. The flag itself stays on record.</p></div></details>
       <details><summary>What do the tiers mean?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2–4 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>
       <details><summary>How do I ask the nurses for a vaccination, FIV test, blood test, microchip or UV check?</summary><div><p>In <b>Send a request</b>, pick <b>Nurses</b> at the top. Choose <b>What</b>, space, species, how many animals and <b>Needed within</b>. Tick <i>Not here yet</i> to schedule it for a later arrival. For a single foster / rescue animal you can also tick Microchip and / or UV on the <b>Vets</b> form — these go to the Processing nurse.</p></div></details>
@@ -701,6 +701,9 @@
     if (expanded.error) { alert(expanded.error); return; }
     const ids = expanded.ids;
     if (!ids.length) return;
+    // 2026-11-18: other animal IDs written in the Notes box (6-8 digits, e.g. "same as 1170125 and 1170126") can become their own requests too.
+    const inNotes = Array.from(new Set((document.getElementById('req-problem').value.match(/\b[A-Za-z]?\d{6,8}\b/g) || []).map(x => x.toUpperCase()))).filter(x => !ids.includes(x));
+    if (inNotes.length && confirm('The notes mention other animal IDs: ' + inNotes.join(', ') + '.\n\nOK = also create a separate request for each of them.\nCancel = only the animal(s) in the Animal ID box.')) inNotes.forEach(x => ids.push(x));
     if (PHOTO_BLOB && ids.length > 1) { alert('A photo can only go with one animal. Remove the photo, or flag the animals one at a time.'); return; }
     if (ids.length > 1 && !confirm(ids.length + ' animals: ' + ids.join(', ') + '.\n\nCreate a separate request for each one?')) return;
     // The Animal ID she types IS the SM number at LDH — there's no separate
