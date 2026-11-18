@@ -568,7 +568,7 @@
           </div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          ${t.done ? '' : RequestEdit.btn('tasks', t.id, 'Edit location')}
+          ${t.done || t.claimed_at ? '' : RequestEdit.btn('tasks', t.id, 'Edit location')}
           ${canBump ? `<button type="button" class="secondary bump-btn" data-id="${esc(t.id)}">Bump to Urgent</button>` : ''}
           ${canPickUp ? `<button type="button" class="secondary pick-up-btn" data-id="${esc(t.id)}">Pick up →</button>` : ''}
           ${stage === 'picked_up' ? `<button type="button" class="secondary put-back-btn" data-id="${esc(t.id)}">Put back</button>` : ''}

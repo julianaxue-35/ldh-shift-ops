@@ -22,6 +22,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="lib/ldh-logic.js?v=20261113a"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
+<script src="lib/request-edit.js?v=20261118a"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
 <link rel="stylesheet" href="lib/surveillance.css?v=20261101b">
@@ -989,7 +990,7 @@
     return `
       <tr class="case-row" data-case="${esc(t.id)}">
         <td data-label="Animal"><i class="row-dot" style="background:${URGENCY_COLOR[t.urgency]}"></i><strong>${esc(t.title)}</strong>${t.needs_medication ? ' <span class="tag-med">Medication</span>' : ''}${flagHistoryHtml(t)}</td>
-        <td data-label="Location">${esc(locationText(t))}</td>
+        <td data-label="Location">${esc(locationText(t))}${isCompleted || t.claimed_at ? '' : ' ' + RequestEdit.btn('tasks', t.id, 'Edit')}</td>
         <td data-label="Shift" class="col-shift" style="color:${SHIFT_COLORS[t.shift]}">${SHIFT_LABELS[t.shift]}</td>
         <td data-label="Type" class="col-type">${TYPE_LABELS[t.type] || t.type}</td>
         <td data-label="Tier"><span class="status-pill ${tier}">${esc(LDHLogic.TIER_LABELS[tier])}</span></td>
@@ -1268,6 +1269,7 @@
   (async function () {
     const { sb: client } = await OpsCore.init({ page: 'staff' });
     sb = client;
+    RequestEdit.init(sb, loadAll);   // Edit location on a case nobody has picked up yet
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
     OpsCore.sweepDonePhotos(sb);   // finished cases keep no photo, whichever tool finished them

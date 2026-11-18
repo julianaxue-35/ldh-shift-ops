@@ -46,5 +46,21 @@ const todayISO = LDHLogic.localISO(new Date());
     t.ok((await n.db()).nurse_requests[0].location === 'Pound 2 / 12', 'Cancel leaves it as it was');
     t.ok(n.errors.length === 0, 'no page errors: ' + n.errors.join('; '));
   } finally { await n.browser.close(); }
-  t.done && t.done();
+  // vet cases: editable on the staff page until a vet picks them up, then locked
+  const v = await open({ tasks: [
+    { id: 'c1', title: 'OPEN-1', location: 'Cat Room 1', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', red_flags: [], done: false, created_at: ago(600e3) },
+    { id: 'c2', title: 'TAKEN-2', location: 'Cat Room 2', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', red_flags: [], done: false, claimed_at: ago(300e3), claimed_by: 'AB', created_at: ago(600e3) }] }, 'index.html');
+  try {
+    await v.page.waitForSelector('#cases-open-tbody tr.case-row');
+    t.ok(await v.page.locator('tr.case-row:has-text("OPEN-1") [data-redit="tasks"]').count() === 1, 'staff page: an unclaimed case has Edit');
+    t.ok(await v.page.locator('tr.case-row:has-text("TAKEN-2") [data-redit="tasks"]').count() === 0, 'staff page: a picked-up case has no Edit');
+    await v.page.click('tr.case-row:has-text("OPEN-1") [data-redit="tasks"]');
+    await v.page.waitForSelector('#rq-save');
+    await v.page.evaluate(() => { const d = window.__db.tasks.find(x => x.id === 'c1'); d.claimed_at = new Date().toISOString(); d.claimed_by = 'CD'; });   // a vet picks it up while the box is open
+    await v.page.selectOption('#rq-room', 'Pound 2'); await v.page.click('#rq-save');
+    await v.page.waitForFunction(() => document.querySelector('#rq-err') && getComputedStyle(document.querySelector('#rq-err')).display !== 'none');
+    t.ok((await v.db()).tasks.find(x => x.id === 'c1').location === 'Cat Room 1', 'picked up while the box was open: the location is NOT changed');
+    t.ok(v.errors.length === 0, 'no page errors: ' + v.errors.join('; '));
+  } finally { await v.browser.close(); }
+  t.done();
 })();

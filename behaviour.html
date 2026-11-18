@@ -379,7 +379,7 @@
     const head = (t, tail) => { const tier = LDHLogic.normTier(t.urgency);
       return `<div class="aname" style="font-size:0.9rem;"><b>${esc(t.title)}</b> <span class="meta">${esc(t.location)} · ${esc(LDHLogic.TIER_LABELS[tier])} ${esc(LDHLogic.TIER_TARGETS[tier])} · sent ${esc(hm(t.created_at))}${tail}</span></div>`; };
     const openHtml = openR.map(t => `<div style="padding:8px 0; border-top:1px solid var(--border);">${head(t, t.claimed_by ? ' · picked up by ' + esc(t.claimed_by) : ' · waiting for a vet')}
-        <div class="bh-reason">${esc(t.problem || '')}</div><div style="margin-top:4px">${RequestEdit.btn('tasks', t.id, 'Edit location')}</div></div>`).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
+        <div class="bh-reason">${esc(t.problem || '')}</div>${t.claimed_by || t.claimed_at ? '' : `<div style="margin-top:4px">${RequestEdit.btn('tasks', t.id, 'Edit location')}</div>`}</div>`).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
     const doneHtml = doneR.length ? `<h3 style="font-size:0.85rem; margin:14px 0 4px;">Done by the vets (last 24 h)</h3>` + doneR.map(t => `<div style="padding:8px 0; border-top:1px solid var(--border);">${head(t, ' · <b>done</b>' + (t.completed_at ? ' at ' + esc(hm(t.completed_at)) : ''))}
         <div class="bh-reason">${esc(t.problem || '')}</div>${line('Treatment', t.treatment)}${line('Plan', t.plan)}${line('Vet note', t.note)}</div>`).join('') : '';
     $('waiting-list').innerHTML = openHtml + doneHtml;
