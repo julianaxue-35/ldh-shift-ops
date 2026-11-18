@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js?v=20261113a"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
 <script src="lib/send-card.js?v=20261111a"></script>
+<script src="lib/request-edit.js?v=20261118a"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
 <script src="lib/behaviour-feedback.js"></script>
 <script src="vendor/jszip.min.js"></script>
@@ -400,6 +401,7 @@
       <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>A vet sent me a medication chart to print</summary><div><p>It appears under <b>Medication labels to make</b> as <b>Medication chart (Excel) to print</b>, with the animal and room. Press <b>Download chart to print</b>, print it, then press <b>Done</b>. The file is removed once the task is finished. Vets use this when the Admission AA is not in, for example at the weekend.</p></div></details>
+      <details><summary>I sent a request with the wrong location. Can I fix it?</summary><div><p>Yes. Press <b>Edit</b> (or <b>Edit location</b>) on the request. Change the space and pen, and for a nurse request the number of animals, the timing or the note; for a treatment the treatment name. Press <b>Save changes</b>. Anyone on the dashboard can do this, and the other pages update by themselves. A treatment's times a day and days cannot be changed this way: stop the course and send a new one.</p></div></details>
       <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
       <details><summary>What do I do first?</summary><div><p>Type your <b>initials</b> in the box at the top of your column (Welfare or Processing) once for the day — they are put on everything you pick up or tick off, and are cleared the next day. Leave the page open: a banner (for example “3 new requests sent through”), a beep and a flashing tab tell you when something new arrives. The sound is on by default — browsers need one tap on the page first, and the button at the top mutes it.</p></div></details>
       <details><summary>How do I pick up, share or finish a nurse request?</summary><div><p>On a request, <b>Pick up</b> puts your initials on it (press <b>Release</b> to hand it back to the pool). Use <b>+1</b> as each animal is done, or <b>All done</b>. The coloured chip shows time left against the "needed within" time.</p></div></details>
@@ -665,6 +667,7 @@
       <div class="nt-actions">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-arrive" data-id="${esc(r.id)}">Mark arrived</button>
+        ${RequestEdit.btn('nurse_requests', r.id)}
       </div></div>`;
   }
   function arrivedRowHtml(r) {
@@ -679,6 +682,7 @@
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
         ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}" data-src="nr" data-rid="${esc(r.id)}">Send to AA</button>` : ''}
         ${r.animal_id && ['microchip', 'microchip_uv', 'vaccination'].includes(r.kind) ? `<button class="secondary bh-send" data-src="nr" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}
+        ${RequestEdit.btn('nurse_requests', r.id)}
         <button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>
         <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
         <button class="go nr-all" data-id="${esc(r.id)}">All done</button>
@@ -800,7 +804,8 @@
       <span class="nt-main"><input type="checkbox" class="nt-tick" data-id="${esc(d.id)}" ${done ? 'checked' : ''}>
         <span class="nt-body"><span class="nt-head"><span class="nt-id aname">${esc(d.animal_id)}</span>${penBadges(d.location)}${catBadge(['Treatment', 'cat-treat'])}<span class="nt-time${late ? ' late' : ''}">${esc(d.slot_label)}${d.due_date !== todayISO ? ' \u00B7 due ' + esc(d.due_date) : ''}</span>${done ? `<span class="nt-done-badge">\u2713 done${d.done_by ? ' by ' + esc(d.done_by) : ''}</span>` : ''}</span>
           <span class="nt-block" style="display:block"><span class="bl">Treatment</span>${esc(d.treatment)}</span>
-          <span class="nt-sub ameta" style="display:block">${d.requested_by && d.requested_by !== 'Vet team' ? 'requested by ' + esc(d.requested_by) : ''}</span></span></span>
+          <span class="nt-sub ameta" style="display:block">${d.requested_by && d.requested_by !== 'Vet team' ? 'requested by ' + esc(d.requested_by) : ''}</span>
+          <span style="display:block;margin-top:4px">${RequestEdit.btn('nurse_treatments', d.treatment_id)}</span></span></span>
       </label>`;
   }
   function penOf(location) { const i = String(location || '').indexOf('/'); return i === -1 ? '' : String(location).slice(i + 1).trim(); }
@@ -860,7 +865,7 @@
           <div class="nt-head"><span class="nt-id aname">${esc(r.animal_id)}</span>${penBadges(locationText(r))}${catBadge(cat)}${doneBadge}<span class="nt-time">assigned ${esc(assignedAt(r.created_at))}</span></div>
           <div class="nt-sub ameta">${esc(taskLabel)}${r.added_by && r.added_by !== 'Vet team' ? ' \u00B7 requested by ' + esc(r.added_by) : ''}${r.source_task_id ? ' \u00B7 transferred from a vet case' : ''}${r.result_note ? ' \u00B7 result: ' + esc(r.result_note) : ''}</div>
           ${block}</div></div>
-        <div class="nt-actions">${actions}</div>
+        <div class="nt-actions">${actions}${r.done || ['med_label', 'med_chart'].includes(r.task) ? '' : RequestEdit.btn('noga_requests', r.id)}</div>
       </div>`;
   }
   // active tasks first; finished ones (last 24 h) fold away in a collapsible block underneath
@@ -1591,6 +1596,7 @@
   (async function () {
     const { sb: client } = await OpsCore.init({ page: 'nurses', gateRole: 'nurse' });
     sb = client;
+    RequestEdit.init(sb, loadAll);   // Edit button on every request card
     // ONE request card for the whole page (not one per nurse column): a nurse asks the vets or the Behaviour team for something.
     // It has no initials box of its own: it uses the Welfare nurse initials (or the Processing nurse initials if only those are filled in).
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });
