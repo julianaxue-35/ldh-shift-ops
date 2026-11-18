@@ -14,7 +14,7 @@ const ago = ms => new Date(Date.now() - ms).toISOString();
     const prompts = [];
     await a.page.evaluate(() => { window.__prompts = []; window.prompt = (m) => { window.__prompts.push(m); return null; }; });
     t.ok(await a.page.locator('#initials-box').count() === 0, 'the old shared sidebar initials box is gone');
-    t.ok(await a.page.locator('#welfare-col #initials-welfare').count() === 1 && await a.page.locator('#processing-col #initials-processing').count() === 1, 'each column has its own initials box');
+    t.ok(await a.page.locator('main .page-head #initials-welfare').count() === 1 && await a.page.locator('main .page-head #initials-processing').count() === 1, 'the Welfare and Processing initials boxes both sit in the top bar on desktop (the sidebar on a phone), one each');
 
     /* each column stamps its own nurse, with no prompt */
     await a.page.fill('#initials-welfare', 'ab');

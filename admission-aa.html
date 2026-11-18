@@ -201,6 +201,11 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <div class="ini-box ini-side" data-ini>
+      <label for="aa-my-initials"><span class="ini-long">Your initials (kept on this device today)</span><span class="ini-short">Initials:</span></label>
+      <input id="aa-my-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" aria-label="Initials initials">
+    </div>
+    <p class="hint" style="margin:0 0 12px;">Initials are saved on every card you tick off; Surgery notes show them as &ldquo;Paperwork by&rdquo;.</p>
     <p class="hint">Enter each item in ShelterMate, then tick it off here. Ticked items move to Completed, where you can put them back for 7 days. Anything left waiting for 24 hours turns red.</p>
     <p class="hint" id="aa-session-count" style="margin-top:14px;"></p>
     <span id="signout-link">Sign out</span>
@@ -213,6 +218,7 @@
     <div class="page-head">
       <div><h1>Admission AA</h1><p>Sent by the nurses. Enter in ShelterMate, then tick off.</p></div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span data-ini-slot style="display:contents;"></span>
         <span id="aa-overdue-count" class="lvl lvl-red" style="display:none;"></span>
         <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
         <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
@@ -220,8 +226,6 @@
     </div>
     <p id="aa-load-error" class="oc-modal-error" style="display:none;">Could not refresh just now. What you see may be out of date — check your connection.</p>
     <div id="aa-on-duty" style="margin:14px 0 0; font-size:0.9rem;"></div>
-    <div style="margin:10px 0 0; font-size:0.9rem;"><label for="aa-my-initials"><b>Your initials</b> (saved on every card you tick off; Surgery notes show them as &ldquo;Paperwork by&rdquo;)</label>
-      <input id="aa-my-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="max-width:110px; margin-left:8px; text-transform:uppercase;"></div>
     <div id="aa-priority-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#fff; border:2px solid #c0392b; color:#c0392b; font-weight:800;"></div>
     <div id="aa-overdue-banner" role="alert" style="display:none; margin:14px 0 0; padding:12px 16px; border-radius:12px; background:#c0392b; color:#fff; font-weight:700;"></div>
     <h2 style="margin:18px 0 10px;">To enter in ShelterMate</h2><div id="aa-list"></div>
@@ -451,7 +455,7 @@
     const btn = e.target.closest('.aa-done'); if (!btn) return;
     const it = ITEMS.find(x => x.id === btn.dataset.id);
     if (!it) return;
-    if (it.kind === 'surgery_note' && !myInitials()) { alert('Type your initials in the box at the top of the page first, so they go on the Surgery note as "Paperwork by".'); document.getElementById('aa-my-initials').focus(); return; }
+    if (it.kind === 'surgery_note' && !myInitials()) { alert('Type your initials in the box at the top left first, so they go on the Surgery note as "Paperwork by".'); document.getElementById('aa-my-initials').focus(); return; }
     const question = it.kind === 'med_chart'
       ? 'Have you printed the medication chart for ' + it.animal_ids.join(', ') + '?'
       : 'Have you entered ' + it.animal_ids.join(', ') + ' in ShelterMate?';

@@ -194,8 +194,10 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <label style="font-size:0.78rem; color: var(--sidebar-text-muted);">Your initials (kept on this device today)</label>
-    <input id="vet-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" style="margin-bottom:12px;">
+    <div class="ini-box ini-side" data-ini>
+      <label for="vet-initials"><span class="ini-long">Your initials (kept on this device today)</span><span class="ini-short">Initials:</span></label>
+      <input id="vet-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" aria-label="Initials initials">
+    </div>
     <p class="hint">
       Case queue, medication hand-off and treatment requests for the vet
       team. Clinical detail stays in the offline shift tools.
@@ -219,6 +221,7 @@
         <p>Pick up, complete and hand off cases; request treatments and nurse tasks; start a shift.</p>
       </div>
       <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <span data-ini-slot style="display:contents;"></span>
         <input id="search-box" placeholder="Search animal ID..." autocomplete="off" style="margin:0; width:220px;">
         <button type="button" class="faq-btn" id="faq-btn" aria-expanded="false" aria-controls="faq-panel">❓ FAQ</button>
         <button type="button" id="sound-chip" class="sound-off">🔕 Tap here to turn on the alert sound</button>
