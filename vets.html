@@ -1078,6 +1078,11 @@
     // a request that asked for a microchip / UV check opens with that task already chosen
     const need = (/^Needs (microchip|UV|treatment)/i.exec(t.problem || '') || [])[1];
     if (t.needs_medication) document.querySelector('.transfer-modal-overlay .transfer-task').value = 'dispense';
+    if (Array.isArray(t.group_animals) && t.group_animals.length) {   // a rescue group: the whole bundle goes to the nurses in one go
+      const ov = document.querySelector('.transfer-modal-overlay'), sel = ov.querySelector('.transfer-task');
+      const prev = sel.previousElementSibling; if (prev) prev.style.display = 'none'; sel.style.display = 'none';
+      ov.querySelector('p').innerHTML = 'Transfers the <b>whole rescue group</b> (' + t.group_animals.length + ' animals) to the nurses in one go. The Processing nurse gets one request for each kind of check, listing every animal and where it is, and the case leaves the vet board.';
+    }
     if (need) document.querySelector('.transfer-modal-overlay .transfer-task').value = /microchip/i.test(need) ? 'microchip' : /treatment/i.test(need) ? 'treatment' : 'uv';
   }
   document.addEventListener('change', (e) => {
@@ -1098,6 +1103,23 @@
     if (!t) { overlay.remove(); return; }
     const who = vetInitFrom(overlay.querySelector('.transfer-initials')); if (!who) { alert('Enter your initials, so the nurse can see who asked.'); overlay.querySelector('.transfer-initials').focus(); return; }
     ok.disabled = true;
+    if (Array.isArray(t.group_animals) && t.group_animals.length) {   // rescue group -> nurse requests, one per kind of check
+      const by = new Map();
+      t.group_animals.filter(a => a.kinds && a.kinds.length).forEach(a => { const k = a.kinds.length === 2 ? 'microchip_uv' : a.kinds[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
+      if (!by.size) { ok.disabled = false; alert('No microchip or UV check was asked for on this group, so there is nothing to hand to the nurses as a bundle. Transfer the animals one at a time instead.'); return; }
+      const typedG = overlay.querySelector('.transfer-note').value.trim();
+      for (const [kind, list] of by) {
+        const ll = Array.from(new Set(list.map(a => a.location)));
+        const { error } = await sb.from('nurse_requests').insert(Object.assign({
+          kind, due_window: '2h', location: ll.length === 1 ? ll[0] : 'Various', species: list[0].species === 'dog' ? 'dog' : 'cat', animal_count: list.length, animal_id: list.map(a => a.id).join(', '),
+          arrived_at: new Date().toISOString(), created_by: 'Vet team (' + who + ')', note: typedG || 'Rescue group, from a vet case'
+        }, list.length === 1 ? {} : { animals: list.map(a => ({ id: a.id, location: a.location, done: false })) }));
+        if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
+      }
+      const { error: cErr } = await sb.from('tasks').update({ done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString(), note: 'Rescue group transferred to nurse' }).eq('id', t.id);
+      if (cErr) alert('The nurse requests were created, but the case could not be closed here: ' + cErr.message);
+      overlay.remove(); OpsCore.toast(); loadAll(); return;
+    }
     const task = overlay.querySelector('.transfer-task').value;
     const typed = overlay.querySelector('.transfer-note').value.trim();
     // a medication request needs the label (or how much to dispense) in the note, so the nurse never gets an empty card

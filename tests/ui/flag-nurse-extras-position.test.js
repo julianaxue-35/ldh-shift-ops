@@ -11,7 +11,7 @@ const t = require('./check')('flag-nurse-extras-position');
     t.ok(await y('#req-nurse-extras') > await y('#req-pen') && await y('#req-nurse-extras') < await y('#req-signs-wrap'), 'it sits between the pen box and the signs');
     t.ok(await y('#req-nurse-extras') < await y('#req-problem'), 'and above the symptoms box');
     t.ok((await page.getAttribute('#req-title', 'placeholder')).includes('Several'), 'the Animal ID box says several animals can be entered');
-    await page.fill('#req-title', '1170123, 1170124 - 1170125'); await page.check('#req-x-microchip'); await page.check('#req-x-uv');
+    await page.selectOption('#req-type', 'foster'); await page.fill('#req-title', '1170123, 1170124 - 1170125'); await page.check('#req-x-microchip'); await page.check('#req-x-uv');
     await page.click('#req-submit'); await page.waitForTimeout(500);
     const r = (await db()).nurse_requests;
     t.ok(r.length === 3 && r.every(x => x.kind === 'microchip_uv'), 'three animals entered at once give three microchip + UV requests: ' + r.map(x => x.animal_id).join(','));

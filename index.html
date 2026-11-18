@@ -419,6 +419,11 @@
           <label style="display:flex; align-items:center; gap:8px; margin:0; font-size:0.95rem; font-weight:700;">Nurse needed within <select id="req-x-window" style="margin:0; width:auto; font-size:1rem;" aria-label="Needed within"><option value="2h">Within 2 hours</option><option value="24_48h">Within 24–48 hours</option></select></label>
         </div>
       </div>
+          <div id="req-group" class="sr-wide" style="display:none; margin:0; padding:14px 16px; border:2px solid var(--violet, #7c5cbf); border-radius:12px;">
+            <div style="font-size:1rem; font-weight:800; margin-bottom:4px;">Rescue group: <span id="req-group-n">0</span> animals</div>
+            <div style="font-size:0.9rem; color:var(--muted); margin-bottom:10px;">Tick what each animal needs (some may need only a UV check). Leave the space blank to use the one above. This is sent as one request. IDs written in the notes are listed here too: untick any that should not be included.</div>
+            <div id="req-group-rows"></div>
+          </div>
           <label class="sr-span2">Needed within<select id="req-urgency-pick" class="tier-routine">
             <option value="routine">Request check — within 24–48 h</option>
             <option value="urgent">Urgent — within 12–24 h</option>
@@ -583,6 +588,7 @@
       <h3 class="faq-group">Logging requests</h3>
       <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival (microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
       <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Tick the <b>signs you can see</b> (one or more groups; you are flagging signs, not diagnosing), and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
+      <details><summary>A group of rescue animals all need microchip / UV checks. How do I flag them?</summary><div><p>Choose <b>Rescue request</b>, then type all the IDs in the Animal ID box (commas or a range, e.g. <i>1170123, 1170125 - 1170128</i>). A row appears for each animal: set its own space and pen if it is somewhere different, and tick <b>Microchip</b> and/or <b>UV</b> for that animal. It goes as <b>one</b> request: the nurse sees one card listing every animal and ticks them off one by one. If you add notes, a sign or a higher urgency, the group goes to the vets as one case instead, and the vet can hand the whole group to the nurses in one go with <b>Transfer to nurse</b>. A photo can only go with one animal.</p></div></details>
       <details><summary>Can I add a photo to a flag?</summary><div><p>Yes. In <b>Send a request</b>, press <b>Take / add a photo</b> under Notes. On a phone this opens the camera. One photo per animal (not for a litter range). The vets see it with a <b>Photo</b> button on the case, and it is <b>deleted as soon as the case is finished</b>. The flag itself stays on record.</p></div></details>
       <details><summary>What do the tiers mean?</summary><div><p><b>Emergency</b> (any emergency sign ticked): vets aim to respond within 2–4 hours. <b>Urgent</b>: within 12–24 hours. <b>Request checks</b> (routine): within 24–48 hours. A vet can bump a routine case up to Urgent.</p><p>For a true emergency, <b>radio the vet — don't wait for the board</b>. An urgent cat birthing check goes straight to the top of the vet board.</p></div></details>
       <details><summary>I flagged the same animal twice — what happens?</summary><div><p>If the earlier case is still open you'll be told it is already on the board. If it was finished, it is reopened as a fresh flag and the earlier flag is remembered in its history.</p></div></details>
@@ -694,18 +700,66 @@
     try { setPhoto(await OpsCore.resizePhoto(f)); } catch (err) { alert(err.message || 'That photo could not be used.'); setPhoto(null); }
   });
 
+  /* ---- rescue group (2026-11-18): several animals on ONE rescue request, each with its own space and its own checks ---- */
+  const GROUP = new Map();   // id -> { include, room, pen, chip, uv }  (kept while the ID / notes boxes change)
+  const GROUP_IDS_IN_NOTES = /\b[A-Za-z]?\d{6,8}\b/g;
+  function groupCandidates() {
+    if (document.getElementById('req-type').value !== 'rescue') return [];
+    const typed = LDHLogic.expandAnimalIds(document.getElementById('req-title').value);
+    const ids = typed.error ? [] : typed.ids.slice();
+    const fromNotes = Array.from(new Set((document.getElementById('req-problem').value.match(GROUP_IDS_IN_NOTES) || []).map(x => x.toUpperCase()))).filter(x => !ids.includes(x));
+    return ids.map(id => ({ id, notes: false })).concat(fromNotes.map(id => ({ id, notes: true })));
+  }
+  function renderGroup() {
+    const cands = groupCandidates(), on = cands.length > 1;
+    const box = document.getElementById('req-group');
+    box.style.display = on ? '' : 'none';
+    // in a group the checks are ticked per animal, so the two single-animal ticks step aside
+    ['req-x-microchip', 'req-x-uv'].forEach(id => { document.getElementById(id).closest('label').style.display = on ? 'none' : ''; });
+    if (!on) return;
+    cands.forEach(c => { if (!GROUP.has(c.id)) GROUP.set(c.id, { include: true, room: '', pen: '', chip: document.getElementById('req-x-microchip').checked, uv: document.getElementById('req-x-uv').checked }); });
+    document.getElementById('req-group-n').textContent = cands.filter(c => GROUP.get(c.id).include).length;
+    const spaces = '<option value="">Same as above</option>' + LDHLogic.LOCATIONS.map(l => `<option>${esc(l)}</option>`).join('');
+    document.getElementById('req-group-rows').innerHTML = cands.map(c => { const g = GROUP.get(c.id);
+      return `<div class="grp-row" data-gid="${esc(c.id)}" style="display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; padding:8px 0; border-top:1px solid var(--border);">
+        <label style="display:flex; align-items:center; gap:6px; margin:0; font-weight:800; min-width:140px;"><input type="checkbox" data-g="include" ${g.include ? 'checked' : ''} style="width:20px;height:20px;"> ${esc(c.id)}${c.notes ? ' <span class="subtle" style="font-weight:600;">(from notes)</span>' : ''}</label>
+        <select data-g="room" style="margin:0; width:auto;" aria-label="Space for ${esc(c.id)}">${spaces.replace('<option>' + esc(g.room) + '</option>', '<option selected>' + esc(g.room) + '</option>')}</select>
+        <input data-g="pen" value="${esc(g.pen)}" placeholder="Pen # / detail" maxlength="40" style="margin:0; width:130px;" aria-label="Pen for ${esc(c.id)}">
+        <label class="req-x-opt" style="padding:6px 10px; font-size:0.95rem;"><input type="checkbox" data-g="chip" ${g.chip ? 'checked' : ''}> Microchip</label>
+        <label class="req-x-opt" style="padding:6px 10px; font-size:0.95rem;"><input type="checkbox" data-g="uv" ${g.uv ? 'checked' : ''}> UV</label></div>`; }).join('');
+  }
+  document.getElementById('req-group-rows').addEventListener('input', (e) => {
+    const row = e.target.closest('.grp-row'), f = e.target.dataset && e.target.dataset.g; if (!row || !f) return;
+    const g = GROUP.get(row.dataset.gid); if (!g) return;
+    if (f === 'include' || f === 'chip' || f === 'uv') g[f] = e.target.checked; else g[f] = e.target.value;
+    if (f === 'include') document.getElementById('req-group-n').textContent = Array.from(GROUP.entries()).filter(([id, v]) => v.include && groupCandidates().some(c => c.id === id)).length;
+  });
+  ['req-title', 'req-problem'].forEach(id => document.getElementById(id).addEventListener('input', renderGroup));
+  document.getElementById('req-type').addEventListener('change', renderGroup);
+  // Included animals of the group, each with its place text and its checks. [] when this is not a group.
+  function groupRows() {
+    const cands = groupCandidates().filter(c => GROUP.get(c.id) && GROUP.get(c.id).include);
+    if (groupCandidates().length < 2 || cands.length < 1) return [];
+    const room0 = document.getElementById('req-location').value, pen0 = document.getElementById('req-pen').value.trim(), det0 = document.getElementById('req-location-detail').value.trim();
+    const place = (room, pen) => LDHLogic.OFFSITE_NAMES.includes(room) ? (pen ? room + ' — ' + pen : room) : (pen ? room + ' / ' + pen : room);
+    return cands.map(c => { const g = GROUP.get(c.id);
+      const loc = g.room ? place(g.room, g.pen.trim()) : (g.pen.trim() ? place(room0, g.pen.trim()) : place(room0, LDHLogic.OFFSITE_NAMES.includes(room0) ? det0 : pen0));
+      return { id: c.id, location: loc, kinds: [g.chip ? 'microchip' : '', g.uv ? 'uv' : ''].filter(Boolean) }; });
+  }
+
   document.getElementById('req-submit').addEventListener('click', async () => {
     // 2026-10-19: a litter can be typed as a range ("1170123 - 1170130" or "1170123,124,126 - 130"): every animal
     // in it gets its own request, so nurses and vets see individual numbers.
     const expanded = LDHLogic.expandAnimalIds(document.getElementById('req-title').value);
     if (expanded.error) { alert(expanded.error); return; }
-    const ids = expanded.ids;
+    const gRows = groupRows(), isGroup = gRows.length > 1;   // a rescue request for several animals goes as ONE request
+    const ids = isGroup ? gRows.map(r => r.id) : expanded.ids;
     if (!ids.length) return;
     // 2026-11-18: other animal IDs written in the Notes box (6-8 digits, e.g. "same as 1170125 and 1170126") can become their own requests too.
     const inNotes = Array.from(new Set((document.getElementById('req-problem').value.match(/\b[A-Za-z]?\d{6,8}\b/g) || []).map(x => x.toUpperCase()))).filter(x => !ids.includes(x));
-    if (inNotes.length && confirm('The notes mention other animal IDs: ' + inNotes.join(', ') + '.\n\nOK = also create a separate request for each of them.\nCancel = only the animal(s) in the Animal ID box.')) inNotes.forEach(x => ids.push(x));
+    if (!isGroup && inNotes.length && confirm('The notes mention other animal IDs: ' + inNotes.join(', ') + '.\n\nOK = also create a separate request for each of them.\nCancel = only the animal(s) in the Animal ID box.')) inNotes.forEach(x => ids.push(x));
     if (PHOTO_BLOB && ids.length > 1) { alert('A photo can only go with one animal. Remove the photo, or flag the animals one at a time.'); return; }
-    if (ids.length > 1 && !confirm(ids.length + ' animals: ' + ids.join(', ') + '.\n\nCreate a separate request for each one?')) return;
+    if (!isGroup && ids.length > 1 && !confirm(ids.length + ' animals: ' + ids.join(', ') + '.\n\nCreate a separate request for each one?')) return;
     // The Animal ID she types IS the SM number at LDH — there's no separate
     // number to enter (2026-09-26: she found the extra box redundant/
     // confusing next to the ID field right above it).
@@ -821,8 +875,45 @@
       return true;
     }
 
+    // One rescue request for several animals: ONE nurse request per kind of check (each lists its animals and where they are),
+    // or ONE vet case for the whole group when the notes / signs / urgency need a vet. Treatment checks stay one task per animal.
+    async function submitGroup() {
+      const spc = document.getElementById('req-x-species').value, animals = gRows.map(a => Object.assign({}, a, { species: spc })), GK = { microchip: 'microchip', uv: 'UV check' };
+      const needsVetG = allFlags().length > 0 || signs.length > 0 || !!baseRow.problem || document.getElementById('req-urgency-pick').value !== 'routine' || (animals.every(a => !a.kinds.length) && !wantTreatment);
+      if (PHOTO_BLOB) { alert('A photo can only go with one animal. Remove the photo, or flag the animals one at a time.'); return false; }
+      if (!needsVetG && animals.some(a => !a.kinds.length) && !wantTreatment) { alert('Tick Microchip and/or UV for every animal in the group (or untick the ones that are not needed).'); return false; }
+      const locs = Array.from(new Set(animals.map(a => a.location))), groupLoc = locs.length === 1 ? locs[0] : 'Various';
+      const missing = (m) => /animals|group_animals|schema cache/i.test(m || '') ? 'the database needs migration 0051 (rescue groups) run first.' : m;
+      if (needsVetG) {
+        const list = animals.map(a => a.id + ' (' + a.location + (a.kinds.length ? '; ' + a.kinds.map(k => GK[k]).join(' + ') : '') + ')').join(', ');
+        const row = Object.assign({}, baseRow, { title: animals[0].id, location: groupLoc, location_detail: null, sm_number: null, group_animals: animals,
+          problem: ['Rescue group of ' + animals.length + ' animals: ' + list, baseRow.problem].filter(Boolean).join(' — ') });
+        const { error } = await sb.from('tasks').insert(row);
+        if (error) { alert('Could not submit the group: ' + missing(error.message)); return false; }
+      } else {
+        const by = new Map();
+        animals.filter(a => a.kinds.length).forEach(a => { const k = a.kinds.length === 2 ? 'microchip_uv' : a.kinds[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
+        for (const [kind, list] of by) {
+          const one = list.length === 1, ll = Array.from(new Set(list.map(a => a.location)));
+          const { error } = await sb.from('nurse_requests').insert(Object.assign({
+            kind, due_window: document.getElementById('req-x-window').value, location: ll.length === 1 ? ll[0] : 'Various', species: document.getElementById('req-x-species').value,
+            animal_count: list.length, animal_id: list.map(a => a.id).join(', '), arrived_at: new Date().toISOString(), created_by: 'Shelter Staff', note: TYPE_LABELS[reqType]
+          }, one ? {} : { animals: list.map(a => ({ id: a.id, location: a.location, done: false })) }));
+          if (error) { alert('The ' + KIND_NAMES[kind] + ' request could not be saved: ' + missing(error.message)); return false; }
+        }
+      }
+      if (wantTreatment) {
+        for (const a of animals) {
+          const { error: trErr } = await sb.from('noga_requests').insert({ animal_id: a.id, location: a.location, location_detail: null, task: 'treatment', note: TYPE_LABELS[reqType], added_by: 'Shelter Staff' });
+          if (trErr) alert('The treatment check for ' + a.id + ' could not be saved: ' + trErr.message);
+        }
+      }
+      return true;
+    }
+
     let allOk = true;
-    for (const title of ids) { if (!(await submitOne(title))) allOk = false; }
+    if (isGroup) allOk = await submitGroup();
+    else for (const title of ids) { if (!(await submitOne(title))) allOk = false; }
     btn.disabled = false;
     if (!allOk) return;
     OpsCore.toast();
@@ -838,6 +929,7 @@
     document.getElementById('req-nurse-extras').style.display = 'none';
     ['req-x-microchip', 'req-x-uv', 'req-x-treatment', 'req-x-medplan'].forEach(id => { document.getElementById(id).checked = false; });
     document.getElementById('req-x-window').value = '2h';
+    GROUP.clear(); renderGroup();
     document.getElementById('req-birthing-wrap').style.display = 'none';
     document.getElementById('req-birthing-reason').value = '';
     document.querySelectorAll('.req-flag').forEach(cb => { cb.checked = false; });

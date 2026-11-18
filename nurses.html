@@ -654,9 +654,33 @@
   // arrived_at yet: show a countdown/overdue state and just a "Mark
   // arrived" button, not the progress actions, which only make sense once
   // the animal is actually here.
+  // A rescue group (migration 0051): one request listing several animals, each with its own place, ticked off one by one.
+  function isGroupReq(r) { return Array.isArray(r.animals) && r.animals.length > 0; }
+  function groupListHtml(r) {
+    if (!isGroupReq(r)) return '';
+    const aa = ['microchip', 'uv', 'microchip_uv'].includes(r.kind);
+    return `<div class="grp-list" style="margin-top:8px;">${r.animals.map((a, i) => `<div class="grp-item" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:5px 0; border-top:1px solid var(--border);">
+      <label style="display:flex; align-items:center; gap:8px; margin:0; font-weight:700; cursor:pointer;"><input type="checkbox" class="nr-animal-tick" data-id="${esc(r.id)}" data-i="${i}" ${a.done ? 'checked' : ''} style="width:20px; height:20px;"> <span${a.done ? ' style="text-decoration:line-through; opacity:.6;"' : ''}>${esc(a.id)}</span></label>
+      ${penBadges(a.location)}
+      ${aa && !a.done ? `<button class="secondary aa-prefill" style="padding:4px 10px; font-size:0.78rem;" data-kind="${esc(r.kind)}" data-ids="${esc(a.id)}" data-src="nr" data-rid="${esc(r.id)}" data-gi="${i}">Send to AA</button>` : ''}</div>`).join('')}</div>`;
+  }
+  // Ticks one animal of a group on or off (done_count follows; the request closes when every animal is done).
+  async function setGroupAnimalDone(r, i, done) {
+    const animals = r.animals.map((a, j) => j === i ? Object.assign({}, a, { done }) : a);
+    const n = animals.filter(a => a.done).length;
+    const { error } = await sb.from('nurse_requests').update({ animals, done_count: n, completed_at: n >= r.animal_count ? new Date().toISOString() : null }).eq('id', r.id);
+    return error ? error.message : '';
+  }
+  document.getElementById('nr-list').addEventListener('change', async (e) => {
+    const cb = e.target.closest('.nr-animal-tick'); if (!cb) return;
+    const r = NURSE_REQUESTS.find(x => x.id === cb.dataset.id); if (!r || !isGroupReq(r)) return;
+    const m = await setGroupAnimalDone(r, parseInt(cb.dataset.i, 10), cb.checked);
+    if (m) alert('Could not save the tick: ' + m);
+    loadAll();
+  });
   function reqHead(r) {
     const k = nurseReqKind(r), cat = catOf(REQ_CAT, r.kind);
-    return `<div class="nt-head"><span class="nt-id aname">${r.animal_id ? esc(r.animal_id) : r.animal_count + ' ' + esc(r.species) + (r.animal_count > 1 ? 's' : '')}</span>${penBadges(r.location)}${catBadge(cat)}</div>
+    return `<div class="nt-head"><span class="nt-id aname">${Array.isArray(r.animals) && r.animals.length ? r.animals.length + ' animals (rescue group)' : r.animal_id ? esc(r.animal_id) : r.animal_count + ' ' + esc(r.species) + (r.animal_count > 1 ? 's' : '')}</span>${Array.isArray(r.animals) && r.animals.length ? '' : penBadges(r.location)}${catBadge(cat)}</div>
       <div class="nt-sub ameta" style="margin-top:2px">${nurseReqTitle(r)}</div>`;
   }
   function scheduledRowHtml(r) {
@@ -676,15 +700,15 @@
     return `<div class="attn-item nr-item nt-card ${esc(catOf(REQ_CAT, r.kind)[1])}${st.level === 'red' ? ' overdue' : ''}">
       <div class="nt-main">${rowPickBox('nr', r, 'processing', r.kind === 'uv' && !!r.animal_id)}<div class="nt-body">${reqHead(r)}
         <div class="nt-sub ameta">arrived ${fmtTime(r.arrived_at)} \u00B7 <b>${r.done_count} of ${r.animal_count} ${k.doneVerb}</b>${r.claimed_by ? ' \u00B7 claimed by ' + esc(r.claimed_by) : ''}${r.note ? ' \u00B7 ' + esc(r.note) : ''}</div>
-        <div class="nt-progress" aria-hidden="true"><i style="width:${pct}%"></i></div></div></div>
+        <div class="nt-progress" aria-hidden="true"><i style="width:${pct}%"></i></div>${groupListHtml(r)}</div></div>
       <div class="nt-actions">
         <span class="lvl lvl-${esc(st.level)}">${esc(st.label)}</span>
         <button class="secondary nr-claim" data-id="${esc(r.id)}">${r.claimed_by ? 'Release' : 'Pick up'}</button>
-        ${r.animal_id && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}" data-src="nr" data-rid="${esc(r.id)}">Send to AA</button>` : ''}
-        ${r.animal_id && ['microchip', 'microchip_uv', 'vaccination'].includes(r.kind) ? `<button class="secondary bh-send" data-src="nr" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}
-        ${RequestEdit.btn('nurse_requests', r.id)}
+        ${r.animal_id && !isGroupReq(r) && ['fiv', 'microchip', 'uv', 'microchip_uv'].includes(r.kind) ? `<button class="secondary aa-prefill" data-kind="${esc(r.kind)}" data-ids="${esc(r.animal_id)}" data-src="nr" data-rid="${esc(r.id)}">Send to AA</button>` : ''}
+        ${r.animal_id && !isGroupReq(r) && ['microchip', 'microchip_uv', 'vaccination'].includes(r.kind) ? `<button class="secondary bh-send" data-src="nr" data-rid="${esc(r.id)}">Send to behaviour</button>` : ''}
+        ${isGroupReq(r) ? '' : RequestEdit.btn('nurse_requests', r.id)}
         <button class="secondary nr-back" data-id="${esc(r.id)}">Send back to vet</button>
-        <button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>
+        ${isGroupReq(r) ? '' : `<button class="secondary nr-plus" data-id="${esc(r.id)}">${esc(k.plusLabel)}</button>`}
         <button class="go nr-all" data-id="${esc(r.id)}">All done</button>
       </div></div>`;
   }
@@ -715,7 +739,7 @@
   // Marks one task done the way its own Done button would. Returns an error message or ''.
   async function markTaskDone(p, initials, nowISO) {
     const res = p.src === 'nr'
-      ? await sb.from('nurse_requests').update({ done_count: (NURSE_REQUESTS.find(x => x.id === p.id) || {}).animal_count || 1, completed_at: nowISO }).eq('id', p.id)
+      ? await sb.from('nurse_requests').update(Object.assign({ done_count: (NURSE_REQUESTS.find(x => x.id === p.id) || {}).animal_count || 1, completed_at: nowISO }, isGroupReq(NURSE_REQUESTS.find(x => x.id === p.id) || {}) ? { animals: NURSE_REQUESTS.find(x => x.id === p.id).animals.map(a => Object.assign({}, a, { done: true })) } : {})).eq('id', p.id)
       : await sb.from('noga_requests').update({ done: true, done_by: initials, done_at: nowISO }).eq('id', p.id);
     return res.error ? res.error.message : '';
   }
@@ -781,6 +805,7 @@
       patch = { done_count: n, completed_at: n >= r.animal_count ? new Date().toISOString() : null };
     } else if (btn.classList.contains('nr-all')) {
       patch = { done_count: r.animal_count, completed_at: new Date().toISOString() };
+      if (isGroupReq(r)) patch.animals = r.animals.map(a => Object.assign({}, a, { done: true }));
     }
     if (!patch) return;
     const { error } = await sb.from('nurse_requests').update(patch).eq('id', r.id);
@@ -1265,14 +1290,14 @@
         </div>
       </div>`;
     const overlay = wrap.firstElementChild;
-    overlay._ctx = { kind, animal, src, task, wantResult };
+    overlay._ctx = { kind, animal, src, task, wantResult, gi: b.dataset.gi == null ? null : parseInt(b.dataset.gi, 10) };
     document.body.appendChild(overlay);
   }
   document.addEventListener('click', async (e) => {
     const open = e.target.closest('.aa-prefill'); if (open) { openAaModal(open); return; }
     const cancel = e.target.closest('.aa-m-cancel'); if (cancel) { cancel.closest('.aa-modal-overlay').remove(); return; }
     const ok = e.target.closest('.aa-m-send'); if (!ok) return;
-    const overlay = ok.closest('.aa-modal-overlay'), { kind, animal, src, task, wantResult } = overlay._ctx;
+    const overlay = ok.closest('.aa-modal-overlay'), { kind, animal, src, task, wantResult, gi } = overlay._ctx;
     const err = overlay.querySelector('.aa-m-error');
     const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
     const val = c => { const x = overlay.querySelector(c); return x ? x.value.trim() : ''; };
@@ -1285,7 +1310,10 @@
     ok.disabled = true;
     const { error } = await sb.from('aa_items').insert(built.row);
     if (error) { ok.disabled = false; return fail('Could not send: ' + error.message); }
-    if (task) {
+    if (task && gi != null && isGroupReq(task)) {   // one animal of a rescue group: tick just that animal
+      const m = await setGroupAnimalDone(task, gi, true);
+      if (m) alert('The result was sent to the Admission AA, but the animal could not be ticked off here: ' + m + '. Tick it off yourself.');
+    } else if (task) {
       const m = await markTaskDone({ src: src.src, id: src.id }, initials, new Date().toISOString());
       if (m) alert('The result was sent to the Admission AA, but the task could not be marked done here: ' + m + '. Tick it off yourself.');
     }
