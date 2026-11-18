@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js?v=20261113a"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
 <script src="lib/send-card.js?v=20261111a"></script>
+<script src="lib/request-edit.js?v=20261118a"></script>
 <script src="lib/trend-chart.js"></script>
 <script src="lib/fsa.js"></script>
 <script src="lib/fir-panel.js?v=20261109c"></script>
@@ -244,6 +245,7 @@
       <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
       <h3 class="faq-group">Working your board</h3>
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
+      <details><summary>A request has the wrong location. Can I fix it?</summary><div><p>Yes. Press <b>Edit</b> on the request card, change the space, pen or reason, and press <b>Save changes</b>. Anyone on the dashboard can do this.</p></div></details>
       <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, season and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
       <details><summary>Who sees my Done note?</summary><div><p>The team that asked. A task given to you from the Vets page (or a vet&rsquo;s Send to Behaviour button) shows your note on the <b>Vets page</b>; one from the Nurses page shows it on the <b>Nurses page</b>; each rings when you tick Done. The Shelter board shows it against the animal too. So write the plan clearly: what you found and what should happen next. Tasks from the shelter staff page are only shown on the Shelter board.</p></div></details>
       <details><summary>How do I answer a task, or ask the vets to do something (e.g. start medication)?</summary><div><p>Press <b>Done</b> on the card and write your <b>comment</b>. Then choose: <b>Mark done</b> (the comment goes back to the vets and the Shelter board) or <b>Request a task back to the vets</b> (pick shelter stress medication, post adoption med pack or other, how soon: <b>Emergency</b> 2&ndash;4 h, <b>Urgent</b> 12&ndash;24 h or <b>Request check</b> 24&ndash;48 h, and add details). The request goes to the vet board with your comment, this task is finished, and the request shows under <b>Requested from the vets</b> on this page until a vet completes it, then moves to <b>Done by the vets</b> with the vet&rsquo;s treatment and plan.</p></div></details>
@@ -356,6 +358,7 @@
       <div class="bh-actions">
         <select class="bh-move"><option value="">${r.lane === 'incoming' ? 'Assign to…' : 'Move to…'}</option>${choices.map(l => `<option value="${l}">${esc(LDHLogic.BEHAVIOUR_LANES[l])}</option>`).join('')}</select>
         ${r.attached_note ? '<button type="button" class="bh-note">Medical note from vets</button>' : ''}
+        ${RequestEdit.btn('behaviour_tasks', r.id)}
         <button type="button" class="bh-done">Done</button>
       </div></div>`;
   }
@@ -376,7 +379,7 @@
     const head = (t, tail) => { const tier = LDHLogic.normTier(t.urgency);
       return `<div class="aname" style="font-size:0.9rem;"><b>${esc(t.title)}</b> <span class="meta">${esc(t.location)} · ${esc(LDHLogic.TIER_LABELS[tier])} ${esc(LDHLogic.TIER_TARGETS[tier])} · sent ${esc(hm(t.created_at))}${tail}</span></div>`; };
     const openHtml = openR.map(t => `<div style="padding:8px 0; border-top:1px solid var(--border);">${head(t, t.claimed_by ? ' · picked up by ' + esc(t.claimed_by) : ' · waiting for a vet')}
-        <div class="bh-reason">${esc(t.problem || '')}</div></div>`).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
+        <div class="bh-reason">${esc(t.problem || '')}</div><div style="margin-top:4px">${RequestEdit.btn('tasks', t.id, 'Edit location')}</div></div>`).join('') || '<p class="empty-state">Nothing waiting on the vets.</p>';
     const doneHtml = doneR.length ? `<h3 style="font-size:0.85rem; margin:14px 0 4px;">Done by the vets (last 24 h)</h3>` + doneR.map(t => `<div style="padding:8px 0; border-top:1px solid var(--border);">${head(t, ' · <b>done</b>' + (t.completed_at ? ' at ' + esc(hm(t.completed_at)) : ''))}
         <div class="bh-reason">${esc(t.problem || '')}</div>${line('Treatment', t.treatment)}${line('Plan', t.plan)}${line('Vet note', t.note)}</div>`).join('') : '';
     $('waiting-list').innerHTML = openHtml + doneHtml;
@@ -551,6 +554,7 @@
   (async function () {
     const { sb: client } = await OpsCore.init({ page: 'behaviour', gateRole: 'behaviour' });
     sb = client;
+    RequestEdit.init(sb, loadAll);   // Edit button on every request card
     $('bh-initials').value = OpsCore.readInitials(INIT_KEY);
     $('app-root').style.display = 'grid';
     // One request card, same as the other pages: here for asking the vets (shelter stress medication, post adoption pack, other).

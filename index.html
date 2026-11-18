@@ -474,6 +474,7 @@
             <option value="vaccination">Vaccination</option>
           </select></label>
           <label>Location / Space<select id="nr-location"></select></label>
+          <label>Pen / Detail #<input id="nr-pen" type="text" maxlength="40" placeholder="Pen # (optional)"></label>
           <label class="nr-grp">Species<select id="nr-species"><option value="cat">Cats</option><option value="dog">Dogs</option></select></label>
           <label class="nr-grp">How many<input id="nr-count" type="number" min="1" value="1"></label>
           <label class="nr-grp">Needed within<select id="nr-window">
@@ -1164,7 +1165,8 @@
       const payload = {
         kind: document.getElementById('nr-kind').value,
         due_window: document.getElementById('nr-window').value,
-        location: document.getElementById('nr-location').value,
+        location: (() => { const room = document.getElementById('nr-location').value, pen = document.getElementById('nr-pen').value.trim();   // "room / pen", like every other request form
+          return !pen ? room : (LDHLogic.OFFSITE_NAMES.indexOf(room) !== -1 ? room + ' \u2014 ' + pen : room + ' / ' + pen); })(),
         species: document.getElementById('nr-species').value,
         animal_count: count,
         note: [document.getElementById('nr-note').value.trim(), window.staffInitials() ? 'sent by ' + window.staffInitials() : ''].filter(Boolean).join(' — ') || null,
@@ -1188,6 +1190,7 @@
       document.getElementById('nr-count').value = '1';
       applyNrDefaultLocation();
       document.getElementById('nr-note').value = '';
+      document.getElementById('nr-pen').value = '';
       setArrivedNow();
       document.getElementById('nr-expected-date').value = ''; document.getElementById('nr-expected-time').value = '';
       document.getElementById('nr-scheduled-toggle').checked = false;
