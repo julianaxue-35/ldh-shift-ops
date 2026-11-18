@@ -184,7 +184,7 @@ const t = require('./check')('flag-form');
   // 2026-11-18: a rescue request for several animals is ONE request (a group), not one per animal
   t.ok(d.tasks.filter(x => ['1180001', '1180002'].includes(x.title)).length === 1 && d.tasks.find(x => x.title === '1180001').group_animals.length === 2 && d.nurse_requests.filter(r => ['1180001', '1180002'].includes(r.animal_id)).length === 0, 'with notes typed a rescue group goes to the vet board as ONE case');
   t.ok(/^Rescue group of 2 animals/.test(d.tasks.find(x => x.title === '1180001').problem) && /sneezing, check on the way/.test(d.tasks.find(x => x.title === '1180001').problem), 'the vet card lists the group and the notes: ' + d.tasks.find(x => x.title === '1180001').problem);
-  t.ok(d.noga_requests.filter(r => ['1180001', '1180002'].includes(r.animal_id) && r.task === 'treatment').length === 2, 'but the treatment check still goes to the nurse per animal: it never needs a vet');
+  t.ok(d.nurse_requests.length >= 1 && d.nurse_requests.some(r => r.kind === 'rescue_group' && r.animals.length === 2 && r.animals.every(a => a.checks.join() === 'treatment')), 'but the treatment checks go straight to the nurses on one grouped card: they never need a vet');
   await page.selectOption('#req-type', 'foster');
   await page.fill('#req-title', '1190010 - 1190001');
   const dlg = []; page.once('dialog', dd => dlg.push(dd.message()));

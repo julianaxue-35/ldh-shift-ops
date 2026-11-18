@@ -888,30 +888,25 @@
       if (noText) { alert('Say what else is needed for ' + noText.id + ' (or untick Other).'); return false; }
       if (!needsVetG && animals.some(a => !a.kinds.length)) { alert('Tick what each animal needs (or untick the animals that are not needed).'); return false; }
       const locs = Array.from(new Set(animals.map(a => a.location))), groupLoc = locs.length === 1 ? locs[0] : 'Various';
-      const missing = (m) => /animals|group_animals|schema cache/i.test(m || '') ? 'the database needs migration 0051 (rescue groups) run first.' : m;
+      const missing = (m) => /animals|group_animals|schema cache|nurse_requests_kind_check/i.test(m || '') ? 'the database needs migration 0051 (rescue groups) run first.' : m;
       if (needsVetG) {
         const list = animals.map(a => a.id + ' (' + a.location + (a.kinds.length ? '; ' + a.kinds.map(k => k === 'other' ? 'other: ' + a.other : GK[k] || k).join(' + ') : '') + ')').join(', ');
         const row = Object.assign({}, baseRow, { title: animals[0].id, location: groupLoc, location_detail: null, sm_number: null, group_animals: animals,
           problem: ['Rescue group of ' + animals.length + ' animals: ' + list, baseRow.problem].filter(Boolean).join(' — ') });
         const { error } = await sb.from('tasks').insert(row);
         if (error) { alert('Could not submit the group: ' + missing(error.message)); return false; }
-      } else {
-        const by = new Map();
-        animals.forEach(a => { const mu = a.kinds.filter(x => x === 'microchip' || x === 'uv'); if (!mu.length) return; const k = mu.length === 2 ? 'microchip_uv' : mu[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
-        for (const [kind, list] of by) {
-          const one = list.length === 1, ll = Array.from(new Set(list.map(a => a.location)));
-          const { error } = await sb.from('nurse_requests').insert(Object.assign({
-            kind, due_window: document.getElementById('req-x-window').value, location: ll.length === 1 ? ll[0] : 'Various', species: document.getElementById('req-x-species').value,
-            animal_count: list.length, animal_id: list.map(a => a.id).join(', '), arrived_at: new Date().toISOString(), created_by: 'Shelter Staff', note: TYPE_LABELS[reqType]
-          }, one ? {} : { animals: list.map(a => ({ id: a.id, location: a.location, done: false })) }));
-          if (error) { alert('The ' + KIND_NAMES[kind] + ' request could not be saved: ' + missing(error.message)); return false; }
-        }
       }
-      // every other request an animal needs (treatment check, bloods, FIV test...) is that animal's own nurse task, as on the single-animal form.
-      // When the group went to the vets only the treatment check goes straight to the nurses (the usual rule); the rest wait for the vet's Transfer.
-      for (const a of animals) for (const k of a.kinds.filter(x => x !== 'microchip' && x !== 'uv' && (!needsVetG || x === 'treatment'))) {
-        const { error: trErr } = await sb.from('noga_requests').insert({ animal_id: a.id, location: a.location, location_detail: null, task: k, note: k === 'other' ? a.other : TYPE_LABELS[reqType], added_by: 'Shelter Staff' });
-        if (trErr) alert('The ' + (GK[k] || k) + ' for ' + a.id + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
+      // ONE nurse card for the whole group: each animal lists its own checks (microchip, UV, treatment check, other). When the group went to the vets
+      // only the treatment checks go straight to the nurses (the usual rule); the rest wait for the vet's Transfer to nurse.
+      const onCard = animals.map(a => ({ a, checks: a.kinds.filter(k => !needsVetG || k === 'treatment') })).filter(x => x.checks.length);
+      if (onCard.length) {
+        const ll = Array.from(new Set(onCard.map(x => x.a.location)));
+        const { error } = await sb.from('nurse_requests').insert({
+          kind: 'rescue_group', due_window: document.getElementById('req-x-window').value, location: ll.length === 1 ? ll[0] : 'Various', species: spc,
+          animal_count: onCard.length, animal_id: onCard.map(x => x.a.id).join(', '), arrived_at: new Date().toISOString(), created_by: 'Shelter Staff', note: TYPE_LABELS[reqType],
+          animals: onCard.map(x => Object.assign({ id: x.a.id, location: x.a.location, checks: x.checks, done: false }, x.checks.includes('other') ? { other: x.a.other } : {}))
+        });
+        if (error) { alert('The nurse request could not be saved: ' + missing(error.message)); return false; }
       }
       return true;
     }

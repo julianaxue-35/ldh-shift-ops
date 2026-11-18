@@ -17,10 +17,10 @@ const t = require('./check')('rescue-group');
     await a.page.selectOption(row('1170302') + '[data-g="room"]', 'Pound 2'); await a.page.fill(row('1170302') + '[data-g="pen"]', '4');
     await a.page.click('#req-submit'); await a.page.waitForTimeout(500);
     const db = await a.db();
-    const uv = db.nurse_requests.find(r => r.kind === 'uv'), both = db.nurse_requests.find(r => r.kind === 'microchip_uv');
-    t.ok(db.nurse_requests.length === 2 && db.tasks.length === 0, 'two nurse requests (UV, microchip + UV), no vet case');
-    t.ok(uv && uv.animal_count === 2 && uv.animals.length === 2 && uv.animals.some(x => x.id === '1170302' && x.location === 'Pound 2 / 4') && uv.location === 'Various', 'the UV request lists both animals with their own places');
-    t.ok(both && both.animal_count === 1 && both.animal_id === '1170303', 'the one that needs both is its own request');
+    const card = db.nurse_requests[0];
+    t.ok(db.nurse_requests.length === 1 && db.tasks.length === 0 && card.kind === 'rescue_group', 'ONE nurse card for the whole group, no vet case');
+    t.ok(card.animal_count === 3 && card.location === 'Various' && card.animals.some(x => x.id === '1170302' && x.location === 'Pound 2 / 4'), 'it lists all three animals with their own places');
+    t.ok(JSON.stringify(card.animals.map(x => x.checks)) === JSON.stringify([['uv'], ['uv'], ['microchip', 'uv']]), 'each animal keeps its own checks: ' + JSON.stringify(card.animals.map(x => x.checks)));
     t.ok(a.errors.length === 0, 'no page errors: ' + a.errors.join('; '));
   } finally { await a.browser.close(); }
   // 2) the nurse ticks animals off one by one
@@ -59,7 +59,7 @@ const t = require('./check')('rescue-group');
     t.ok((await v.page.textContent('.transfer-modal-overlay')).includes('whole rescue group') && !(await v.page.locator('.transfer-task').isVisible()), 'the transfer box says it moves the whole group');
     await v.page.fill('.transfer-initials', 'JX'); await v.page.click('.transfer-confirm'); await v.page.waitForTimeout(500);
     const d = await v.db();
-    t.ok(d.nurse_requests.length === 2 && d.nurse_requests.some(r => r.kind === 'uv' && r.animal_id === '1170601') && d.nurse_requests.some(r => r.kind === 'microchip_uv' && r.animal_id === '1170602'), 'one nurse request per kind of check');
+    t.ok(d.nurse_requests.length === 1 && d.nurse_requests[0].kind === 'rescue_group' && d.nurse_requests[0].animals.length === 2 && JSON.stringify(d.nurse_requests[0].animals[1].checks) === JSON.stringify(['microchip', 'uv']), 'ONE nurse card for the whole bundle, each animal with its own checks');
     t.ok(d.tasks[0].done === true, 'and the vet case is closed');
     t.ok(v.errors.length === 0, 'no page errors: ' + v.errors.join('; '));
   } finally { await v.browser.close(); }
@@ -71,11 +71,27 @@ const t = require('./check')('rescue-group');
     await o.page.check('.grp-row[data-gid="1170701"] [data-k="treatment"]');
     await o.page.check('.grp-row[data-gid="1170702"] [data-k="other"]');
     await o.page.click('#req-submit'); await o.page.waitForTimeout(300);
-    t.ok((await o.db()).noga_requests.length === 0, '"Other" with no text is refused');
+    t.ok((await o.db()).nurse_requests.length === 0, '"Other" with no text is refused');
     await o.page.fill('.grp-row[data-gid="1170702"] [data-g="otherText"]', 'check the ears and weigh'); await o.page.click('#req-submit'); await o.page.waitForTimeout(500);
-    const nq = (await o.db()).noga_requests;
-    t.ok(nq.length === 2 && nq.some(r => r.animal_id === '1170701' && r.task === 'treatment') && nq.some(r => r.animal_id === '1170702' && r.task === 'other' && r.note === 'check the ears and weigh'), 'treatment check and the free-text request become that animal\'s nurse tasks');
+    const g5 = (await o.db()).nurse_requests;
+    t.ok(g5.length === 1 && g5[0].animals.length === 2 && JSON.stringify(g5[0].animals[0].checks) === JSON.stringify(['treatment']) && JSON.stringify(g5[0].animals[1].checks) === JSON.stringify(['other']) && g5[0].animals[1].other === 'check the ears and weigh', 'treatment check and the free-text request ride on the same grouped card');
+    t.ok((await o.db()).noga_requests.length === 0, 'no separate per-animal tasks');
     t.ok(o.errors.length === 0, 'no page errors: ' + o.errors.join('; '));
   } finally { await o.browser.close(); }
+  // 6) transferring a medication request to the nurse: the request text is already in the note box; Tab fills the hint on other requests
+  const m = await open({ tasks: [
+    { id: 'med1', title: '1180801', location: 'Cat Room 1', shift: 'sick_injured', type: 'medication', needs_medication: true, urgency: 'urgent', red_flags: [], done: false, created_at: ago(600e3), sm_number: '1180801', problem: 'Meloxicam 0.5mg/ml 0.2ml SID with food for 5 days', med_label: 'Meloxicam 0.5mg/ml 0.2ml orally once daily with food for 5 days' },
+    { id: 'chk1', title: '1180802', location: 'Cat Room 2', shift: 'sick_injured', type: 'shelter', urgency: 'urgent', red_flags: [], done: false, created_at: ago(600e3), problem: 'Please recheck the eye' }] }, 'vets.html');
+  try {
+    await m.page.waitForSelector('.attn-item .transfer-btn');
+    await m.page.click('.attn-item:has-text("1180801") .transfer-btn'); await m.page.waitForSelector('.transfer-modal-overlay');
+    t.ok((await m.page.inputValue('.transfer-note')) === 'Meloxicam 0.5mg/ml 0.2ml orally once daily with food for 5 days', 'a medication request opens with its label already typed in the note box');
+    await m.page.click('.transfer-cancel');
+    await m.page.click('.attn-item:has-text("1180802") .transfer-btn'); await m.page.waitForSelector('.transfer-modal-overlay');
+    t.ok((await m.page.inputValue('.transfer-note')) === '', 'another request leaves the box empty with a grey hint');
+    await m.page.focus('.transfer-note'); await m.page.keyboard.press('Tab');
+    t.ok((await m.page.inputValue('.transfer-note')) === 'Please recheck the eye', 'pressing Tab fills the hint in for real');
+    t.ok(m.errors.length === 0, 'no page errors: ' + m.errors.join('; '));
+  } finally { await m.browser.close(); }
   t.done();
 })();

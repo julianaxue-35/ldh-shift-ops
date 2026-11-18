@@ -1079,7 +1079,7 @@
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Task for the nurse</label>
           <select class="transfer-task">${Object.keys(LDHLogic.MISC_TASK_LABELS).filter(k => k !== 'med_label' && k !== 'med_chart' && k !== 'treatment').map(k => `<option value="${esc(k)}">${esc(LDHLogic.MISC_TASK_LABELS[k])}</option>`).join('')}</select>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">${t.needs_medication ? 'Medication label, or how many tablets / mL to dispense (required)' : 'Note for the nurse (optional)'}</label>
-          <textarea class="transfer-note" rows="3" placeholder="${esc(t.problem || 'e.g. bloods before surgery')}"></textarea>
+          <textarea class="transfer-note" rows="3" placeholder="${esc(t.problem || 'e.g. bloods before surgery')}">${t.needs_medication ? esc(t.med_label || t.problem || '') : ''}</textarea>
           <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">Your initials (the nurse sees them)</label>
           <input class="transfer-initials vet-init" maxlength="4" placeholder="e.g. JX" autocomplete="off" value="${esc(storedVetInit())}">
           <div class="oc-modal-actions">
@@ -1099,6 +1099,12 @@
     }
     if (need) document.querySelector('.transfer-modal-overlay .transfer-task').value = /microchip/i.test(need) ? 'microchip' : /treatment/i.test(need) ? 'treatment' : 'uv';
   }
+  // 2026-11-18: the grey example in the nurse note box is just a hint; Tab now fills it in for real (a medication request already opens with its text filled in)
+  document.addEventListener('keydown', (e) => {
+    const ta = e.target && e.target.closest && e.target.closest('.transfer-note');
+    if (!ta || e.key !== 'Tab' || e.shiftKey || ta.value.trim() || !ta.placeholder || /^e\.g\./i.test(ta.placeholder)) return;
+    e.preventDefault(); ta.value = ta.placeholder; ta.setSelectionRange(ta.value.length, ta.value.length);
+  });
   document.addEventListener('change', (e) => {
     const self = e.target.closest('.done-self'); if (!self) return;
     const o = self.closest('.done-modal-overlay');
@@ -1118,25 +1124,17 @@
     const who = vetInitFrom(overlay.querySelector('.transfer-initials')); if (!who) { alert('Enter your initials, so the nurse can see who asked.'); overlay.querySelector('.transfer-initials').focus(); return; }
     ok.disabled = true;
     if (Array.isArray(t.group_animals) && t.group_animals.length) {   // rescue group -> nurse requests, one per kind of check
-      const by = new Map();
-      t.group_animals.forEach(a => { const mu = (a.kinds || []).filter(x => x === 'microchip' || x === 'uv'); if (!mu.length) return; const k = mu.length === 2 ? 'microchip_uv' : mu[0]; if (!by.has(k)) by.set(k, []); by.get(k).push(a); });
-      // the other asks (bloods, FIV test, ...) become that animal's own nurse task; a treatment check was already sent when the group was flagged
-      const others = [];
-      t.group_animals.forEach(a => (a.kinds || []).filter(x => x !== 'microchip' && x !== 'uv' && x !== 'treatment').forEach(k => others.push({ id: a.id, location: a.location, task: k, text: k === 'other' ? a.other : '' })));
-      if (!by.size && !others.length) { ok.disabled = false; alert('No microchip or UV check was asked for on this group, so there is nothing to hand to the nurses as a bundle. Transfer the animals one at a time instead.'); return; }
+      // one nurse card for the group: each animal keeps its own checks (a treatment check was already sent when the group was flagged)
+      const onCard = t.group_animals.map(a => ({ a, checks: (a.kinds || []).filter(k => k !== 'treatment') })).filter(x => x.checks.length);
+      if (!onCard.length) { ok.disabled = false; alert('Nothing is left to hand to the nurses on this group (any treatment checks were already sent). Close the case with DONE instead.'); return; }
       const typedG = overlay.querySelector('.transfer-note').value.trim();
-      for (const [kind, list] of by) {
-        const ll = Array.from(new Set(list.map(a => a.location)));
-        const { error } = await sb.from('nurse_requests').insert(Object.assign({
-          kind, due_window: '2h', location: ll.length === 1 ? ll[0] : 'Various', species: list[0].species === 'dog' ? 'dog' : 'cat', animal_count: list.length, animal_id: list.map(a => a.id).join(', '),
-          arrived_at: new Date().toISOString(), created_by: 'Vet team (' + who + ')', note: typedG || 'Rescue group, from a vet case'
-        }, list.length === 1 ? {} : { animals: list.map(a => ({ id: a.id, location: a.location, done: false })) }));
-        if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
-      }
-      for (const o of others) {
-        const { error } = await sb.from('noga_requests').insert({ animal_id: o.id, location: o.location, location_detail: null, task: o.task, note: o.text || typedG || t.problem || null, added_by: who, source_task_id: t.id });
-        if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
-      }
+      const ll = Array.from(new Set(onCard.map(x => x.a.location)));
+      const { error } = await sb.from('nurse_requests').insert({
+        kind: 'rescue_group', due_window: '2h', location: ll.length === 1 ? ll[0] : 'Various', species: onCard[0].a.species === 'dog' ? 'dog' : 'cat', animal_count: onCard.length,
+        animal_id: onCard.map(x => x.a.id).join(', '), arrived_at: new Date().toISOString(), created_by: 'Vet team (' + who + ')', note: typedG || 'Rescue group, from a vet case',
+        animals: onCard.map(x => Object.assign({ id: x.a.id, location: x.a.location, checks: x.checks, done: false }, x.checks.includes('other') ? { other: x.a.other } : {}))
+      });
+      if (error) { ok.disabled = false; alert('Could not transfer to the nurses: ' + error.message); return; }
       const { error: cErr } = await sb.from('tasks').update({ done: true, completed_by_role: 'vet_nurse', completed_at: new Date().toISOString(), note: 'Rescue group transferred to nurse' }).eq('id', t.id);
       if (cErr) alert('The nurse requests were created, but the case could not be closed here: ' + cErr.message);
       overlay.remove(); OpsCore.toast(); loadAll(); return;

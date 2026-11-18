@@ -485,7 +485,7 @@
   // the category badge colour for a task or request
   const MISC_CAT = { med_label: ['Medication', 'cat-med'], med_chart: ['Medication', 'cat-med'], dispense: ['Medication', 'cat-med'], treatment: ['Treatment', 'cat-treat'], ivft: ['Treatment', 'cat-treat'], tail_bandage: ['Treatment', 'cat-treat'],
     blood: ['Test', 'cat-test'], ear_swab: ['Test', 'cat-test'], fiv_test: ['Test', 'cat-test'], urine_collection: ['Test', 'cat-test'], triple_test: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'] };
-  const REQ_CAT = { vaccination: ['Vaccination', 'cat-vac'], fiv: ['Test', 'cat-test'], blood: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'], microchip_uv: ['Microchip / UV', 'cat-chip'] };
+  const REQ_CAT = { vaccination: ['Vaccination', 'cat-vac'], fiv: ['Test', 'cat-test'], blood: ['Test', 'cat-test'], microchip: ['Microchip / UV', 'cat-chip'], uv: ['Microchip / UV', 'cat-chip'], rescue_group: ['Microchip / UV', 'cat-chip'], microchip_uv: ['Microchip / UV', 'cat-chip'] };
   const catOf = (map, key) => map[key] || ['Task', 'cat-other'];
   const catBadge = (c) => `<span class="nt-cat ${c[1]}">${esc(c[0])}</span>`;
   function penBadges(location) {
@@ -640,7 +640,8 @@
     blood: { label: 'Blood test', toDo: 'for blood test', doneVerb: 'blood tested', plusLabel: '+1 blood tested' },
     microchip: { toDo: 'to microchip', doneVerb: 'microchipped', plusLabel: '+1 microchipped' },
     uv: { toDo: 'for UV check', doneVerb: 'UV checked', plusLabel: '+1 UV checked' },
-    microchip_uv: { label: 'Microchip + UV', toDo: 'to microchip + UV check', doneVerb: 'microchipped + UV checked', plusLabel: '+1 microchipped + UV checked' }
+    microchip_uv: { label: 'Microchip + UV', toDo: 'to microchip + UV check', doneVerb: 'microchipped + UV checked', plusLabel: '+1 microchipped + UV checked' },
+    rescue_group: { label: 'Rescue group', toDo: 'rescue group checks', doneVerb: 'done', plusLabel: '+1 done' }
   };
   // A request raised for one named animal (foster / rescue flag) reads "A123 — Pathway: to microchip";
   // a head-count request reads "FIR Room — 3 cats to vaccinate".
@@ -658,11 +659,15 @@
   function isGroupReq(r) { return Array.isArray(r.animals) && r.animals.length > 0; }
   function groupListHtml(r) {
     if (!isGroupReq(r)) return '';
-    const aa = ['microchip', 'uv', 'microchip_uv'].includes(r.kind);
+    const CHK = { microchip: 'Microchip', uv: 'UV', treatment: 'Treatment check / due' };
+    // a rescue_group card lists each animal's own checks; an older group card (one kind of check for all) falls back to its kind
+    const checksOf = (a) => Array.isArray(a.checks) ? a.checks : (r.kind === 'microchip_uv' ? ['microchip', 'uv'] : ['microchip', 'uv'].includes(r.kind) ? [r.kind] : []);
+    const aaKind = (a) => { const c = checksOf(a).filter(x => x === 'microchip' || x === 'uv'); return c.length === 2 ? 'microchip_uv' : c[0] || ''; };
     return `<div class="grp-list" style="margin-top:8px;">${r.animals.map((a, i) => `<div class="grp-item" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:5px 0; border-top:1px solid var(--border);">
       <label style="display:flex; align-items:center; gap:8px; margin:0; font-weight:700; cursor:pointer;"><input type="checkbox" class="nr-animal-tick" data-id="${esc(r.id)}" data-i="${i}" ${a.done ? 'checked' : ''} style="width:20px; height:20px;"> <span${a.done ? ' style="text-decoration:line-through; opacity:.6;"' : ''}>${esc(a.id)}</span></label>
       ${penBadges(a.location)}
-      ${aa && !a.done ? `<button class="secondary aa-prefill" style="padding:4px 10px; font-size:0.78rem;" data-kind="${esc(r.kind)}" data-ids="${esc(a.id)}" data-src="nr" data-rid="${esc(r.id)}" data-gi="${i}">Send to AA</button>` : ''}</div>`).join('')}</div>`;
+      ${checksOf(a).filter(x => CHK[x] || x === 'other').map(x => `<span class="nt-cat cat-chip">${x === 'other' ? 'Other: ' + esc(a.other || '') : esc(CHK[x])}</span>`).join('')}
+      ${aaKind(a) && !a.done ? `<button class="secondary aa-prefill" style="padding:4px 10px; font-size:0.78rem;" data-kind="${esc(aaKind(a))}" data-ids="${esc(a.id)}" data-src="nr" data-rid="${esc(r.id)}" data-gi="${i}">Send to AA</button>` : ''}</div>`).join('')}</div>`;
   }
   // Ticks one animal of a group on or off (done_count follows; the request closes when every animal is done).
   async function setGroupAnimalDone(r, i, done) {
