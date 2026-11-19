@@ -827,6 +827,7 @@
       if (needsVet) {
         if (window.staffInitials()) row.problem = [row.problem, '(sent by ' + window.staffInitials() + ')'].filter(Boolean).join(' — ');
         ({ error } = await sb.from('tasks').insert(row));
+        if (OpsCore.isRlsError(error) && await OpsCore.reauth(sb)) ({ error } = await sb.from('tasks').insert(row));   // login had lapsed: sign in again, try once more
         if (error && /column.*conditions|conditions.*column|schema cache/i.test(error.message || '') && !/duplicate/.test(error.message || '')) error = { message: 'The database needs migration 0047 (sign groups) run first.' };
         /* 2026-10-09: the same animal flagged AGAIN in the same pen on the same shift hits the unique index
            (title+location+shift). If the earlier case is finished, reopen it as a fresh flag (the database logs it in
@@ -897,7 +898,8 @@
         const list = animals.map(a => a.id + ' (' + a.location + (a.kinds.length ? '; ' + a.kinds.map(k => k === 'other' ? 'other: ' + a.other : GK[k] || k).join(' + ') : '') + ')').join(', ');
         const row = Object.assign({}, baseRow, { title: animals[0].id, location: groupLoc, location_detail: null, sm_number: null, group_animals: animals,
           problem: ['Rescue group of ' + animals.length + ' animals: ' + list, baseRow.problem].filter(Boolean).join(' — ') });
-        const { error } = await sb.from('tasks').insert(row);
+        let { error } = await sb.from('tasks').insert(row);
+        if (OpsCore.isRlsError(error) && await OpsCore.reauth(sb)) ({ error } = await sb.from('tasks').insert(row));
         if (error) { alert('Could not submit the group: ' + missing(error.message)); return false; }
       }
       // ONE nurse card for the whole group: each animal lists its own checks (microchip, UV, treatment check, other). When the group went to the vets
