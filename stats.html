@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stats — LDH Shift Ops</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261123a"></script>
+<script src="lib/ldh-logic.js?v=20261113a"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/trend-chart.js?v=20261028a"></script>
 <link rel="stylesheet" href="lib/surveillance.css?v=20261101b">
@@ -114,10 +114,6 @@
   /* Top KPI row — completion donut and the 3 shift cards as 4 equal,
      same-weight columns, instead of the donut sitting alone in its own
      full-width row above them. */
-  .sur-split { border-collapse: collapse; margin: 14px 0; font-size: 14px; width: 100%; max-width: 560px; }
-  .sur-split th, .sur-split td { padding: 6px 10px; border-bottom: 1px solid var(--line, #ddd); text-align: right; }
-  .sur-split th:first-child { text-align: left; font-weight: 600; }
-  .sur-split caption { text-align: left; padding-bottom: 6px; }
   .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
   .completion-donut {
@@ -366,7 +362,7 @@
   let SURGERY_ROWS = null;   // null = the table is not there yet
   async function loadSurgeryLog() {
     const yearStart = LDHLogic.statsSince(Date.now());
-    const { data, error } = await sb.from('surgery_log').select('done_at, species, routine, procedure, procedure2').gte('done_at', yearStart.toISOString());
+    const { data, error } = await sb.from('surgery_log').select('done_at, species, routine').gte('done_at', yearStart.toISOString());
     SURGERY_ROWS = error ? null : (data || []);
   }
   /* ---- Activity line graphs (2026-10-27): Totals and Surgery ----
@@ -398,7 +394,7 @@
     const grid = document.getElementById('surgery-breakdown-grid');
     if (!SURGERY_ROWS) { grid.innerHTML = '<p class="subtle">The surgery numbers will appear here once the latest database update has been run.</p>'; return; }
     const st = ST.sur, now = Date.now(), b = LDHLogic.timeBuckets(st.period, now);
-    const keep = (r) => st.kind === 'all' || LDHLogic.surgeryKind(r) === st.kind;
+    const keep = (r) => st.kind === 'all' || (st.kind === 'routine' ? !!r.routine : !r.routine);
     const SPECIES = [['cat', 'Cats', C.blue], ['dog', 'Dogs', C.orange], ['rabbit', 'Rabbits', C.aqua]];
     const known = SPECIES.map(x => x[0]);
     const series = SPECIES.map(([k, name, color]) => ({ name, color, values: LDHLogic.bucketCounts(SURGERY_ROWS.filter(r => r.species === k && keep(r)).map(r => r.done_at), b, false) }));
@@ -406,15 +402,9 @@
     if (other.length) series.push({ name: 'Other species', color: C.violet, values: LDHLogic.bucketCounts(other.map(r => r.done_at), b, false) });
     series.push({ name: 'All surgeries', color: C.ink, dash: true, values: LDHLogic.bucketCounts(SURGERY_ROWS.filter(keep).map(r => r.done_at), b, false) });
     const t = LDHLogic.surgeryBreakdown(SURGERY_ROWS, now)[st.period];
-    const sk = LDHLogic.surgeryBySpeciesKind(SURGERY_ROWS, st.period, now);
-    const sum = (k) => Object.values(sk).reduce((a, v) => a + v[k], 0);
-    const rowsHtml = [['cat', 'Cats'], ['dog', 'Dogs'], ['rabbit', 'Rabbits'], ['other', 'Other species']].filter(([k]) => k !== 'other' || sk.other.spey + sk.other.castrate + sk.other.other)
-      .map(([k, n]) => `<tr><th scope="row">${n}</th><td>${sk[k].spey}</td><td>${sk[k].castrate}</td><td>${sk[k].other}</td><td><b>${sk[k].spey + sk[k].castrate + sk[k].other}</b></td></tr>`).join('');
-    const tableHtml = `<table class="sur-split"><caption class="subtle">${PERIOD_NAME[st.period]}: species, then spey / castrate</caption><thead><tr><th></th><th>Speys</th><th>Castrates</th><th>Non-routine</th><th>Total</th></tr></thead><tbody>${rowsHtml}<tr><th scope="row">All species</th><td><b>${sum('spey')}</b></td><td><b>${sum('castrate')}</b></td><td><b>${sum('other')}</b></td><td><b>${t.total}</b></td></tr></tbody></table>`;
     grid.innerHTML =
-      `<div class="chart-controls">${seg('sur-period', PERIODS, st.period)}${seg('sur-kind', [['all', 'All'], ['spey', 'Speys'], ['castrate', 'Castrates'], ['other', 'Non-routine']], st.kind)}</div>`
-      + `<div class="kpi-row">${kpi('Total surgeries', t.total, C.ink, avgSub(LDHLogic.dailyAverage(SURGERY_ROWS.map(r => r.done_at), st.period, now, LDHLogic.WORKING_DAYS.surgery)) + ' <span class="subtle">(Mon–Fri, no public holidays)</span>')}${kpi('Speys', sum('spey'))}${kpi('Castrates', sum('castrate'))}${kpi('Non-routine', t.nonRoutine)}</div>`
-      + tableHtml
+      `<div class="chart-controls">${seg('sur-period', PERIODS, st.period)}${seg('sur-kind', [['all', 'All'], ['routine', 'Routine'], ['other', 'Non-routine']], st.kind)}</div>`
+      + `<div class="kpi-row">${kpi('Total surgeries', t.total, C.ink, avgSub(LDHLogic.dailyAverage(SURGERY_ROWS.map(r => r.done_at), st.period, now, LDHLogic.WORKING_DAYS.surgery)) + ' <span class="subtle">(Mon–Fri, no public holidays)</span>')}${kpi('Routine (spey / castrate)', t.routine)}${kpi('Non-routine', t.nonRoutine)}</div>`
       + TrendChart.html({ labels: b.labels, series, title: 'Surgeries by species, ' + PERIOD_NAME[st.period].toLowerCase(), unitLabel: 'Surgeries registered ' + (b.unit === 'month' ? 'per month' : 'per day') + ' · ' + PERIOD_NAME[st.period].toLowerCase() });
   }
 
