@@ -866,6 +866,12 @@
     if (doneBtn) {
       const t = TASKS.find(x => x.id === doneBtn.dataset.id);
       if (!t) return;
+      // 2026-11-23: a case another vet has picked up can only be finished by that vet (same rule as Put back)
+      if (t.claimed_by && !t.done) {
+        const me = askVetInitials();
+        if (!me) return;
+        if (me !== t.claimed_by) { alert(t.title + ' was picked up by ' + t.claimed_by + '. Only ' + t.claimed_by + ' can mark it done. If they are away, ask them to Put it back first.'); return; }
+      }
       openDoneModal(t);
       return;
     }
