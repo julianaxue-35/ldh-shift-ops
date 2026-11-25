@@ -189,6 +189,13 @@ async function open(seed = {}, pageName, opts = {}) {
   await ctx.route('**/supabase.js', r => r.abort());
   await ctx.route('https://julianaxue-35.github.io/**', r => r.abort());   // Pick up opens the shift tool in a new tab; keep tests offline
   await ctx.addInitScript(STUB);
+  // The staff page asks for initials before sending (2026-11-25). Tests that are not about that answer "send without them";
+  // a test of the question itself passes opts.askInitials.
+  if (!opts.askInitials) await ctx.addInitScript(() => {
+    const ask = window.prompt.bind(window), sure = window.confirm.bind(window);
+    window.prompt = (m, d) => /^Enter your initials before sending/.test(String(m)) ? '' : ask(m, d);
+    window.confirm = m => /^Send WITHOUT initials/.test(String(m)) ? true : sure(m);
+  });
   await ctx.addInitScript((s) => {
     Object.keys(s).forEach(k => s[k].forEach(r => window.__db[k].push(
       Object.assign({ id: 'seed' + Math.random().toString(36).slice(2), created_at: new Date().toISOString() }, r))));
