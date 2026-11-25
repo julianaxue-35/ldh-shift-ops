@@ -24,6 +24,7 @@
 <script src="lib/ops-core.js?v=20261110a"></script>
 <script src="lib/send-card.js?v=20261111a"></script>
 <script src="lib/request-edit.js?v=20261118a"></script>
+<script src="lib/my-requests.js?v=20261125b"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
 <script src="lib/behaviour-feedback.js"></script>
 <script src="vendor/jszip.min.js"></script>
@@ -404,6 +405,7 @@
       <h2>FAQ — nurses</h2>
       <p class="subtle">Quick answers for working through tasks and sending results back to the vets.</p>
       <h3 class="faq-group">Working your board</h3>
+      <details><summary>How do I see or change a request I sent?</summary><div><p>Press <b>My requests</b> at the top of the page. It lists what was sent under <b>your initials</b> (the ones on the button) in the last 7 days, marked <b>Waiting</b>, <b>Picked up</b> or <b>Done</b>. Press <b>Edit</b> to change one that is still waiting. There are no replies. If something is missing, check the initials: anything sent without them, or under different ones, is not listed. If the Welfare and Processing boxes hold different initials, choose whose list to show.</p></div></details>
       <details><summary>A vet sent me a medication chart to print</summary><div><p>It appears under <b>Medication labels to make</b> as <b>Medication chart (Excel) to print</b>, with the animal and room. Press <b>Download chart to print</b>, print it, then press <b>Done</b>. The file is removed once the task is finished. Vets use this when the Admission AA is not in, for example at the weekend.</p></div></details>
       <details><summary>I sent a request with the wrong location. Can I fix it?</summary><div><p>Yes. Press <b>Edit</b> (or <b>Edit location</b>) on the request. Change the space and pen, and for a nurse request the number of animals, the timing or the note; for a treatment the treatment name. Press <b>Save changes</b>. Anyone on the dashboard can do this, and the other pages update by themselves. A treatment's times a day and days cannot be changed this way: stop the course and send a new one.</p></div></details>
       <details><summary>Which column is mine?</summary><div><p><b>Welfare nurse</b> (left): medication labels, treatments due and miscellaneous tasks. <b>Processing nurse</b> (right): vaccination, FIV and blood requests from shelter staff, plus microchip and UV tasks.</p></div></details>
@@ -1634,6 +1636,7 @@
     const { sb: client } = await OpsCore.init({ page: 'nurses', gateRole: 'nurse' });
     sb = client;
     RequestEdit.init(sb, loadAll);   // Edit button on every request card
+    MyRequests.mount({ sb, initials: () => [document.getElementById('initials-welfare').value, document.getElementById('initials-processing').value] });
     // ONE request card for the whole page (not one per nurse column): a nurse asks the vets or the Behaviour team for something.
     // It has no initials box of its own: it uses the Welfare nurse initials (or the Processing nurse initials if only those are filled in).
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'nurses', onDone: showPlanBanner });

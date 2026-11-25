@@ -24,6 +24,7 @@
 <script src="lib/ops-core.js?v=20261110a"></script>
 <script src="lib/send-card.js?v=20261111a"></script>
 <script src="lib/request-edit.js?v=20261118a"></script>
+<script src="lib/my-requests.js?v=20261125b"></script>
 <script src="lib/trend-chart.js"></script>
 <script src="lib/fsa.js"></script>
 <script src="lib/fir-panel.js?v=20261109c"></script>
@@ -246,6 +247,7 @@
       <h2>FAQ — behaviour team</h2>
       <p class="subtle">How the Behaviour page works, from a request arriving to a Done note.</p>
       <h3 class="faq-group">Working your board</h3>
+      <details><summary>How do I see or change a request I sent?</summary><div><p>Press <b>My requests</b> at the top of the page. It lists what was sent under <b>your initials</b> (the ones on the button) in the last 7 days, marked <b>Waiting</b>, <b>Picked up</b> or <b>Done</b>. Press <b>Edit</b> to change one that is still waiting. There are no replies. If something is missing, check the initials: anything sent without them, or under different ones, is not listed.</p></div></details>
       <details><summary>Where do requests come from, and where do they land?</summary><div><p>Shelter staff send them from the <b>Behaviour task</b> bar on the shelter staff page, and vets and nurses send them from the <b>Behaviour</b> tab of their <b>Send a request</b> card. Vets can also send an animal with its medical note from the Processing, Sick &amp; Injured and Surgery tools. <b>Everything lands in Incoming</b> at the top, unassigned, unless the sender ticked <i>Send straight to the Behaviour TL</i>.</p></div></details>
       <details><summary>A request has the wrong location. Can I fix it?</summary><div><p>Yes. Press <b>Edit</b> on the request card, change the space, pen or reason, and press <b>Save changes</b>. Anyone on the dashboard can do this.</p></div></details>
       <details><summary>What is the ring and the table at the bottom?</summary><div><p><b>What the Behaviour team has done</b> counts the cases ticked Done: today (the ring fills as today nears a usual working day) and the week, month, season and year so far, with the average per working day and the courthold and incident-review totals. Finished cases are removed from the page after 7 days, but the count is kept (only the kind of case and the date, never the animal).</p></div></details>
@@ -557,6 +559,7 @@
     const { sb: client } = await OpsCore.init({ page: 'behaviour', gateRole: 'behaviour' });
     sb = client;
     RequestEdit.init(sb, loadAll);   // Edit button on every request card
+    MyRequests.mount({ sb, initials: () => $('bh-initials').value });
     $('bh-initials').value = OpsCore.readInitials(INIT_KEY);
     $('app-root').style.display = 'grid';
     // One request card, same as the other pages: here for asking the vets (shelter stress medication, post adoption pack, other).

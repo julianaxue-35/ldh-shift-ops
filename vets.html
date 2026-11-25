@@ -25,6 +25,7 @@
 <script src="lib/ops-core.js?v=20261110a"></script>
 <script src="lib/send-card.js?v=20261111a"></script>
 <script src="lib/request-edit.js?v=20261118a"></script>
+<script src="lib/my-requests.js?v=20261125b"></script>
 <script src="lib/memo-extras.js?v=20261105a"></script>
 <script src="vendor/jszip.min.js"></script>
 <script src="lib/minutes-docx.js"></script>
@@ -335,6 +336,7 @@
       <h2>FAQ — vets</h2>
       <p class="subtle">Quick answers for picking up cases, handing work to the nurses and handling results.</p>
       <h3 class="faq-group">Cases</h3>
+      <details><summary>How do I see or change a request I sent?</summary><div><p>Press <b>My requests</b> at the top of the page. It lists what was sent under <b>your initials</b> (the ones on the button) in the last 7 days, marked <b>Waiting</b>, <b>Picked up</b> or <b>Done</b>. Press <b>Edit</b> to change one that is still waiting. There are no replies. If something is missing, check the initials: anything sent without them, or under different ones, is not listed.</p></div></details>
       <details><summary>A flag has a Photo button</summary><div><p>Staff can attach one phone photo when they flag an animal. Press <b>Photo</b> on the case to see it full screen; tap to close. When you mark the case <b>DONE</b> the photo is deleted for good (the case itself is kept for the 3-month review), so put anything you need to keep in your note.</p></div></details>
       <details><summary>I sent a request with the wrong location. Can I fix it?</summary><div><p>Yes. Press <b>Edit</b> (or <b>Edit location</b>) on the request. Change the space and pen, and for a nurse request the number of animals, the timing or the note; for a treatment the treatment name. Press <b>Save changes</b>. Anyone on the dashboard can do this, and the other pages update by themselves. A treatment's times a day and days cannot be changed this way: stop the course and send a new one.</p></div></details>
       <details><summary>How do I pick up a case?</summary><div><p>In <b>Cases</b>, press <b>Pick up →</b> on a card. To take several, tick their boxes and press <b>Pick up N selected, sorted by location</b>. Type your initials once in the box at the top left at the start of the day; picking up uses them (no prompt) and they show on the card (&ldquo;Picked up 10:32 by AB&rdquo;), and opens the shift tool for that animal. Once a case is picked up it leaves the pick-up list for the other vets. If another vet got there first you'll be told it was skipped.</p></div></details>
@@ -1179,6 +1181,7 @@
     const { sb: client } = await OpsCore.init({ page: 'vets', gateRole: 'vet' });
     sb = client;
     RequestEdit.init(sb, loadAll);   // Edit button on every request card
+    MyRequests.mount({ sb, initials: () => storedVetInit() });
     document.getElementById('app-root').style.display = 'grid';
     // One request card, the same on every page: the vets ask the nurses (a treatment course or a one-animal task) or the behaviour team.
     BF = BehaviourFeedback.mount(document.getElementById('behaviour-plans'), { sb, role: 'vets', doneEl: document.getElementById('behaviour-done'), onDone: showPlanBanner });

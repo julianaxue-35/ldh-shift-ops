@@ -23,6 +23,7 @@
 <script src="lib/ldh-logic.js?v=20261113a"></script>
 <script src="lib/ops-core.js?v=20261110a"></script>
 <script src="lib/request-edit.js?v=20261118a"></script>
+<script src="lib/my-requests.js?v=20261125b"></script>
 <script src="lib/surveillance-view.js?v=20261101b"></script>
 <script src="lib/animal-history-view.js?v=20261101b"></script>
 <link rel="stylesheet" href="lib/surveillance.css?v=20261101b">
@@ -351,7 +352,7 @@
   <aside>
     <h2>LDH Shift Ops</h2>
     <div id="ops-nav" style="margin-bottom:18px;"></div>
-    <div class="ini-box ini-side" data-ini id="sr-who" title="Needed for Behaviour requests, optional for the others. Remembered on this device for the day.">
+    <div class="ini-box ini-side" data-ini id="sr-who" title="You are asked for these before sending. Remembered on this device for the day.">
       <label for="sr-initials"><span class="ini-long">Your initials (kept on this device today)</span><span class="ini-short">Initials:</span></label>
       <span id="sr-who-state" hidden></span><input id="sr-initials" maxlength="4" placeholder="e.g. AB" autocomplete="off" aria-label="Initials initials">
     </div>
@@ -590,6 +591,7 @@
       <h2>FAQ — shelter staff</h2>
       <p class="subtle">Quick answers for logging requests and following a case.</p>
       <h3 class="faq-group">Logging requests</h3>
+      <details><summary>How do I see or change a request I sent?</summary><div><p>Press <b>My requests</b> at the top of the page. It lists what was sent under <b>your initials</b> (the ones on the button) in the last 7 days, marked <b>Waiting</b>, <b>Picked up</b> or <b>Done</b>. Press <b>Edit</b> to change one that is still waiting. There are no replies. If something is missing, check the initials: anything sent without them, or under different ones, is not listed.</p></div></details>
       <details><summary>Which tab do I use: Vets, Nurses or Behaviour?</summary><div><p>All requests are made in the one <b>Send a request</b> card. Pick who it is for: <b>Vets</b> to look at an animal (shelter check, foster, rescue, medication), <b>Nurses</b> for vaccination on arrival (microchip, UV and treatment checks for foster or rescue animals are ticked on the Vets tab), <b>Behaviour</b> for a courthold reassessment, surrender history, aggression / incident or behaviour review. Every form has the same order: <b>What</b>, animal, space and pen, <b>Needed within</b>, then your reason or note. Every tab has an <b>Other</b> choice: describe it in the note. Offsite, Pathway and <b>Vet clinic</b> ask for a detail (for example the foster&rsquo;s name or the ward) instead of a pen.</p></div></details>
       <details><summary>How do I log a request for a vet?</summary><div><ol><li>In <b>Send a request</b>, pick <b>Vets</b> at the top, then type the <b>Animal ID</b>, choose the <b>space</b> and pen number.</li><li>Pick <b>What</b>: Shelter, Foster, Rescue or Medication. For offsite / Pathway animals, add a detail such as the foster's name.</li><li>Tick the <b>signs you can see</b> (one or more groups; you are flagging signs, not diagnosing), and describe the problem in a few words.</li><li>Tick any <b>emergency signs</b>. The tier line under them shows how fast the vets will respond.</li><li>Pick <b>Needed within</b> and add a short reason or note.</li><li>Press <b>Send to vets</b>.</li></ol></div></details>
       <details><summary>A group of rescue animals all need microchip / UV checks. How do I flag them?</summary><div><p>Choose <b>Rescue request</b>, then type all the IDs in the Animal ID box (commas or a range, e.g. <i>1170123, 1170125 - 1170128</i>). A row appears for each animal: set its own space and pen if it is somewhere different, and tick <b>Microchip</b> and/or <b>UV</b> for that animal. It goes as <b>one</b> request: the nurse sees one card listing every animal and ticks them off one by one. If you add notes, a sign or a higher urgency, the group goes to the vets as one case instead, and the vet can hand the whole group to the nurses in one go with <b>Transfer to nurse</b>. A photo can only go with one animal.</p></div></details>
@@ -602,7 +604,7 @@
       <details><summary>Which &ldquo;needed within&rdquo; do I pick?</summary><div><p><b>30&ndash;60 minutes</b> is for something that cannot wait (an aggression or incident). <b>Within today</b> is the usual choice. <b>Within 48 hours</b> is for a concern that is not urgent. For a true emergency, <b>radio the team &mdash; do not wait for the board</b>.</p></div></details>
       <details><summary>Who sees my request, and what is &ldquo;Send straight to the Behaviour TL&rdquo;?</summary><div><p>Every request lands on the <b>Behaviour page</b> in Incoming, and the team then gives it to the TL or the right assist (cat or dog assist, matched to the animal&rsquo;s space). Tick <b>Send straight to the Behaviour TL</b> only when you want it to skip Incoming and go to the TL at once.</p></div></details>
       <details><summary>How do I find out what the Behaviour team decided?</summary><div><p>When the team finishes, their note shows on that animal&rsquo;s card on the <b>Shelter board</b> (with their initials and the time) for 24 hours. While the task is open, the Shelter board shows that it is waiting.</p></div></details>
-      <details><summary>Why am I asked for initials, and do I have to type them every time?</summary><div><p>Initials show who sent a request, so the team knows who to ask about it. There is one initials box at the top left, under the menu. It is <b>required for Behaviour</b> and <b>optional for Vets and Nurses</b> (so an emergency is never held up) (they are only added to a flag that goes to the vet board). Your initials are remembered on this device for the day, so you only type them once.</p></div></details>
+      <details><summary>Why am I asked for initials, and do I have to type them every time?</summary><div><p>Initials show who sent a request, so the team knows who to ask about it. There is one initials box at the top left, under the menu. If the box is empty when you press Send, you are <b>asked for your initials</b> first. They are <b>required for Behaviour</b>; for Vets and Nurses you can still choose to send without them (so an emergency is never held up), but then the request will not show under My requests. Your initials are remembered on this device for the day, so you only type them once.</p></div></details>
       <h3 class="faq-group">Following a case</h3>
       <details><summary>Where do I see how a case is going?</summary><div><p>In the <b>Cases</b> table. Each row shows the <b>Stage</b>: <i>flagged</i> (waiting for a vet), <i>picked up</i> (a vet has it), <i>waiting for medication</i> (vet check done, medication still to be made up) or <i>completed</i>. Finished cases stay in the Completed list for 24 hours. The <b>Time left</b> column counts down to the tier's target and turns amber, then red, when it is running late.</p></div></details>
       <details><summary>A case went back from "picked up" to "flagged" — why?</summary><div><p>Vets can <b>put a case back</b> if they are called away. It returns to its tier and any vet can pick it up. The time target keeps running from when it was first flagged.</p></div></details>
@@ -867,7 +869,7 @@
         for (const kind of kinds) {
           const { error: nrErr } = await sb.from('nurse_requests').insert({
             kind, due_window: document.getElementById('req-x-window').value, location: room, species: document.getElementById('req-x-species').value,
-            animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff', note
+            animal_count: 1, animal_id: title, arrived_at: new Date().toISOString(), created_by: 'Shelter Staff' + (window.staffInitials() ? ' (' + window.staffInitials() + ')' : ''), note
           });
           if (nrErr) alert('The ' + KIND_NAMES[kind] + ' request for ' + title + ' could not be saved: ' + nrErr.message);
         }
@@ -876,7 +878,7 @@
       // whether or not the rest of the request also needs a vet
       if (wantTreatment) {
         const { error: trErr } = await sb.from('noga_requests').insert({
-          animal_id: title, location: baseRow.location, location_detail: baseRow.location_detail, task: 'treatment', note, added_by: 'Shelter Staff'
+          animal_id: title, location: baseRow.location, location_detail: baseRow.location_detail, task: 'treatment', note, added_by: 'Shelter Staff' + (window.staffInitials() ? ' (' + window.staffInitials() + ')' : '')
         });
         if (trErr) alert('The treatment check for ' + title + ' could not be saved: ' + (/noga_requests_task_check/.test(trErr.message || '') ? 'the database needs migration 0022 run first.' : trErr.message));
       }
@@ -909,7 +911,7 @@
         const ll = Array.from(new Set(onCard.map(x => x.a.location)));
         const { error } = await sb.from('nurse_requests').insert({
           kind: 'rescue_group', due_window: document.getElementById('req-x-window').value, location: ll.length === 1 ? ll[0] : 'Various', species: spc,
-          animal_count: onCard.length, animal_id: onCard.map(x => x.a.id).join(', '), arrived_at: new Date().toISOString(), created_by: 'Shelter Staff', note: TYPE_LABELS[reqType],
+          animal_count: onCard.length, animal_id: onCard.map(x => x.a.id).join(', '), arrived_at: new Date().toISOString(), created_by: 'Shelter Staff' + (window.staffInitials() ? ' (' + window.staffInitials() + ')' : ''), note: TYPE_LABELS[reqType],
           animals: onCard.map(x => Object.assign({ id: x.a.id, location: x.a.location, checks: x.checks, done: false }, x.checks.includes('other') ? { other: x.a.other } : {}))
         });
         if (error) { alert('The nurse request could not be saved: ' + missing(error.message)); return false; }
@@ -1329,6 +1331,16 @@
     el.addEventListener('input', paint); paint();
     el.addEventListener('change', () => { el.value = el.value.trim().toUpperCase(); paint(); OpsCore.saveInitials(KEY, el.value); OpsCore.saveInitials('ldh_behaviour_initials_v1', el.value); });
     window.staffInitials = () => el.value.trim().toUpperCase();
+    /* 2026-11-25: nothing leaves without asking for initials first. Runs before the Send buttons' own handlers. */
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('#req-submit, #nr-submit, #bk-submit');
+      if (!btn || window.staffInitials()) return;
+      const typed = (prompt('Enter your initials before sending (e.g. AB). They let you find this under My requests.') || '').trim().toUpperCase();
+      if (/^[A-Z]{1,4}$/.test(typed)) { el.value = typed; el.dispatchEvent(new Event('change', { bubbles: true })); return; }
+      if (btn.id === 'bk-submit') return;   // Behaviour needs initials: the button's own message says so
+      if (confirm('Send WITHOUT initials? It will not show under My requests, and nobody will know who to ask.')) return;
+      e.preventDefault(); e.stopImmediatePropagation(); el.focus();
+    }, true);
   })();
 
   /* ---- "Send to" tabs: Vets / Nurses / Behaviour ---- */
@@ -1372,6 +1384,7 @@
     const { sb: client } = await OpsCore.init({ page: 'staff' });
     sb = client;
     RequestEdit.init(sb, loadAll);   // Edit location on a case nobody has picked up yet
+    MyRequests.mount({ sb, initials: () => window.staffInitials ? window.staffInitials() : document.getElementById('sr-initials').value });
     document.getElementById('app-root').style.display = 'grid';
     await loadAll();
     OpsCore.sweepDonePhotos(sb);   // finished cases keep no photo, whichever tool finished them
