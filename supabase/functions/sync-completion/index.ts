@@ -199,6 +199,13 @@ function flagsClosedByNote(rows, animalId) {
   const want = flagId(animalId);
   return (rows || []).filter((r) => r && !r.done && !r.vet_done_at && r.type !== 'check_recheck' && flagId(r.title) === want);
 }
+// Register in Sick & Injured (2026-11-28) finishes that animal's open request(s) raised up to the moment Register was pressed.
+// A follow-up nobody has picked up is a new concern and stays open; so does a case already waiting on the nurse.
+function flagsClosedByRegister(rows, animalId, atMs) {
+  const want = flagId(animalId);
+  return (rows || []).filter((r) => r && !r.done && !r.vet_done_at && r.type !== 'check_recheck' && flagId(r.title) === want &&
+    (r.claimed_at || !r.followup) && new Date(r.created_at).getTime() <= atMs);
+}
 // flag-validate-end
 // conditions-of-start
 // The sign groups of a flagged row as stored: `conditions` if a non-empty array, else the old single `condition`, else none. Raw keys; the tools fold legacy keys into groups.
@@ -268,6 +275,22 @@ async function closeFlagsForNote(supabase, animalId, sentBy) {
     if (plain.length) await supabase.from('tasks').update(base).in('id', plain).eq('done', false);
     if (meds.length) await supabase.from('tasks').update(Object.assign({}, base, { med_done_at: now, med_done_by: sentBy || null })).in('id', meds).eq('done', false);
   } catch (e) { console.warn('close flags', e); }
+}
+// Not best effort: an error is returned so the phone keeps the registration and tries again.
+// A medication case keeps med_done_at empty, so the database holds it as "waiting on medication" (as Done on the board does).
+async function closeRequestsForRegister(supabase, animalId, atMs) {
+  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+  const { data, error } = await supabase.from('tasks')
+    .select('id,title,type,done,vet_done_at,claimed_at,followup,created_at')
+    .eq('done', false).neq('type', 'check_recheck').is('vet_done_at', null).gte('created_at', since).limit(1000);
+  if (error) return error;
+  const ids = flagsClosedByRegister(data ?? [], animalId, atMs).map((r) => r.id);
+  if (!ids.length) return null;
+  const now = new Date().toISOString();
+  const upd = await supabase.from('tasks')
+    .update({ done: true, completed_by_role: 'vet_nurse', completed_at: now, vet_done_at: now })
+    .in('id', ids).eq('done', false);
+  return upd.error;
 }
 // Completed Admission AA cards are kept 7 days (so a note the AA missed can be put back), then removed. Best effort.
 // status-match-start
@@ -688,6 +711,13 @@ Deno.serve(async (req) => {
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: CORS_HEADERS });
+  }
+
+  // The upsert above only ever touches the 'list' row. Pressing Register also closes the staff request: the phone says how long
+  // ago it was pressed (not a clock time, so a phone with a wrong clock cannot close newer requests).
+  if (shift === 'sick_injured' && typeof body.registered_ago_ms === 'number' && body.registered_ago_ms >= 0) {
+    const closeErr = await closeRequestsForRegister(supabase, title, Date.now() - body.registered_ago_ms);
+    if (closeErr) return new Response(JSON.stringify({ error: closeErr.message }), { status: 500, headers: CORS_HEADERS });
   }
 
   return new Response(JSON.stringify({ ok: true }), {
