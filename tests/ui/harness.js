@@ -10,7 +10,7 @@ const STUB = `
 (() => {
   const uuid = () => 'id' + Math.random().toString(36).slice(2) + Date.now();
   window.__storage = window.__storage || {};
-  const db = window.__db = { tasks: [], memos: [], clinic_meeting: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], nurse_chart_files: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
+  const db = window.__db = { nurse_vacc_log: [], tasks: [], memos: [], clinic_meeting: [], roster: [], nurse_requests: [], nurse_treatments: [], nurse_treatment_doses: [], flag_history: [], locations: [], surveillance_snapshots: [], noga_requests: [], nurse_chart_files: [], aa_items: [], surgery_log: [], nurse_on_duty: [], vacc_list: [], aa_done_log: [], behaviour_tasks: [], fsa_cats: [], fsa_log: [] };
   const now = () => new Date().toISOString();
   const defaults = {
     // Round 3 (0010_round3.sql) columns replicated here so UI tests reflect
@@ -31,6 +31,7 @@ const STUB = `
     surveillance_snapshots: () => ({}),
     noga_requests: () => ({ task: 'other', done: false, created_at: now() }),
     surgery_log: () => ({}),
+    nurse_vacc_log: () => ({ given_on: new Date().toLocaleDateString('en-CA') }),
     nurse_on_duty: () => ({}),
     vacc_list: () => ({}),
     aa_done_log: () => ({ completed_at: now() }),
@@ -175,6 +176,7 @@ const STUB = `
         return { data: Object.keys(by).map(k => ({ day: k.split('|')[0], cat: k.split('|')[1], n: by[k] })), error: null };
       }
       if (fn === 'nurse_daily_counts') return { data: window.__nurseCounts || [], error: null };
+      if (fn === 'nurse_vacc_counts') return { data: (window.__db.nurse_vacc_log || []).map(r => ({ day: r.given_on || new Date().toLocaleDateString('en-CA'), n: 1 })), error: null };
       if (fn === 'behaviour_daily_counts') return { data: window.__behaviourCounts || [], error: null };
       return { data: [], error: null };
     },
