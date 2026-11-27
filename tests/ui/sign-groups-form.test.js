@@ -75,6 +75,7 @@ const KEYS = 'respiratory,gi,wounds_pain_swelling,urinary,skin,msk,neuro,eyes,ea
   await page.fill('#req-title', 'S4'); await page.selectOption('#req-location', 'Cat Room 1'); await page.fill('#req-pen', '3');
   await tick('gi'); await tick('urinary');
   await page.click('#req-submit'); await page.waitForTimeout(400);
+  await page.click('#dup-ask [data-dup="same"]'); await page.waitForTimeout(400);
   const s4 = (await db()).tasks.filter(x => x.title === 'S4');
   t.ok(s4.length === 1 && s4[0].conditions.join() === 'gi,urinary' && s4[0].condition === 'gi', 're-flag unions groups, no duplicate (got ' + JSON.stringify(s4.map(r => r.conditions)) + ')');
 

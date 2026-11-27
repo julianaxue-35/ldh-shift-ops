@@ -96,7 +96,7 @@ const STUB = `
           if (op === 'insert') {
             // Opt-in mirror of tasks_title_location_shift_kind_idx (0044): a test sets window.__uniqueTasks = true. A request and a list entry are different kinds.
             const kindOf = x => (x.type === undefined || x.type === 'check_recheck') ? 'list' : 'request';
-            if (name === 'tasks' && window.__uniqueTasks && payload.some(p => rows.some(r => r.title === p.title && r.location === p.location && r.shift === p.shift && kindOf(r) === kindOf(p)))) {
+            if (name === 'tasks' && window.__uniqueTasks && payload.some(p => rows.some(r => r.title === p.title && r.location === p.location && r.shift === p.shift && kindOf(r) === kindOf(p) && (r.followup || 0) === (p.followup || 0)))) {
               res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "tasks_title_location_shift_idx"' } }); return;
             }
             data = payload.map(p => hold(Object.assign({ id: uuid() }, defaults[name](), p))); data.forEach(d => { rows.push(d); logFlag(d); });

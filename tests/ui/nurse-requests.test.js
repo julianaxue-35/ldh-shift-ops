@@ -29,7 +29,7 @@ const t = require('./check')('nurse-requests');
     await page.waitForTimeout(250);
     const reqs = (await db()).nurse_requests;
     t.ok(reqs.length === 1 && reqs[0].animal_count === 3 && reqs[0].location === 'FIR Room' && reqs[0].created_by === 'Shelter Staff', 'new request saved from the form, raised by Shelter Staff');
-    const arr0 = new Date(reqs[0].arrived_at); t.ok(arr0.getMinutes() === 0 && Date.now() - arr0.getTime() >= 0 && Date.now() - arr0.getTime() < 3600e3 + 120000, 'arrival time saved on the hour (this hour): ' + arr0.toISOString());
+    const arr0 = new Date(reqs[0].arrived_at); t.ok(Date.now() - arr0.getTime() >= 0 && Date.now() - arr0.getTime() < 120000, 'left on the current hour: arrival saved as now, so the countdown starts when sent: ' + arr0.toISOString());
 
     /* ---------- Scheduled arrival (2026-09-26): log one for later, not now ---------- */
     t.ok(!(await page.isVisible('#nr-expected-wrap')), 'expected-arrival field hidden by default');
