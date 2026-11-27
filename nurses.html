@@ -20,7 +20,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LDH Shift Ops — Nurses</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="lib/ldh-logic.js?v=20261113a"></script>
+<script src="lib/ldh-logic.js?v=20261127a"></script>
 <script src="lib/ops-core.js?v=20261127a"></script>
 <script src="lib/send-card.js?v=20261111a"></script>
 <script src="lib/request-edit.js?v=20261118a"></script>
@@ -1489,6 +1489,7 @@
     const chosen = VACC.animals.filter(a => vaccPicked.has(vaccKey(a)));
     if (!chosen.length) { err.textContent = 'Tick the animals you have vaccinated first.'; err.style.display = 'block'; return; }
     if (!confirm('Mark ' + chosen.length + ' animal' + (chosen.length === 1 ? '' : 's') + ' as done WITHOUT sending to the Admission AA?')) return;
+    logVaccinations(chosen);
     const gone = new Set(chosen.map(vaccKey));
     VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
     VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));
@@ -1529,7 +1530,8 @@
     if (error) { err.textContent = 'Could not send: ' + error.message; err.style.display = 'block'; return; }
     OpsCore.toast();
     const gone = new Set(chosen.map(vaccKey));
-    VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
+    logVaccinations(chosen);   // only once the send has gone through
+        VACC.sent = VACC.sent.concat(chosen.map(vaccKey));
     VACC.animals = VACC.animals.filter(a => !gone.has(vaccKey(a)));
     vaccPicked.clear(); vaccPush(); renderVacc();
     const ok = document.getElementById('vacc-count'); ok.textContent = 'Sent ' + chosen.length + ' to the Admission AA \u2713 \u00b7 ' + VACC.animals.length + ' still due';
@@ -1558,6 +1560,7 @@
 
   /* ---- What the nurse team has done: today's ring + the daily average for the week / month / quarter / year ---- */
   let NURSE_COUNTS = null;   // null = the database function is not there yet
+  let VACC_COUNTS = null;    // vaccinations given by the nurses, per day
   async function loadNurseCounts() {
     try {
       const since = LDHLogic.localISO(LDHLogic.statsSince(Date.now()));
@@ -1568,6 +1571,8 @@
         sb.rpc('nurse_daily_counts', { p_since: todayKey })
       ]);
       const norm = r => ({ day: String(r.day).slice(0, 10), role: r.role, n: Number(r.n) });
+      const vc = await sb.rpc('nurse_vacc_counts', { p_since: since });
+      VACC_COUNTS = vc.error ? null : (vc.data || []).map(r => ({ day: String(r.day).slice(0, 10), n: Number(r.n) }));
       if (hist.error || fresh.error) NURSE_COUNTS = null;
       else NURSE_COUNTS = (hist.data || []).map(norm).filter(r => r.day < todayKey).concat((fresh.data || []).map(norm).filter(r => r.day >= todayKey));
     } catch (e) { NURSE_COUNTS = null; }
@@ -1601,7 +1606,26 @@
           ${PERIODS.map(([k, label]) => `<tr data-period="${k}"><td>${label}</td><td style="text-align:right;"><b>${o[k].total}</b></td><td style="text-align:right;"><b>${o[k].avg}</b></td></tr>`).join('')}
         </table>
       </div>`;
-    }).join('');
+    }).join('') + vaccStatsHtml();
+  }
+  function vaccStatsHtml() {
+    if (!VACC_COUNTS) return '';
+    const o = LDHLogic.countStats(VACC_COUNTS, Date.now());
+    return `<div data-role="vaccinations" style="border:1px solid var(--border); border-radius:14px; padding:14px;">
+      <h3 style="margin:0 0 6px; font-size:0.95rem;">Vaccinations given</h3>
+      <p style="font-size:2rem; font-weight:800; margin:0;">${o.today} <span style="font-size:.8rem; opacity:.7;">today</span></p>
+      <table style="width:100%; margin-top:10px; font-size:0.85rem; border-collapse:collapse;">
+        <tr style="opacity:.7;"><th style="text-align:left;">&nbsp;</th><th style="text-align:right;">Given</th><th style="text-align:right;">Avg / day</th></tr>
+        ${[['week', 'This week'], ['month', 'This month'], ['quarter', 'This season'], ['year', 'This year']].map(([k, label]) => `<tr data-period="${k}"><td>${label}</td><td style="text-align:right;"><b>${o[k].total}</b></td><td style="text-align:right;"><b>${o[k].avg}</b></td></tr>`).join('')}
+      </table>
+      <p style="font-size:.75rem; opacity:.7; margin:8px 0 0;">From the Vaccinations due list (marked done or sent to the Admission AA) and finished Vaccination requests.</p>
+    </div>`;
+  }
+  // each animal ticked off the Report 7 list is logged once a day (the list itself is cleared after 3 days)
+  function logVaccinations(animals) {
+    const rows = animals.map(a => ({ animal_id: String(a.id || '').trim() })).filter(r => r.animal_id);
+    if (!rows.length) return;
+    sb.from('nurse_vacc_log').upsert(rows, { onConflict: 'animal_id,given_on', ignoreDuplicates: true }).then(() => loadNurseCounts().then(renderNurseStats), () => {});
   }
   let BF = null;   // the Behaviour team's plans for what the nurses asked
   // The Behaviour team ticked one of our tasks Done: same banner, sound and tab flash as a new task.
