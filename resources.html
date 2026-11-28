@@ -1,0 +1,328 @@
+<!doctype html>
+<!--
+  ============================================================
+  LDH Shift Ops Dashboard
+  Copyright (c) 2026 Juliana Xue. All rights reserved.
+
+  This work is the intellectual property of Juliana Xue.
+  It is licensed to her current employer for use ONLY for as
+  long as she remains engaged there; that right of use ends
+  automatically when her engagement ends.
+
+  Except for that limited employer use-licence, no part of
+  this work may be copied, modified, distributed, or used
+  without the express written permission of Juliana Xue.
+  ============================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resources — LDH Shift Ops</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="lib/ldh-logic.js?v=20261127a"></script>
+<script src="lib/ops-core.js?v=20261128a"></script>
+<style>
+  /* 2026-09-19 theme redesign: flat, modern light theme — white cards with
+     crisp borders and a soft drop shadow, replacing the earlier neumorphic
+     soft-UI look (same-color raised/inset shadows on a single background
+     tone). Accent hues (amber/blue/green/critical) are unchanged from
+     before — only how surfaces render changed, not the color coding. */
+  :root {
+    --bg: #F4F6FB;
+    --card-bg: #FFFFFF;
+    --sidebar: #1E2238;
+    --sidebar-border: #1E2238;
+    --sidebar-text-muted: #9BA0BC;
+    --amber: #FF9F43;
+    --blue: #4A6CF7;
+    --violet: #8C62FF;
+    --green: #229A63;
+    --light-blue: #93C5FD;
+    --donut-teal: #4FC1D6;
+    --donut-track: #E5E7EB;
+    --ink: #1E2238;
+    --muted: #6B7280;
+    --muted-light: #9CA3AF;
+    --critical: #D03B3B;
+    --neutral-100: #F3F2EF;
+    --neutral-300: #D8D6CE;
+    --neutral-500: #9C9A90;
+    --border: rgba(30,34,56,0.10);
+    --shadow-card: 0 2px 6px rgba(30,34,56,0.06), 0 1px 2px rgba(30,34,56,0.05);
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 15px; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+
+  /* Login gate — shown before anything else; nothing is fetched until a
+     session exists (spec: "no data until a valid session exists"). */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  #login-card {
+    background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card);
+    padding: 32px; width: 320px;
+  }
+  #login-card h1 { font-size: 1.2rem; margin: 0 0 6px; }
+  #login-card p { font-size: 0.85rem; color: var(--muted); margin: 0 0 20px; }
+  #login-error { color: var(--critical); font-size: 0.82rem; margin: -6px 0 10px; display: none; }
+
+  .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh); }
+  aside { background: var(--sidebar); color: #fff; padding: 24px 18px; border-right: 1px solid var(--sidebar-border); }
+  aside h2 { font-size: 1.05rem; margin: 0 0 20px; letter-spacing: 0.01em; color: #fff; }
+  aside label {
+    display: block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--sidebar-text-muted); margin-bottom: 8px;
+  }
+  aside select { width: 100%; background: #2A2F4A; color: #fff; border: none; box-shadow: none; margin-bottom: 24px; font-size: 0.9rem; }
+  aside p.hint { font-size: 0.78rem; line-height: 1.6; color: var(--sidebar-text-muted); margin: 0; }
+  aside #signout-link { display: inline-block; margin-top: 14px; font-size: 0.78rem; color: var(--sidebar-text-muted); cursor: pointer; text-decoration: underline; }
+  main { padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { margin: 0 0 4px; font-size: 1.3rem; }
+  .page-head p { margin: 0; font-size: 0.85rem; color: var(--muted); }
+  #search-box {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 16px;
+    background: var(--card-bg); font: inherit; font-size: 0.85rem; width: 220px;
+  }
+  .card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); box-shadow: var(--shadow-card); padding: 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 0.95rem; }
+  .card p.subtle { font-size: 0.78rem; color: var(--muted); margin: -8px 0 14px; }
+  input, select, textarea {
+    border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px;
+    background: var(--card-bg); font: inherit; font-size: 0.9rem; color: var(--ink); width: 100%; margin-bottom: 10px;
+  }
+  button {
+    border: none; border-radius: 12px; padding: 10px 18px; background: var(--amber); color: var(--ink);
+    font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer;
+  }
+  button.secondary { background: var(--card-bg); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
+  button:disabled { opacity: 0.6; cursor: default; }
+
+  /* Top KPI row — completion donut and the 3 shift cards as 4 equal,
+     same-weight columns, instead of the donut sitting alone in its own
+     full-width row above them. */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .completion-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 20px 16px; }
+  .completion-donut {
+    width: 110px; height: 110px; position: relative;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+  }
+  .completion-donut svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .completion-donut .val { position: relative; font-size: 1.5rem; font-weight: 700; }
+  .completion-donut .lbl { position: relative; font-size: 0.62rem; color: var(--muted); letter-spacing: 0.04em; }
+  .completion-side { font-size: 0.78rem; color: var(--muted); }
+  .completion-side b { display: block; font-size: 1.1rem; color: var(--ink); }
+
+  /* Two-column dashboard body — wider main column for the case queues,
+     narrower side rail for completed/memos, instead of every section
+     stacked full-width one after another. */
+  .dashboard-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+  .main-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .side-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; align-items: start; min-width: 0; }
+
+  .shift-card .totals { font-size: 1.6rem; font-weight: 700; margin: 4px 0 10px; }
+  .shift-card .totals span { font-size: 0.9rem; font-weight: 400; color: var(--muted); }
+  .bar-track { height: 10px; border-radius: 6px; background: var(--neutral-100); overflow: hidden; margin-bottom: 10px; }
+  .bar-fill { height: 100%; border-radius: 6px; }
+  .shift-card .onshift { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .shift-card .shift-icon {
+    float: right; width: 30px; height: 30px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: 0.95rem; color: #fff;
+  }
+  .chip {
+    display: inline-block; padding: 5px 12px; border-radius: 12px; background: var(--card-bg); border: 1px solid var(--border);
+    margin: 2px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+  }
+  .roster-add-row { display: flex; gap: 6px; margin-top: 8px; }
+  .roster-add-row input { margin: 0; }
+  .roster-add-row button { padding: 8px 12px; font-size: 0.75rem; white-space: nowrap; }
+
+  table.queue-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.queue-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 0 10px 10px; }
+  table.queue-table td { padding: 10px; border-top: 1px solid rgba(30,34,56,0.06); }
+  table.queue-table tr:first-child td { border-top: none; }
+  .row-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  .lvl { font-size: 0.68rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .lvl-ok { background: rgba(34,154,99,0.12); color: var(--green); }
+  .lvl-amber { background: rgba(255,159,67,0.22); color: #9a5b00; }
+  .lvl-red { background: rgba(208,59,59,0.14); color: var(--critical); }
+  .lvl-seen, .lvl-done { background: rgba(107,114,128,0.14); color: var(--muted); }
+  .nr-form, .nt-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; align-items: end; }
+  .nr-form label, .nt-form label { font-size: 0.72rem; font-weight: 700; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; }
+  .empty-state { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .completed-row {
+    display: flex; justify-content: space-between; gap: 12px; font-size: 0.85rem;
+    padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06);
+  }
+  .completed-row:last-child { border-bottom: none; }
+  .completed-row .time { color: var(--muted-light); white-space: nowrap; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .shift-launch { flex: 1 1 170px; text-decoration: none; color: var(--ink); background: var(--amber); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .shift-launch b { font-size: 0.95rem; }
+  .shift-launch span { font-size: 0.75rem; opacity: 0.8; }
+  .filter-chip {
+    border: 1px solid var(--border); border-radius: 12px; padding: 7px 14px; background: var(--card-bg);
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .filter-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .urgency-col { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 14px; }
+  .urgency-col h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .attn-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(30,34,56,0.06); gap: 8px; }
+  .attn-item:last-child { border-bottom: none; }
+  .nt-loc-h { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); margin: 12px 0 2px; }
+  .nt-h { font-size: 0.85rem; font-weight: 700; margin: 14px 0 0; }
+  .nt-h.overdue { color: var(--critical); }
+  .attn-item .aname { font-size: 0.95rem; font-weight: 600; }
+  .attn-item .ameta { font-size: 0.78rem; line-height: 1.45; color: var(--muted); }
+  .urgency-col .attn-item { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 0; }
+  .urgency-col .attn-item .ameta { margin-top: 2px; }
+  .attn-item .pickup-check { width: 18px; height: 18px; margin: 0; padding: 0; flex: none; }
+  .attn-item button.mark-done { padding: 5px 10px; font-size: 0.72rem; }
+
+  #memo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .memo { background: #fff; border: 1px solid rgba(30,34,56,0.08); border-radius: 14px; padding: 12px 16px; font-size: 0.88rem; line-height: 1.5; }
+  .memo strong { font-weight: 700; }
+  #memo-post textarea { min-height: 60px; }
+
+  .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .totals-period { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+  .totals-period h3 { margin: 0 0 10px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .totals-period .row { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 3px 0; }
+  .totals-period .row b { font-weight: 700; }
+  .totals-period .row.grand { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; font-weight: 700; }
+  @media (max-width: 700px) { .totals-grid { grid-template-columns: 1fr; } }
+
+  .chart-controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 4px 0 12px; }
+  .seg { display: inline-flex; border: 2px solid var(--border, #d6d9e0); border-radius: 12px; overflow: hidden; }
+  .seg-b { width: auto; margin: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; color: var(--ink, #222); padding: 7px 16px; font-weight: 600; cursor: pointer; }
+  .seg-b.on { background: #2a78d6; color: #fff; }
+  .tc-svg { width: 100%; height: auto; display: block; }
+  .tc-grid { stroke: rgba(30,34,56,0.1); stroke-width: 1; }
+  .tc-ax { font-size: 11px; fill: #52514e; }
+  .tc-legend { display: flex; gap: 8px 18px; flex-wrap: wrap; margin: 6px 0 4px; font-size: 0.82rem; }
+  .tc-key i { display: inline-block; width: 16px; height: 4px; border-radius: 2px; margin-right: 6px; vertical-align: middle; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .tc-cross { stroke: rgba(30,34,56,0.35); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
+  .tc-tip { position: absolute; z-index: 400; display: none; pointer-events: none; background: #1e2238; color: #fff; font-size: 0.78rem; padding: 8px 12px; border-radius: 10px; min-width: 150px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
+  .tc-tip b { display: block; margin-bottom: 4px; }
+  .tc-tip div { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+  .tc-tip i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+  .tc-tip span { margin-left: auto; padding-left: 14px; font-weight: 700; }
+  .tc-tip .tc-tip-total { border-top: 1px solid rgba(255,255,255,0.25); margin-top: 4px; padding-top: 4px; }
+  .tc-key-total { color: #52514e; }
+  @media print { .tc-tip { display: none !important; } }
+  .tc-note { font-size: 0.72rem; color: #52514e; text-align: right; }
+  .tc-table { margin-top: 6px; font-size: 0.78rem; }
+  .tc-table summary { cursor: pointer; color: #52514e; }
+  .tc-scroll { overflow: auto; max-height: 280px; }
+  .tc-table tfoot th, .tc-table tfoot td { font-weight: 700; border-top: 2px solid rgba(30,34,56,0.25); }
+  .tc-table table { border-collapse: collapse; } .tc-table th, .tc-table td { padding: 3px 10px; text-align: right; border-top: 1px solid rgba(30,34,56,0.08); } .tc-table th:first-child { text-align: left; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .chart-legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  @media (max-width: 1000px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .dashboard-body { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .kpi-row { grid-template-columns: 1fr; }
+  }
+  /* phones and tablets: 16px fields (no iPhone zoom) and finger-sized links and buttons */
+  @media (pointer: coarse), (max-width: 800px) { select, textarea, input:not([type=checkbox]):not([type=radio]):not([type=file]) { font-size: 16px; } }
+  @media (pointer: coarse) { aside a { display: inline-block; padding: 12px 0; min-width: 44px; } button { min-height: 40px; } }
+  .print-only { display: none; }
+  @media print {
+    @page { size: A4; margin: 12mm; }
+    body { background: #fff; }
+    aside, .no-print, #period-totals, #surgery-breakdown, #response-rate-section { display: none !important; }
+    .layout { display: block !important; }
+    main { padding: 0 !important; }
+    .print-only { display: block !important; }
+    .card { box-shadow: none !important; border: none !important; padding: 0 !important; }
+    .heat-tile, table { break-inside: avoid; }
+    .heat-tile { border: 1px solid #ccc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-head, #surveillance-section > h2 { display: none !important; }
+    h3 { break-after: avoid; page-break-after: avoid; }
+    table.heat-rooms { break-inside: auto; }
+    .heat-rooms tr { break-inside: avoid; }
+  }
+
+  .doc { display:flex; align-items:center; gap:14px; width:100%; text-align:left; background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:16px 18px; font:inherit; font-weight:700; color:var(--ink); cursor:pointer; box-shadow:var(--shadow-card); }
+  .doc i { font-style:normal; font-size:1.5rem; } .doc:hover { border-color:rgba(74,108,247,.55); }
+  #doc-list { display:flex; flex-direction:column; gap:10px; max-width:720px; }
+  #viewer { display:none; flex-direction:column; gap:10px; min-height:0; }
+  #viewer .bar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; } #viewer h2 { margin:0; font-size:1.05rem; }
+  #viewer button { border:1px solid var(--border); background:var(--card-bg); border-radius:10px; padding:9px 14px; font:inherit; font-weight:700; cursor:pointer; color:var(--ink); }
+  #frame { width:100%; height:calc(100vh - 110px); min-height:520px; border:1px solid var(--border); border-radius:14px; background:#fff; }
+  @media (max-width:800px) { main { padding:14px; } #frame { height:82vh; } }
+</style>
+</head>
+<body>
+
+<div class="layout" id="app-root" style="display:none;">
+  <aside>
+    <h2>LDH Shift Ops</h2>
+    <div id="ops-nav" style="margin-bottom:18px;"></div>
+    <p class="hint">Resources for shift staff. Open a document to use it.</p>
+    <a id="signout-link">Sign out</a>
+  </aside>
+  <main>
+    <div id="list-view">
+      <div class="page-head"><div><h1>Resources</h1><p>Click a document to open it.</p></div></div>
+      <div id="doc-list"></div>
+    </div>
+    <div id="viewer">
+      <div class="bar"><button type="button" id="back">&larr; All resources</button><h2 id="doc-title"></h2></div>
+      <!-- the document runs sealed off from the dashboard: it can run its own buttons but cannot reach the sign-in or any data -->
+      <iframe id="frame" sandbox="allow-scripts" title="Resource document"></iframe>
+    </div>
+  </main>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let sb, DOCS = [];
+  function showList(msg) {
+    $('viewer').style.display = 'none'; $('frame').removeAttribute('srcdoc'); $('list-view').style.display = '';
+    $('doc-list').innerHTML = msg ? '<p>' + esc(msg) + '</p>'
+      : DOCS.map(d => '<button type="button" class="doc" data-slug="' + esc(d.slug) + '"><i>&#128196;</i><span>' + esc(d.title) + '</span></button>').join('') || '<p>No documents yet.</p>';
+  }
+  async function openDoc(slug) {
+    const d = DOCS.find(x => x.slug === slug); if (!d) return showList();
+    const { data, error } = await sb.from('resources').select('body').eq('slug', slug).limit(1);   // the contents are read only when opened
+    if (error || !data || !data.length) return showList('That document could not be opened. Check the connection and try again.');
+    $('list-view').style.display = 'none'; $('viewer').style.display = 'flex'; $('doc-title').textContent = d.title;
+    $('frame').srcdoc = data[0].body;
+  }
+  function route() { const slug = decodeURIComponent(location.hash.slice(1)); if (slug) openDoc(slug); else showList(); }
+  (async function () {
+    ({ sb } = await OpsCore.init({ page: 'resources' }));
+    $('app-root').style.display = 'grid';
+    $('signout-link').addEventListener('click', async () => { await sb.auth.signOut(); location.reload(); });
+    $('doc-list').addEventListener('click', e => { const b = e.target.closest('[data-slug]'); if (b) location.hash = encodeURIComponent(b.dataset.slug); });
+    $('back').addEventListener('click', () => { location.hash = ''; });
+    window.addEventListener('hashchange', route);
+    const { data, error } = await sb.from('resources').select('slug,title').order('sort', { ascending: true });
+    if (error) return showList('The resources could not be loaded. If this is new, the database update has to be run first.');
+    DOCS = data || []; route();
+  })();
+})();
+</script>
+</body>
+</html>
